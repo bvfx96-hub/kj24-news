@@ -1,0 +1,4054 @@
+require("dotenv").config();
+
+const crypto = require("crypto");
+const cors = require("cors");
+const cron = require("node-cron");
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const { XMLParser } = require("fast-xml-parser");
+const { MongoClient, ObjectId } = require("mongodb");
+
+const PORT = Number(process.env.PORT || 3000);
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
+const MONGODB_DB = process.env.MONGODB_DB || "khabri_junction";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
+const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+const NEWS_COLLECTION = "news";
+const ADS_COLLECTION = "ads";
+const MANUAL_NEWS_COLLECTION = "manual_news";
+const NEWS_ANALYTICS_COLLECTION = "news_analytics";
+const SETTINGS_COLLECTION = "settings";
+const DEFAULT_AUTOMATION_QUERY = process.env.GOOGLE_NEWS_QUERY || "Chhattisgarh Durg Bhilai Raipur Bilaspur sports astrology";
+const AUTOMATION_INTERVAL_MINUTES = 30;
+const AUTOMATION_CRON_EXPRESSION = "*/30 * * * *";
+const NEWS_FRESHNESS_HOURS = 12;
+const NEWS_FRESHNESS_WINDOW_MS = NEWS_FRESHNESS_HOURS * 60 * 60 * 1000;
+const RSS_FETCH_RETRY_COUNT = 3;
+const AUTOMATION_STUCK_MS = 20 * 60 * 1000;
+const SITE_URL = (process.env.SITE_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+const DEFAULT_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=1200&auto=format&fit=crop";
+const THUMBNAIL_WIDTH = 1200;
+const THUMBNAIL_HEIGHT = 675;
+const MIN_SOURCE_IMAGE_LENGTH = 18;
+const CATEGORY_DEFINITIONS = [
+  { label: "Raipur Promotion", slug: "raipur-promotion", page: "raipur-promotion-news", badge: "RAIPUR PROMO", keywords: ["raipur promotion", "promotion", "brand promotion", "sponsored", "advertorial"] },
+  { label: "Market", slug: "market", page: "market-news", badge: "MARKET", keywords: ["market", "sensex", "nifty", "stock", "share market", "business", "trading"] },
+  { label: "Weather", slug: "weather", page: "weather-update", badge: "WEATHER", keywords: ["weather", "temperature", "rain", "heat", "cold", "mausam"] },
+  { label: "Viral Videos", slug: "viral-videos", page: "viral-videos", badge: "VIRAL", keywords: ["viral", "video", "reel", "youtube", "shorts", "trending reel"] },
+  { label: "Local News", slug: "local-news", page: "local-news", badge: "LOCAL", keywords: ["local", "district", "city", "ward", "nagar", "local news"] },
+  { label: "MP Shahdol", slug: "mp-shahdol", page: "mp-shahdol-news", badge: "SHAHDOL", keywords: ["shahdol", "mp shahdol", "madhya pradesh shahdol"] },
+  { label: "World", slug: "world", page: "desh-duniya-news", badge: "WORLD", keywords: ["world", "global", "international", "desh duniya", "foreign"] },
+  { label: "Sports", slug: "sports", page: "sports.html", badge: "SPORTS", keywords: ["ipl", "cricket", "football", "match", "tournament", "sports", "score", "team", "league"] },
+  { label: "Astrology", slug: "astrology", page: "astrology.html", badge: "ASTROLOGY", keywords: ["rashifal", "astrology", "horoscope", "zodiac", "panchang"] },
+  { label: "Crime", slug: "crime", page: "crime.html", badge: "CRIME", keywords: ["murder", "police", "theft", "crime", "arrest", "fraud", "case", "fir"] },
+  { label: "Politics", slug: "politics", page: "politics.html", badge: "POLITICS", keywords: ["government", "minister", "election", "politics", "cabinet", "vidhan", "bjp", "congress"] },
+  { label: "Entertainment", slug: "entertainment", page: "entertainment.html", badge: "ENTERTAINMENT", keywords: ["film", "movie", "cinema", "actor", "actress", "bollywood", "ott", "entertainment"] },
+  { label: "Health", slug: "health", page: "health.html", badge: "HEALTH", keywords: ["health", "hospital", "doctor", "medical", "clinic", "patient", "medicine"] },
+  { label: "Jobs", slug: "jobs", page: "jobs.html", badge: "JOBS", keywords: ["job", "jobs", "recruitment", "vacancy", "exam", "result", "career", "rojgar"] },
+  { label: "Durg", slug: "durg", page: "durg.html", badge: "DURG", keywords: ["durg"] },
+  { label: "Bhilai", slug: "bhilai", page: "bhilai.html", badge: "BHILAI", keywords: ["bhilai"] },
+  { label: "Raipur", slug: "raipur", page: "raipur.html", badge: "RAIPUR", keywords: ["raipur"] },
+  { label: "Bilaspur", slug: "bilaspur", page: "bilaspur.html", badge: "BILASPUR", keywords: ["bilaspur"] },
+  { label: "Kawardha", slug: "kawardha", page: "kawardha.html", badge: "KAWARDHA", keywords: ["kawardha", "kabirdham"] },
+  { label: "Khairagarh", slug: "khairagarh", page: "khairagarh.html", badge: "KHAIRAGARH", keywords: ["khairagarh"] },
+  { label: "Rajnandgaon", slug: "rajnandgaon", page: "rajnandgaon.html", badge: "RAJNANDGAON", keywords: ["rajnandgaon"] },
+  { label: "Breaking", slug: "breaking", page: "breaking.html", badge: "BREAKING", keywords: ["breaking", "latest", "alert", "big news", "urgent"] }
+];
+const CLEAN_CATEGORY_ROUTES = [
+  { path: "/raipur-news", title: "Raipur News", category: "Raipur", description: "रायपुर की ताजा खबरें, अपडेट और लोकल रिपोर्ट।" },
+  { path: "/raipur-promotion-news", title: "Raipur Promotion News", category: "Raipur Promotion", description: "रायपुर प्रमोशन, ब्रांड अपडेट और स्पॉन्सर्ड लोकल खबरें।" },
+  { path: "/market-news", title: "Market News", category: "Market", description: "शेयर मार्केट, बिजनेस और बाजार अपडेट।" },
+  { path: "/weather-update", title: "Weather Update", category: "Weather", description: "दुर्ग, भिलाई और रायपुर का मौसम अपडेट।" },
+  { path: "/viral-videos", title: "Viral Reels / Viral Videos", category: "Viral Videos", description: "वायरल वीडियो, यूट्यूब रील और ट्रेंडिंग लोकल क्लिप।" },
+  { path: "/local-news", title: "Local News", category: "Local News", description: "छत्तीसगढ़ की लोकल और जिला खबरें।" },
+  { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "मध्य प्रदेश शहडोल की ताजा खबरें।" },
+  { path: "/desh-duniya-news", title: "देश-दुनिया की खबर", category: "World", description: "देश-दुनिया, अंतरराष्ट्रीय अपडेट और ग्लोबल खबरें।" }
+];
+const CITY_DEFINITIONS = [
+  { label: "Durg", slug: "durg", keywords: ["durg"] },
+  { label: "Bhilai", slug: "bhilai", keywords: ["bhilai"] },
+  { label: "Raipur", slug: "raipur", keywords: ["raipur"] },
+  { label: "Bilaspur", slug: "bilaspur", keywords: ["bilaspur"] },
+  { label: "Rajnandgaon", slug: "rajnandgaon", keywords: ["rajnandgaon"] },
+  { label: "Kawardha", slug: "kawardha", keywords: ["kawardha", "kabirdham"] },
+  { label: "Khairagarh", slug: "khairagarh", keywords: ["khairagarh"] }
+];
+const CG_LOCAL_NEWS_SOURCES = [
+  { name: "Haribhoomi Chhattisgarh", query: "Chhattisgarh latest site:haribhoomi.com", priority: 1 },
+  { name: "Patrika Chhattisgarh", query: "Chhattisgarh latest site:patrika.com", priority: 1 },
+  { name: "Dainik Bhaskar Chhattisgarh", query: "Chhattisgarh latest site:bhaskar.com/local/chhattisgarh", priority: 1 },
+  { name: "Amar Ujala Chhattisgarh", query: "Chhattisgarh latest site:amarujala.com/chhattisgarh", priority: 1 },
+  { name: "Navbharat CG", query: "Chhattisgarh latest site:navbharatlive.com/chhattisgarh", priority: 1 },
+  { name: "Deshbandhu", query: "Chhattisgarh latest site:deshbandhu.co.in", priority: 1 },
+  { name: "Lalluram", query: "Chhattisgarh latest site:lalluram.com", priority: 1 },
+  { name: "CGWALL", query: "Chhattisgarh latest site:cgwall.com OR site:cgwall.in", priority: 1 },
+  { name: "The Hitavada Raipur", query: "Raipur Chhattisgarh latest site:thehitavada.com", priority: 1 },
+  { name: "News18 Chhattisgarh", query: "Chhattisgarh latest site:hindi.news18.com/news/chhattisgarh", priority: 1 },
+  { name: "Zee MPCG", query: "Chhattisgarh latest site:zeenews.india.com/hindi/india/madhya-pradesh-chhattisgarh", priority: 1 },
+  { name: "ETV Bharat Chhattisgarh", query: "Chhattisgarh latest site:etvbharat.com", priority: 1 },
+  { name: "TV9 Chhattisgarh", query: "Chhattisgarh latest site:tv9hindi.com/state/chhattisgarh", priority: 1 },
+  { name: "Swadesh CG", query: "Chhattisgarh latest site:swadeshnews.in OR site:swadesh.in", priority: 1 },
+  { name: "Dainik Chhattisgarh", query: "Chhattisgarh latest site:dailychhattisgarh.com", priority: 1 },
+  { name: "Raipur Local Portals", query: "Raipur local news Chhattisgarh latest", priority: 2 },
+  { name: "Bhilai Durg Local Portals", query: "Bhilai Durg local news Chhattisgarh latest", priority: 2 }
+];
+const DISTRICT_NEWS_SOURCES = CITY_DEFINITIONS.map((city) => ({
+  name: `${city.label} District Feed`,
+  query: `${city.label} Chhattisgarh latest news`,
+  priority: 2,
+  district: city.slug
+}));
+const NATIONAL_FALLBACK_NEWS_SOURCES = [
+  { name: "Google Hindi Chhattisgarh Fallback", query: "Chhattisgarh latest Hindi news", priority: 4 },
+  { name: "National Hindi Chhattisgarh Fallback", query: "Chhattisgarh breaking news Hindi", priority: 4 }
+];
+const CG_RELEVANCE_TERMS = [
+  "chhattisgarh", "cg", "raipur", "durg", "bhilai", "bilaspur", "rajnandgaon", "kawardha", "kabirdham", "khairagarh",
+  "bastar", "surguja", "korba", "raigarh", "jashpur", "kanker", "kondagaon", "sukma", "bijapur", "dhamtari",
+  "mahasamund", "balod", "bemetara", "mungeli", "gariaband", "balrampur", "janjgir", "ambikapur", "dantewada"
+];
+const MIN_LOCAL_ITEMS_BEFORE_FALLBACK = 4;
+const MAX_ITEMS_PER_SOURCE_PER_RUN = 2;
+
+const app = express();
+const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
+
+let newsCollection;
+let adsCollection;
+let manualNewsCollection;
+let newsAnalyticsCollection;
+let settingsCollection;
+let mongoReady = false;
+let mongoError = null;
+let automationRunning = false;
+let automationTask;
+
+app.use(cors({ origin: true, credentials: false }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.static(__dirname));
+
+app.get("/favicon.ico", (req, res) => {
+  res.type("png").sendFile(`${__dirname}/assets/logo-kj.png`);
+});
+
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeBoolean(value) {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function slugText(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toSlug(value) {
+  return slugText(value)
+    .replace(/\s+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 90) || "news-update";
+}
+
+function hashValue(value) {
+  return crypto.createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parseDateCandidate(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "object") {
+    return parseDateCandidate(value["#text"] || value["@_datetime"] || value["@_content"] || value["@_date"]);
+  }
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function findDateCandidate(value, depth = 0) {
+  if (!value || depth > 3 || typeof value !== "object") {
+    return null;
+  }
+
+  const directKeys = ["pubDate", "isoDate", "published", "updated", "datePublished", "dateCreated", "dc:date", "atom:updated"];
+
+  for (const key of directKeys) {
+    const parsed = parseDateCandidate(value[key]);
+
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  for (const [key, nested] of Object.entries(value)) {
+    if (/date|published|updated/i.test(key)) {
+      const parsed = parseDateCandidate(nested);
+
+      if (parsed) {
+        return parsed;
+      }
+    }
+  }
+
+  for (const nested of Object.values(value)) {
+    const parsed = findDateCandidate(nested, depth + 1);
+
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function freshnessInfo(publishedAt, now = new Date()) {
+  const sourcePublishedAt = parseDateCandidate(publishedAt);
+
+  if (!sourcePublishedAt) {
+    return {
+      isFresh: false,
+      score: 0,
+      ageHours: null,
+      reason: "missing publish date"
+    };
+  }
+
+  const ageMs = now.getTime() - sourcePublishedAt.getTime();
+
+  if (ageMs < -10 * 60 * 1000) {
+    return {
+      isFresh: false,
+      score: 0,
+      ageHours: 0,
+      reason: "publish date is in the future"
+    };
+  }
+
+  const ageHours = Math.max(0, ageMs / (60 * 60 * 1000));
+
+  if (ageMs > NEWS_FRESHNESS_WINDOW_MS) {
+    return {
+      isFresh: false,
+      score: 0,
+      ageHours,
+      reason: `older than ${NEWS_FRESHNESS_HOURS} hours`
+    };
+  }
+
+  return {
+    isFresh: true,
+    score: Math.max(1, Math.round(100 - (ageMs / NEWS_FRESHNESS_WINDOW_MS) * 100)),
+    ageHours,
+    reason: ""
+  };
+}
+
+function normalizeSourceUrl(value) {
+  return normalizeText(value).replace(/\/+$/u, "").toLowerCase();
+}
+
+function sourceHashFromUrl(value) {
+  const normalized = normalizeSourceUrl(value);
+  return normalized ? hashValue(normalized) : "";
+}
+
+function sourceHashForItem(item) {
+  return normalizeText(item?.sourceHash) || sourceHashFromUrl(item?.sourceUrl);
+}
+
+function formatIST(value) {
+  const date = parseDateCandidate(value);
+
+  if (!date) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  }).format(date);
+}
+
+function nextScheduledRunDate(intervalMinutes = AUTOMATION_INTERVAL_MINUTES, from = new Date()) {
+  const intervalMs = Math.max(1, Number(intervalMinutes || AUTOMATION_INTERVAL_MINUTES)) * 60 * 1000;
+  const next = Math.ceil((from.getTime() + 1000) / intervalMs) * intervalMs;
+  return new Date(next);
+}
+
+function stripHTML(value) {
+  return normalizeText(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
+}
+
+function firstArrayItem(value) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function extractImageUrlFromValue(value) {
+  const item = firstArrayItem(value);
+
+  if (!item) {
+    return "";
+  }
+
+  if (typeof item === "string") {
+    const imgMatch = item.match(/<img[^>]+src=["']([^"']+)["']/i);
+    return normalizeText(imgMatch?.[1] || item);
+  }
+
+  if (typeof item === "object") {
+    return normalizeText(item["@_url"] || item["@_href"] || item.url || item.href || item.link || item["#text"]);
+  }
+
+  return "";
+}
+
+function extractRssImage(item = {}) {
+  const candidates = [
+    item["media:content"],
+    item["media:thumbnail"],
+    item.enclosure,
+    item.image?.url,
+    item.image,
+    item["itunes:image"],
+    item["content:encoded"],
+    item.description
+  ];
+
+  for (const candidate of candidates) {
+    const url = extractImageUrlFromValue(candidate);
+
+    if (url && !isLikelyLowQualityImage(url)) {
+      return url;
+    }
+  }
+
+  return "";
+}
+
+function extractImageFromHtml(html) {
+  const text = String(html || "");
+  const patterns = [
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<img[^>]+src=["']([^"']+)["']/i
+  ];
+
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    const url = normalizeText(match?.[1]);
+
+    if (url && !isLikelyLowQualityImage(url)) {
+      return url;
+    }
+  }
+
+  return "";
+}
+
+async function fetchSourceImageFromPage(url) {
+  const sourceUrl = normalizeText(url);
+
+  if (!sourceUrl || /news\.google\.com/i.test(sourceUrl)) {
+    return "";
+  }
+
+  try {
+    const response = await fetch(sourceUrl, {
+      headers: {
+        "User-Agent": "KhabriJunctionBot/1.0"
+      },
+      signal: AbortSignal.timeout(4500)
+    });
+
+    if (!response.ok) {
+      return "";
+    }
+
+    return extractImageFromHtml(await response.text());
+  } catch (error) {
+    return "";
+  }
+}
+
+function splitThumbnailTitle(value, maxLength = 28, maxLines = 4) {
+  const title = normalizeText(typeof value === "object" ? value.title : value || "Khabri Junction News");
+  const words = title.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+    const nextLine = `${line} ${word}`.trim();
+
+    if (nextLine.length > maxLength && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = nextLine;
+    }
+
+    if (lines.length === maxLines - 1) {
+      break;
+    }
+  }
+
+  if (line && lines.length < maxLines) {
+    lines.push(line);
+  }
+
+  return lines.slice(0, maxLines);
+}
+
+function thumbnailPalette(input = {}) {
+  const category = toSlug(input.categorySlug || input.category || input.categoryBadge || "");
+  const palettes = {
+    sports: ["#0b3b2e", "#138a36", "#f7c948"],
+    politics: ["#1f2937", "#b91c1c", "#ffffff"],
+    crime: ["#111827", "#7f1d1d", "#fca5a5"],
+    entertainment: ["#2d1b69", "#d946ef", "#fef3c7"],
+    health: ["#064e3b", "#10b981", "#d1fae5"],
+    astrology: ["#1e1b4b", "#7c3aed", "#fde68a"],
+    jobs: ["#0f172a", "#2563eb", "#dbeafe"],
+    breaking: ["#101820", "#e1081b", "#ffffff"]
+  };
+
+  if (["durg", "bhilai", "raipur", "bilaspur", "rajnandgaon", "kawardha", "khairagarh"].includes(category) || input.city) {
+    return ["#111827", "#c1121f", "#fff7ed"];
+  }
+
+  return palettes[category] || palettes.breaking;
+}
+
+function thumbnailBadges(input = {}) {
+  return Array.from(new Set([
+    normalizeText(input.categoryBadge || input.category || "NEWS").toUpperCase(),
+    normalizeText(input.city || input.districtHint).toUpperCase()
+  ].filter(Boolean)));
+}
+
+function svgDataUrl(svg) {
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+function isLikelyLowQualityImage(value) {
+  const url = normalizeText(value);
+
+  if (!url || url.length < MIN_SOURCE_IMAGE_LENGTH || url.startsWith("data:image/svg")) {
+    return true;
+  }
+
+  return /logo|icon|avatar|sprite|placeholder|default|transparent|1x1|pixel/i.test(url);
+}
+
+function optimizedRemoteImageUrl(value) {
+  const url = normalizeText(value);
+
+  if (!url || url.startsWith("data:")) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (/images\.unsplash\.com$/i.test(parsed.hostname)) {
+      parsed.searchParams.set("auto", "format");
+      parsed.searchParams.set("fit", "crop");
+      parsed.searchParams.set("w", String(THUMBNAIL_WIDTH));
+      parsed.searchParams.set("q", "74");
+    }
+
+    return parsed.toString();
+  } catch (error) {
+    return url;
+  }
+}
+
+function preferredSourceImage(input = {}, existing = {}) {
+  const direct = normalizeText(input.sourceImage || existing.sourceImage || input.sourceImageUrl || existing.sourceImageUrl);
+
+  if (direct && !isLikelyLowQualityImage(direct)) {
+    return direct;
+  }
+
+  const candidate = normalizeText(input.image || existing.image);
+
+  if (candidate && !candidate.startsWith("data:") && !isLikelyLowQualityImage(candidate) && candidate !== DEFAULT_NEWS_IMAGE) {
+    return candidate;
+  }
+
+  return "";
+}
+
+function renderThumbnailOverlay(input = {}) {
+  const badges = thumbnailBadges(input);
+  const [dark, accent, light] = thumbnailPalette(input);
+  const title = normalizeText(input.title || input.titleHi || "Khabri Junction News");
+  const lines = splitThumbnailTitle({ title }, 30, 3);
+  const badgeSvg = badges.map((badge, index) => `
+    <rect x="${70 + index * 260}" y="62" width="${Math.min(235, Math.max(130, badge.length * 20))}" height="58" rx="12" fill="${index ? accent : "#ffffff"}"/>
+    <text x="${92 + index * 260}" y="101" fill="${index ? "#ffffff" : accent}" font-family="Arial, sans-serif" font-size="26" font-weight="900">${escapeHTML(badge.slice(0, 18))}</text>
+  `).join("");
+  const titleSvg = lines.map((text, index) => (
+    `<text x="70" y="${310 + index * 62}" fill="#ffffff" font-family="Arial, sans-serif" font-size="46" font-weight="800">${escapeHTML(text)}</text>`
+  )).join("");
+
+  return {
+    dark,
+    accent,
+    light,
+    badgeSvg,
+    titleSvg
+  };
+}
+
+function generateNewsThumbnail(input = {}) {
+  const { dark, accent, light, badgeSvg, titleSvg } = renderThumbnailOverlay(input);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" viewBox="0 0 ${THUMBNAIL_WIDTH} ${THUMBNAIL_HEIGHT}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${dark}"/>
+      <stop offset="0.58" stop-color="${accent}"/>
+      <stop offset="1" stop-color="${light}"/>
+    </linearGradient>
+    <pattern id="lines" width="48" height="48" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <rect width="16" height="48" fill="rgba(255,255,255,0.1)"/>
+    </pattern>
+  </defs>
+  <rect width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" fill="url(#bg)"/>
+  <rect width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" fill="url(#lines)"/>
+  ${badgeSvg}
+  <text x="70" y="210" fill="#ffffff" opacity="0.75" font-family="Arial, sans-serif" font-size="28" font-weight="700">KHABRI JUNCTION</text>
+  ${titleSvg}
+  <text x="70" y="610" fill="#ffffff" opacity="0.8" font-family="Arial, sans-serif" font-size="25" font-weight="700">khabrijunction.com</text>
+  <text x="730" y="610" fill="#ffffff" opacity="0.18" font-family="Arial, sans-serif" font-size="82" font-weight="900">KJ NEWS</text>
+</svg>`;
+
+  return svgDataUrl(svg);
+}
+
+function buildWatermarkedSourceThumbnail(input = {}) {
+  const sourceImage = optimizedRemoteImageUrl(input.sourceImage || input.image);
+
+  if (isLikelyLowQualityImage(sourceImage)) {
+    return "";
+  }
+
+  const { accent, badgeSvg, titleSvg } = renderThumbnailOverlay(input);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" viewBox="0 0 ${THUMBNAIL_WIDTH} ${THUMBNAIL_HEIGHT}">
+  <defs>
+    <linearGradient id="shade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="rgba(0,0,0,0.72)"/>
+      <stop offset="0.48" stop-color="rgba(0,0,0,0.25)"/>
+      <stop offset="1" stop-color="rgba(193,18,31,0.72)"/>
+    </linearGradient>
+  </defs>
+  <rect width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" fill="#111827"/>
+  <image href="${escapeHTML(sourceImage)}" width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" preserveAspectRatio="xMidYMid slice"/>
+  <rect width="${THUMBNAIL_WIDTH}" height="${THUMBNAIL_HEIGHT}" fill="url(#shade)"/>
+  ${badgeSvg}
+  <rect x="70" y="175" width="292" height="50" rx="10" fill="${accent}" opacity="0.92"/>
+  <text x="92" y="208" fill="#ffffff" font-family="Arial, sans-serif" font-size="25" font-weight="900">KHABRI JUNCTION</text>
+  ${titleSvg}
+  <text x="790" y="612" fill="#ffffff" opacity="0.55" font-family="Arial, sans-serif" font-size="36" font-weight="900">KJ NEWS</text>
+</svg>`;
+
+  return svgDataUrl(svg);
+}
+
+function thumbnailHashForNews(input = {}) {
+  return hashValue([
+    input.sourceImage,
+    input.titleHi || input.title,
+    input.categorySlug || input.category,
+    input.city || input.districtHint,
+    input.sourceUrl
+  ].filter(Boolean).join("|"));
+}
+
+function aiThumbnailPrompt(input = {}) {
+  const category = normalizeText(input.category || input.categoryBadge || "Breaking");
+  const city = normalizeText(input.city || input.districtHint || "Chhattisgarh");
+  const title = normalizeText(input.titleHi || input.title || "Local Chhattisgarh news");
+
+  return `Create a realistic indian local news thumbnail for Khabri Junction.
+Category style: ${category}.
+District/city: ${city}.
+News headline context: ${title}.
+Visual rules:
+- Indian Chhattisgarh local newsroom style, cinematic lighting.
+- Realistic editorial/photojournalism look, no poster look.
+- No real politician or accused face unless provided.
+- No fake text, no logo, no watermark in the AI image.
+- Natural Indian places, newsroom, public location, local civic scene when relevant.
+- Strong but clean red, white and black brand-compatible feel.
+- Leave room for KHABRI JUNCTION watermark, category badge and district badge.
+- Google Discover friendly, fast mobile thumbnail composition.`;
+}
+
+async function generateOpenAIThumbnail(input = {}) {
+  if (!OPENAI_API_KEY) {
+    return "";
+  }
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: OPENAI_IMAGE_MODEL,
+        prompt: aiThumbnailPrompt(input),
+        size: "1024x1024",
+        quality: "low",
+        output_format: "webp",
+        n: 1
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      await addAutomationLog("thumbnail-error", "OpenAI image generation failed", { error: errorText.slice(0, 180) });
+      return "";
+    }
+
+    const payload = await response.json();
+    const image = payload.data?.[0];
+
+    if (image?.b64_json) {
+      return `data:image/webp;base64,${image.b64_json}`;
+    }
+
+    return normalizeText(image?.url);
+  } catch (error) {
+    await addAutomationLog("thumbnail-error", "OpenAI image generation failed", { error: error.message });
+    return "";
+  }
+}
+
+async function buildThumbnailFields(input = {}, existing = {}, options = {}) {
+  const sourceImage = preferredSourceImage(input, existing);
+  const title = normalizeText(input.titleHi || input.title || existing.titleHi || existing.title);
+  const categoryBadge = normalizeText(input.categoryBadge || existing.categoryBadge || input.category || existing.category);
+  const thumbnailBase = {
+    ...existing,
+    ...input,
+    title,
+    categoryBadge,
+    sourceImage
+  };
+  const thumbnailHash = thumbnailHashForNews(thumbnailBase);
+  const canReuse = !options.force && existing.thumbnailHash === thumbnailHash;
+  let optimizedThumbnail = normalizeText(input.optimizedThumbnail || existing.optimizedThumbnail);
+  let aiThumbnail = normalizeText(input.aiThumbnail || existing.aiThumbnail);
+  const allowAi = options.allowAi !== false;
+  let thumbnailStatus = normalizeText(input.thumbnailStatus || existing.thumbnailStatus);
+
+  if (!canReuse || options.action === "use-source") {
+    optimizedThumbnail = buildWatermarkedSourceThumbnail(thumbnailBase);
+  }
+
+  const shouldGenerateAi = allowAi && (
+    options.action === "generate-ai" ||
+    options.action === "regenerate-ai" ||
+    (!optimizedThumbnail && !aiThumbnail && options.action !== "use-source")
+  );
+
+  if (shouldGenerateAi) {
+    const generatedAi = options.action === "generate-ai" && canReuse && aiThumbnail
+      ? aiThumbnail
+      : await generateOpenAIThumbnail(thumbnailBase);
+
+    if (generatedAi) {
+      aiThumbnail = generatedAi;
+      thumbnailStatus = "ai-generated";
+    } else {
+      aiThumbnail = generateNewsThumbnail(thumbnailBase);
+      thumbnailStatus = "fallback";
+    }
+  } else if (!optimizedThumbnail && !aiThumbnail) {
+    aiThumbnail = generateNewsThumbnail(thumbnailBase);
+    thumbnailStatus = "fallback";
+  }
+
+  if (optimizedThumbnail) {
+    thumbnailStatus = "source-watermarked";
+  } else if (!thumbnailStatus) {
+    thumbnailStatus = aiThumbnail ? "ai-generated" : "fallback";
+  }
+
+  return {
+    sourceImage,
+    optimizedThumbnail,
+    aiThumbnail,
+    thumbnailHash,
+    thumbnailStatus,
+    image: optimizedThumbnail || aiThumbnail || sourceImage || normalizeText(input.image || existing.image) || DEFAULT_NEWS_IMAGE
+  };
+}
+
+function categoryFromValue(value) {
+  const slug = toSlug(value);
+  const normalized = slugText(value);
+
+  return CATEGORY_DEFINITIONS.find((category) => (
+    category.slug === slug ||
+    slugText(category.label) === normalized ||
+    slugText(category.badge) === normalized
+  )) || null;
+}
+
+function inferCategory(text) {
+  const value = slugText(text);
+  const topicCategories = CATEGORY_DEFINITIONS.filter((category) => !CITY_DEFINITIONS.some((city) => city.slug === category.slug));
+  const cityCategories = CATEGORY_DEFINITIONS.filter((category) => CITY_DEFINITIONS.some((city) => city.slug === category.slug));
+  const topicMatch = topicCategories.find((category) => category.keywords.some((keyword) => value.includes(keyword)));
+
+  if (topicMatch) {
+    return topicMatch.label;
+  }
+
+  const cityMatch = cityCategories.find((category) => category.keywords.some((keyword) => value.includes(keyword)));
+
+  if (cityMatch) {
+    return cityMatch.label;
+  }
+
+  return "Breaking";
+
+  const categoryRules = [
+    ["Astrology", ["astrology", "rashifal", "horoscope", "panchang", "zodiac", "राशिफल", "ज्योतिष"]],
+    ["Sports", ["sports", "cricket", "ipl", "football", "match", "खेल", "क्रिकेट"]],
+    ["Durg", ["durg", "दुर्ग"]],
+    ["Bhilai", ["bhilai", "भिलाई"]],
+    ["Raipur", ["raipur", "रायपुर"]],
+    ["Bilaspur", ["bilaspur", "बिलासपुर"]],
+    ["Kawardha", ["kawardha", "कवर्धा"]],
+    ["Khairagarh", ["khairagarh", "खैरागढ़", "खैरागढ़"]],
+    ["Rajnandgaon", ["rajnandgaon", "राजनांदगांव"]],
+    ["Politics", ["politics", "election", "minister", "bjp", "congress", "राजनीति", "चुनाव"]],
+    ["Crime", ["crime", "police", "arrest", "murder", "fraud", "अपराध", "पुलिस"]],
+    ["Health", ["health", "hospital", "doctor", "medical", "स्वास्थ्य", "अस्पताल"]],
+    ["Jobs", ["job", "jobs", "recruitment", "vacancy", "रोजगार", "नौकरी"]]
+  ];
+
+  const match = categoryRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
+  return match ? match[0] : "Breaking";
+}
+
+function inferCity(text) {
+  const value = slugText(text);
+  const cityMatch = CITY_DEFINITIONS.find((city) => city.keywords.some((keyword) => value.includes(keyword)));
+
+  if (cityMatch) {
+    return cityMatch.slug;
+  }
+
+  return "";
+
+  const cityRules = [
+    ["durg", ["durg", "दुर्ग"]],
+    ["bhilai", ["bhilai", "भिलाई"]],
+    ["raipur", ["raipur", "रायपुर"]],
+    ["bilaspur", ["bilaspur", "बिलासपुर"]],
+    ["kawardha", ["kawardha", "कवर्धा"]],
+    ["khairagarh", ["khairagarh", "खैरागढ़", "खैरागढ़"]],
+    ["rajnandgaon", ["rajnandgaon", "राजनांदगांव"]]
+  ];
+
+  const match = cityRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
+  return match ? match[0] : "";
+}
+
+function categoryDefinitionForNews(input, existing = {}) {
+  const directCategory = categoryFromValue(input.category || input.tag || existing.category || existing.categorySlug);
+  const detectedCategory = categoryFromValue(inferCategory(`${input.title} ${input.summary} ${input.body} ${input.sourceTitle} ${input.category} ${input.tag}`));
+
+  return directCategory || detectedCategory || CATEGORY_DEFINITIONS.find((category) => category.slug === "breaking");
+}
+
+function trimForMeta(value, maxLength = 155) {
+  const text = normalizeText(value).replace(/\s+/g, " ");
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  return `${text.slice(0, maxLength - 1).trim()}...`;
+}
+
+function buildSeoFields(news) {
+  const title = normalizeText(news.title);
+  const summary = trimForMeta(news.summary || news.body || title);
+  const badge = normalizeText(news.categoryBadge || news.category || "News");
+
+  return {
+    slug: normalizeText(news.slug) || toSlug(title),
+    metaTitle: trimForMeta(news.metaTitle || `${title} | Khabri Junction`, 70),
+    metaDescription: trimForMeta(news.metaDescription || summary, 155),
+    ogTitle: trimForMeta(news.ogTitle || title, 90),
+    ogDescription: trimForMeta(news.ogDescription || summary, 200),
+    schemaType: "NewsArticle",
+    keywords: Array.from(new Set([badge, news.category, news.city, "Khabri Junction", "Chhattisgarh"].filter(Boolean))).join(", ")
+  };
+}
+
+function hasHindiText(value) {
+  return /[\u0900-\u097F]/.test(String(value || ""));
+}
+
+function detectContentLanguage(value) {
+  return hasHindiText(value) ? "hi" : "en";
+}
+
+function parseJsonObject(text) {
+  const raw = normalizeText(text);
+
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    const match = raw.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : {};
+  }
+}
+
+async function translateNewsCopy(source, targetLanguage) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is missing");
+  }
+
+  const targetName = targetLanguage === "hi" ? "Hindi" : "English";
+  const prompt = `
+Translate this news copy into ${targetName} for Khabri Junction.
+
+Rules:
+- Keep facts, numbers, names, places and allegations exactly as given.
+- Do not add new facts.
+- Keep the language natural for a news website.
+- Return ONLY valid JSON.
+
+Input:
+${JSON.stringify(source, null, 2)}
+
+Return JSON:
+{
+  "title": "translated title",
+  "summary": "translated summary",
+  "body": "translated full body"
+}
+`;
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      input: prompt,
+      max_output_tokens: 1600
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI translation failed: ${response.status} ${errorText.slice(0, 160)}`);
+  }
+
+  const payload = await response.json();
+  const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
+  const parsed = parseJsonObject(outputText);
+
+  return {
+    title: normalizeText(parsed.title),
+    summary: normalizeText(parsed.summary),
+    body: normalizeText(parsed.body)
+  };
+}
+
+async function prepareBilingualNews(input, existing = {}) {
+  const sourceTitle = normalizeText(input.title || input.titleEn || input.titleHi || existing.title || existing.titleEn || existing.titleHi);
+  const sourceSummary = normalizeText(input.summary || input.summaryEn || input.summaryHi || existing.summary || existing.summaryEn || existing.summaryHi);
+  const sourceBody = normalizeText(input.body || input.bodyEn || input.bodyHi || existing.body || existing.bodyEn || existing.bodyHi);
+  const sourceLanguage = normalizeText(input.language || existing.language || detectContentLanguage(`${sourceTitle} ${sourceSummary} ${sourceBody}`));
+  const sourceIsHindi = sourceLanguage === "hi" || detectContentLanguage(`${sourceTitle} ${sourceSummary} ${sourceBody}`) === "hi";
+  let titleEn = normalizeText(input.titleEn || existing.titleEn || (!sourceIsHindi ? sourceTitle : ""));
+  let summaryEn = normalizeText(input.summaryEn || existing.summaryEn || (!sourceIsHindi ? sourceSummary : ""));
+  let bodyEn = normalizeText(input.bodyEn || existing.bodyEn || (!sourceIsHindi ? sourceBody : ""));
+  let titleHi = normalizeText(input.titleHi || existing.titleHi || (sourceIsHindi ? sourceTitle : ""));
+  let summaryHi = normalizeText(input.summaryHi || existing.summaryHi || (sourceIsHindi ? sourceSummary : ""));
+  let bodyHi = normalizeText(input.bodyHi || existing.bodyHi || (sourceIsHindi ? sourceBody : ""));
+  const errors = [];
+
+  if ((!titleEn || !summaryEn || !bodyEn) && (titleHi || summaryHi || bodyHi)) {
+    try {
+      const translated = await translateNewsCopy({ title: titleHi, summary: summaryHi, body: bodyHi }, "en");
+      titleEn = titleEn || translated.title;
+      summaryEn = summaryEn || translated.summary;
+      bodyEn = bodyEn || translated.body;
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+
+  if ((!titleHi || !summaryHi || !bodyHi) && (titleEn || summaryEn || bodyEn)) {
+    try {
+      const translated = await translateNewsCopy({ title: titleEn, summary: summaryEn, body: bodyEn }, "hi");
+      titleHi = titleHi || translated.title;
+      summaryHi = summaryHi || translated.summary;
+      bodyHi = bodyHi || translated.body;
+    } catch (error) {
+      errors.push(error.message);
+    }
+  }
+
+  titleEn = titleEn || sourceTitle || titleHi;
+  summaryEn = summaryEn || sourceSummary || summaryHi;
+  bodyEn = bodyEn || sourceBody || bodyHi || summaryEn;
+  titleHi = titleHi || sourceTitle || titleEn;
+  summaryHi = summaryHi || sourceSummary || summaryEn;
+  bodyHi = bodyHi || sourceBody || bodyEn || summaryHi;
+
+  return {
+    ...input,
+    title: sourceIsHindi ? titleHi : titleEn,
+    summary: sourceIsHindi ? summaryHi : summaryEn,
+    body: sourceIsHindi ? bodyHi : bodyEn,
+    titleEn,
+    summaryEn,
+    bodyEn,
+    titleHi,
+    summaryHi,
+    bodyHi,
+    language: sourceLanguage,
+    translationStatus: errors.length ? "pending" : "complete",
+    translationError: errors.slice(0, 2).join(" | ")
+  };
+}
+
+function escapeHTML(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeXML(value) {
+  return escapeHTML(value);
+}
+
+function publicBaseUrl(req) {
+  if (!req) {
+    return SITE_URL;
+  }
+
+  return `${req.protocol}://${req.get("host")}`.replace(/\/+$/, "");
+}
+
+function routeSlugForNews(doc) {
+  const categorySlug = normalizeText(doc.categorySlug || toSlug(doc.category || "breaking"));
+  const citySlug = normalizeText(doc.city);
+  const cityCategory = citySlug ? categoryFromValue(citySlug) : null;
+
+  if (categorySlug === "breaking" && cityCategory) {
+    return cityCategory.slug;
+  }
+
+  return categorySlug || "breaking";
+}
+
+function landingPageForNews(doc) {
+  const routeSlug = routeSlugForNews(doc);
+  const routeCategory = categoryFromValue(routeSlug);
+
+  return routeCategory?.page || doc.categoryPage || "breaking.html";
+}
+
+function articleUrl(doc, req) {
+  return `${publicBaseUrl(req)}/${routeSlugForNews(doc)}/${doc.slug || toSlug(doc.title)}`;
+}
+
+function normalizeNews(input, existing = {}) {
+  const now = new Date();
+  const title = normalizeText(input.title || input.titleEn || input.titleHi);
+
+  if (!title) {
+    const error = new Error("title is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const automated = normalizeBoolean(input.automated || existing.automated);
+  const categoryDefinition = categoryDefinitionForNews(input, existing);
+  const combinedText = `${input.title} ${input.titleEn} ${input.titleHi} ${input.summary} ${input.summaryEn} ${input.summaryHi} ${input.body} ${input.bodyEn} ${input.bodyHi} ${input.sourceTitle} ${input.category} ${input.tag}`;
+  const city = normalizeText(input.city || existing.city || inferCity(combinedText));
+  const status = normalizeText(input.status || existing.status || (automated ? "pending" : "published"));
+  const sourceUrl = normalizeText(input.sourceUrl || existing.sourceUrl);
+  const sourceHash = normalizeText(input.sourceHash || existing.sourceHash || sourceHashFromUrl(sourceUrl));
+  const storyHash = normalizeText(input.storyHash || existing.storyHash);
+  const sourcePublishedAt = parseDateCandidate(input.sourcePublishedAt || existing.sourcePublishedAt);
+  const freshnessScoreValue = Number(input.freshnessScore ?? existing.freshnessScore);
+  const categoryBadge = normalizeText(input.categoryBadge || input.tag || categoryDefinition.badge);
+  const sourceImage = preferredSourceImage(input, existing);
+  const optimizedThumbnail = normalizeText(input.optimizedThumbnail || existing.optimizedThumbnail) || buildWatermarkedSourceThumbnail({
+    ...input,
+    ...existing,
+    title,
+    categoryBadge,
+    category: categoryDefinition.label,
+    city,
+    sourceImage
+  });
+  const aiThumbnail = normalizeText(input.aiThumbnail || existing.aiThumbnail);
+  const fallbackThumbnail = generateNewsThumbnail({ title, categoryBadge, category: categoryDefinition.label, city });
+  const thumbnailHash = normalizeText(input.thumbnailHash || existing.thumbnailHash || thumbnailHashForNews({
+    ...input,
+    title,
+    category: categoryDefinition.label,
+    categoryBadge,
+    city,
+    sourceImage
+  }));
+  const image = optimizedThumbnail || aiThumbnail || sourceImage || normalizeText(input.image || existing.image) || fallbackThumbnail;
+  const news = {
+    title,
+    summary: normalizeText(input.summary),
+    body: normalizeText(input.body),
+    titleEn: normalizeText(input.titleEn || input.title || existing.titleEn || existing.title),
+    summaryEn: normalizeText(input.summaryEn || input.summary || existing.summaryEn || existing.summary),
+    bodyEn: normalizeText(input.bodyEn || input.body || existing.bodyEn || existing.body),
+    titleHi: normalizeText(input.titleHi || existing.titleHi),
+    summaryHi: normalizeText(input.summaryHi || existing.summaryHi),
+    bodyHi: normalizeText(input.bodyHi || existing.bodyHi),
+    category: categoryDefinition.label,
+    categorySlug: categoryDefinition.slug,
+    categoryPage: categoryDefinition.page,
+    categoryBadge,
+    city,
+    image,
+    sourceImage,
+    optimizedThumbnail,
+    aiThumbnail,
+    thumbnailHash,
+    thumbnailStatus: normalizeText(input.thumbnailStatus || existing.thumbnailStatus || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
+    createdAt: existing.createdAt || input.createdAt || now,
+    updatedAt: now,
+    publishedAt: status === "published" ? input.publishedAt || existing.publishedAt || now : existing.publishedAt || null,
+    status,
+    breaking: normalizeBoolean(input.breaking) || categoryDefinition.slug === "breaking",
+    featured: normalizeBoolean(input.featured),
+    trending: normalizeBoolean(input.trending),
+    language: normalizeText(input.language || existing.language || "en"),
+    translationStatus: normalizeText(input.translationStatus || existing.translationStatus),
+    translationError: normalizeText(input.translationError || existing.translationError),
+    tag: normalizeText(input.tag || input.categoryBadge || categoryDefinition.badge),
+    sourceUrl,
+    sourceTitle: normalizeText(input.sourceTitle || existing.sourceTitle),
+    sourceName: normalizeText(input.sourceName || existing.sourceName),
+    feedSourceName: normalizeText(input.feedSourceName || existing.feedSourceName),
+    sourcePriority: Number(input.sourcePriority ?? existing.sourcePriority ?? 9),
+    districtHint: normalizeText(input.districtHint || existing.districtHint),
+    sourcePublishedAt,
+    sourceHash,
+    storyHash,
+    freshnessScore: Number.isFinite(freshnessScoreValue) ? freshnessScoreValue : null,
+    duplicateKey: normalizeText(input.duplicateKey || existing.duplicateKey || sourceHash || hashValue(slugText(input.sourceUrl || input.sourceTitle || title))),
+    automated
+  };
+  const seo = buildSeoFields({ ...news, ...input, slug: input.slug || existing.slug });
+  const normalized = {
+    ...news,
+    ...seo
+  };
+
+  if (!normalized.sourceUrl) {
+    delete normalized.sourceUrl;
+  }
+
+  if (!normalized.sourceHash) {
+    delete normalized.sourceHash;
+  }
+
+  if (!normalized.storyHash) {
+    delete normalized.storyHash;
+  }
+
+  if (!normalized.sourcePublishedAt) {
+    delete normalized.sourcePublishedAt;
+  }
+
+  ["sourceImage", "optimizedThumbnail", "aiThumbnail", "thumbnailHash", "thumbnailStatus"].forEach((field) => {
+    if (!normalized[field]) {
+      delete normalized[field];
+    }
+  });
+
+  return normalized;
+}
+
+function parseObjectId(id) {
+  if (!ObjectId.isValid(id)) {
+    const error = new Error("invalid news id");
+    error.status = 400;
+    throw error;
+  }
+
+  return new ObjectId(id);
+}
+
+function serializeNews(doc) {
+  if (!doc) {
+    return null;
+  }
+
+  return {
+    _id: String(doc._id),
+    title: doc.title,
+    summary: doc.summary,
+    body: doc.body,
+    titleEn: doc.titleEn || doc.title,
+    summaryEn: doc.summaryEn || doc.summary,
+    bodyEn: doc.bodyEn || doc.body,
+    titleHi: doc.titleHi || doc.title,
+    summaryHi: doc.summaryHi || doc.summary,
+    bodyHi: doc.bodyHi || doc.body,
+    category: doc.category,
+    categorySlug: doc.categorySlug,
+    categoryPage: landingPageForNews(doc),
+    categoryBadge: doc.categoryBadge,
+    city: doc.city,
+    image: doc.image,
+    sourceImage: doc.sourceImage,
+    optimizedThumbnail: doc.optimizedThumbnail,
+    aiThumbnail: doc.aiThumbnail,
+    thumbnailHash: doc.thumbnailHash,
+    thumbnailStatus: doc.thumbnailStatus,
+    slug: doc.slug,
+    articleUrl: articleUrl(doc),
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    publishedAt: doc.publishedAt,
+    status: doc.status,
+    breaking: doc.breaking,
+    featured: doc.featured,
+    trending: doc.trending,
+    language: doc.language,
+    translationStatus: doc.translationStatus,
+    translationError: doc.translationError,
+    tag: doc.tag,
+    metaTitle: doc.metaTitle,
+    metaDescription: doc.metaDescription,
+    ogTitle: doc.ogTitle,
+    ogDescription: doc.ogDescription,
+    schemaType: doc.schemaType,
+    keywords: doc.keywords,
+    sourceUrl: doc.sourceUrl,
+    sourceTitle: doc.sourceTitle,
+    sourceName: doc.sourceName,
+    feedSourceName: doc.feedSourceName,
+    sourcePriority: doc.sourcePriority,
+    districtHint: doc.districtHint,
+    sourcePublishedAt: doc.sourcePublishedAt,
+    sourceHash: doc.sourceHash,
+    storyHash: doc.storyHash,
+    freshnessScore: doc.freshnessScore,
+    automated: doc.automated,
+    contentSource: doc.contentSource || (doc.automated ? "ai" : "manual"),
+    views: doc.views || 0,
+    clicks: doc.clicks || 0
+  };
+}
+
+function requireDatabase(req, res, next) {
+  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection) {
+    return res.status(503).json({
+      error: "MongoDB is not connected",
+      detail: mongoError ? mongoError.message : "Check MONGODB_URI and start MongoDB."
+    });
+  }
+
+  next();
+}
+
+function serializeAd(doc) {
+  return doc ? {
+    _id: String(doc._id),
+    title: doc.title,
+    position: doc.position,
+    enabled: doc.enabled,
+    target: doc.target || "all",
+    image: doc.image || "",
+    linkUrl: doc.linkUrl || "",
+    adsenseCode: doc.adsenseCode || "",
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt
+  } : null;
+}
+
+function normalizeAd(input, existing = {}) {
+  const now = new Date();
+  return {
+    title: normalizeText(input.title || existing.title || "Advertisement"),
+    position: normalizeText(input.position || existing.position || "homepage"),
+    enabled: input.enabled === undefined ? normalizeBoolean(existing.enabled) : normalizeBoolean(input.enabled),
+    target: normalizeText(input.target || existing.target || "all"),
+    image: normalizeText(input.image || existing.image),
+    linkUrl: normalizeText(input.linkUrl || existing.linkUrl),
+    adsenseCode: normalizeText(input.adsenseCode || existing.adsenseCode),
+    createdAt: existing.createdAt || now,
+    updatedAt: now
+  };
+}
+
+async function uniqueSlugAcrossCollections(title, sourceHash = "", existingId = null, collection = newsCollection) {
+  const baseSlug = toSlug(title);
+  const suffix = normalizeText(sourceHash).slice(0, 8) || hashValue(`${baseSlug}:${Date.now()}`).slice(0, 8);
+  let candidate = baseSlug;
+  let counter = 1;
+  const idFilter = existingId ? { _id: { $ne: existingId } } : {};
+
+  while (
+    await newsCollection.findOne({ slug: candidate, ...idFilter }, { projection: { _id: 1 } }) ||
+    await manualNewsCollection.findOne({ slug: candidate, ...idFilter }, { projection: { _id: 1 } })
+  ) {
+    candidate = `${baseSlug}-${counter === 1 ? suffix : `${suffix}-${counter}`}`.slice(0, 110);
+    counter += 1;
+  }
+
+  return candidate;
+}
+
+async function normalizeManualNews(input, existing = {}) {
+  const existingId = existing._id || null;
+  const prepared = await prepareBilingualNews({
+    ...input,
+    automated: false,
+    contentSource: "manual",
+    sourceName: normalizeText(input.sourceName || existing.sourceName || "Khabri Junction Desk")
+  }, existing);
+  const normalized = normalizeNews(prepared, existing);
+  const requestedSlug = normalizeText(input.slug || existing.slug);
+  const slug = requestedSlug && requestedSlug === existing.slug
+    ? requestedSlug
+    : await uniqueSlugAcrossCollections(requestedSlug || normalized.title, normalized.duplicateKey, existingId, manualNewsCollection);
+
+  return {
+    ...normalized,
+    slug,
+    automated: false,
+    contentSource: "manual",
+    priority: 1,
+    author: normalizeText(input.author || existing.author || "Khabri Junction Desk"),
+    views: Number(existing.views || 0),
+    clicks: Number(existing.clicks || 0)
+  };
+}
+
+function adHtml(ad) {
+  if (!ad || !ad.enabled) {
+    return "";
+  }
+
+  if (ad.adsenseCode) {
+    return ad.adsenseCode;
+  }
+
+  if (ad.image) {
+    const image = escapeHTML(ad.image);
+    const title = escapeHTML(ad.title || "Advertisement");
+    const img = `<img src="${image}" alt="${title}" loading="lazy">`;
+    return ad.linkUrl ? `<a href="${escapeHTML(ad.linkUrl)}" target="_blank" rel="noopener">${img}</a>` : img;
+  }
+
+  return escapeHTML(ad.title || "Advertisement");
+}
+
+async function activeAdsByPosition() {
+  if (!adsCollection) {
+    return {};
+  }
+
+  const ads = await adsCollection.find({ enabled: true }).sort({ updatedAt: -1 }).toArray();
+  return ads.reduce((acc, ad) => {
+    if (!acc[ad.position]) {
+      acc[ad.position] = adHtml(ad);
+    }
+    return acc;
+  }, {});
+}
+
+function buildNewsQuery(query) {
+  const mongoQuery = {};
+  const andConditions = [];
+
+  if (!query.status && !normalizeBoolean(query.all) && !normalizeBoolean(query.includeAll)) {
+    mongoQuery.status = "published";
+  }
+
+  ["status", "category", "categorySlug", "city", "language"].forEach((field) => {
+    if (query[field]) {
+      mongoQuery[field] = query[field];
+    }
+  });
+
+  if (query.section) {
+    const section = toSlug(query.section);
+    const sectionCategory = categoryFromValue(section);
+    const sectionCity = CITY_DEFINITIONS.find((city) => city.slug === section);
+
+    if (section === "breaking") {
+      andConditions.push({ $or: [{ categorySlug: "breaking" }, { breaking: true }] });
+    } else if (sectionCity) {
+      andConditions.push({ $or: [{ categorySlug: section }, { city: section }] });
+    } else if (sectionCategory) {
+      mongoQuery.categorySlug = sectionCategory.slug;
+    }
+  }
+
+  if (query.q) {
+    const search = normalizeText(query.q).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    andConditions.push({
+      $or: [
+        { title: { $regex: search, $options: "i" } },
+        { summary: { $regex: search, $options: "i" } },
+        { body: { $regex: search, $options: "i" } }
+      ]
+    });
+  }
+
+  ["breaking", "featured", "trending", "automated"].forEach((field) => {
+    if (query[field] !== undefined) {
+      mongoQuery[field] = normalizeBoolean(query[field]);
+    }
+  });
+
+  if (andConditions.length) {
+    mongoQuery.$and = andConditions;
+  }
+
+  return mongoQuery;
+}
+
+function defaultAutomationSettings() {
+  const now = new Date();
+
+  return {
+    _id: "automation",
+    enabled: normalizeBoolean(process.env.AUTOMATION_ENABLED),
+    query: DEFAULT_AUTOMATION_QUERY,
+    intervalMinutes: AUTOMATION_INTERVAL_MINUTES,
+    updatedAt: now,
+    lastRunAt: null,
+    lastRunStatus: "never-run",
+    lastRunMessage: "",
+    nextRunAt: nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES, now),
+    freshnessWindowHours: NEWS_FRESHNESS_HOURS,
+    cronHealth: {
+      enabled: normalizeBoolean(process.env.AUTOMATION_ENABLED),
+      running: false,
+      lastStartedAt: null,
+      lastCompletedAt: null,
+      nextRunAt: nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES, now),
+      lastHeartbeatAt: null
+    },
+    sourceStats: [],
+    failedJobs: [],
+    staleRemoved: 0,
+    logs: []
+  };
+}
+
+async function getAutomationSettings() {
+  const existing = await settingsCollection.findOne({ _id: "automation" });
+
+  if (existing) {
+    return existing;
+  }
+
+  const defaults = defaultAutomationSettings();
+  await settingsCollection.insertOne(defaults);
+  return defaults;
+}
+
+function defaultSiteSettings() {
+  const now = new Date();
+
+  return {
+    _id: "site",
+    weather: [
+      { city: "Durg", temp: "34°C", condition: "साफ मौसम", updatedAt: now },
+      { city: "Bhilai", temp: "33°C", condition: "हल्की गर्मी", updatedAt: now },
+      { city: "Raipur", temp: "35°C", condition: "धूप", updatedAt: now }
+    ],
+    market: [
+      { name: "SENSEX", value: "77,958.52", change: "+1.22%" },
+      { name: "NIFTY 50", value: "24,330.95", change: "+1.24%" },
+      { name: "BANK NIFTY", value: "55,981.05", change: "+2.63%" }
+    ],
+    videos: [
+      { title: "लोकल मार्केट रील वायरल", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
+      { title: "शहर ट्रैफिक अपडेट वीडियो", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
+    ],
+    ads: {
+      header: "",
+      sidebar: "",
+      inArticle: "",
+      footer: ""
+    },
+    notification: {
+      enabled: true,
+      title: "ताजा खबरों की सूचना पाएं",
+      description: "Khabri Junction से लोकल न्यूज अपडेट पाने के लिए नोटिफिकेशन सब्सक्राइब करें।"
+    },
+    updatedAt: now
+  };
+}
+
+async function getSiteSettings() {
+  const existing = await settingsCollection.findOne({ _id: "site" });
+  const dynamicAds = await activeAdsByPosition();
+
+  if (existing) {
+    const defaults = defaultSiteSettings();
+    return {
+      ...defaults,
+      ...existing,
+      ads: { ...defaults.ads, ...(existing.ads || {}), ...dynamicAds },
+      notification: { ...defaults.notification, ...(existing.notification || {}) }
+    };
+  }
+
+  const defaults = defaultSiteSettings();
+  await settingsCollection.insertOne(defaults);
+  return { ...defaults, ads: { ...defaults.ads, ...dynamicAds } };
+}
+
+function serializeAutomationSettings(settings) {
+  const openAIConfigured = Boolean(OPENAI_API_KEY);
+  const staleMissingKeyMessage = openAIConfigured && settings.lastRunStatus === "missing-openai-key";
+  const intervalMinutes = Number(settings.intervalMinutes || AUTOMATION_INTERVAL_MINUTES);
+  const cronHealth = settings.cronHealth || {};
+  const nextRunAt = cronHealth.nextRunAt || settings.nextRunAt || nextScheduledRunDate(intervalMinutes);
+
+  return {
+    enabled: Boolean(settings.enabled),
+    query: settings.query || DEFAULT_AUTOMATION_QUERY,
+    intervalMinutes,
+    updatedAt: settings.updatedAt,
+    lastRunAt: staleMissingKeyMessage ? null : settings.lastRunAt,
+    lastRunStatus: staleMissingKeyMessage ? "ready" : settings.lastRunStatus || "never-run",
+    lastRunMessage: staleMissingKeyMessage ? "OpenAI connected. Run automation now or enable schedule." : settings.lastRunMessage || "",
+    nextRunAt,
+    freshnessWindowHours: Number(settings.freshnessWindowHours || NEWS_FRESHNESS_HOURS),
+    localSourceCount: CG_LOCAL_NEWS_SOURCES.length,
+    districtSourceCount: DISTRICT_NEWS_SOURCES.length,
+    staleRemoved: Number(settings.staleRemoved || 0),
+    cronHealth: {
+      enabled: Boolean(cronHealth.enabled ?? settings.enabled),
+      running: Boolean(cronHealth.running || automationRunning),
+      runId: normalizeText(cronHealth.runId),
+      runningSince: cronHealth.runningSince || null,
+      lastStartedAt: cronHealth.lastStartedAt || null,
+      lastCompletedAt: cronHealth.lastCompletedAt || null,
+      lastHeartbeatAt: cronHealth.lastHeartbeatAt || null,
+      nextRunAt
+    },
+    sourceStats: Array.isArray(settings.sourceStats) ? settings.sourceStats : [],
+    failedJobs: Array.isArray(settings.failedJobs) ? settings.failedJobs : [],
+    logs: Array.isArray(settings.logs) ? settings.logs : [],
+    running: automationRunning,
+    openAIConfigured
+  };
+}
+
+async function addAutomationLog(type, message, meta = {}) {
+  if (!settingsCollection) {
+    return;
+  }
+
+  await settingsCollection.updateOne(
+    { _id: "automation" },
+    {
+      $push: {
+        logs: {
+          $each: [
+            {
+              type,
+              message,
+              meta,
+              createdAt: new Date(),
+              createdAtIST: formatIST(new Date())
+            }
+          ],
+          $position: 0,
+          $slice: 80
+        }
+      }
+    },
+    { upsert: true }
+  );
+}
+
+function googleNewsUrl(query) {
+  const encoded = encodeURIComponent(query || DEFAULT_AUTOMATION_QUERY);
+  return `https://news.google.com/rss/search?q=${encoded}&hl=hi&gl=IN&ceid=IN:hi`;
+}
+
+function cleanGoogleTitle(title) {
+  return normalizeText(title).replace(/\s+-\s+[^-]+$/u, "");
+}
+
+function sourceNameFromRssItem(item) {
+  const source = item?.source;
+  const name = normalizeText(typeof source === "object" ? source["#text"] : source);
+
+  if (name) {
+    return name;
+  }
+
+  try {
+    return new URL(normalizeText(item?.link)).hostname.replace(/^www\./, "");
+  } catch (error) {
+    return "Google News";
+  }
+}
+
+function updateSourceStat(sourceStats, sourceName, field, amount = 1) {
+  const name = normalizeText(sourceName) || "Google News";
+  const current = sourceStats[name] || {
+    sourceName: name,
+    total: 0,
+    fresh: 0,
+    stale: 0,
+    duplicates: 0,
+    nonLocalSkipped: 0,
+    generated: 0,
+    pending: 0,
+    errors: 0
+  };
+
+  current[field] = Number(current[field] || 0) + amount;
+  sourceStats[name] = current;
+  return current;
+}
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchGoogleNewsXml(query) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= RSS_FETCH_RETRY_COUNT; attempt += 1) {
+    try {
+      const response = await fetch(googleNewsUrl(query), {
+        headers: {
+          "User-Agent": "KhabriJunctionBot/1.0"
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Google News RSS failed: ${response.status}`);
+      }
+
+      return {
+        xml: await response.text(),
+        attempts: attempt
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < RSS_FETCH_RETRY_COUNT) {
+        await addAutomationLog("retry", `RSS fetch retry ${attempt + 1}/${RSS_FETCH_RETRY_COUNT}`, { error: error.message });
+        await sleep(700 * attempt);
+      }
+    }
+  }
+
+  throw lastError || new Error("Google News RSS failed");
+}
+
+async function fetchGoogleNewsItems(query, options = {}) {
+  const now = options.now || new Date();
+  const { xml, attempts } = await fetchGoogleNewsXml(query);
+  const parser = new XMLParser({ ignoreAttributes: false });
+  const parsed = parser.parse(xml);
+  const rawItems = parsed?.rss?.channel?.item || [];
+  const items = Array.isArray(rawItems) ? rawItems : [rawItems];
+  const sourceStats = {};
+  const stats = {
+    query: query || DEFAULT_AUTOMATION_QUERY,
+    sourcePlan: normalizeText(options.sourceName),
+    districtHint: normalizeText(options.district),
+    priority: Number(options.priority || 9),
+    fetchedAt: now,
+    fetchedAtIST: formatIST(now),
+    attempts,
+    total: 0,
+    fresh: 0,
+    stale: 0,
+    invalidDate: 0,
+    sources: sourceStats
+  };
+  const mappedItems = items
+    .filter(Boolean)
+    .map((item) => {
+      const rssSourceName = sourceNameFromRssItem(item);
+      const sourceName = rssSourceName && rssSourceName !== "Google News" ? rssSourceName : normalizeText(options.sourceName) || rssSourceName;
+      const sourcePublishedAt = findDateCandidate(item);
+      const freshness = freshnessInfo(sourcePublishedAt, now);
+      const sourceUrl = normalizeText(item.link || item.guid?.["#text"] || item.guid);
+      const sourceImage = extractRssImage(item);
+      const mapped = {
+        sourceTitle: normalizeText(item.title),
+        title: cleanGoogleTitle(item.title),
+        summary: stripHTML(item.description),
+        sourceUrl,
+        sourceName,
+        feedSourceName: normalizeText(options.sourceName),
+        sourcePriority: Number(options.priority || 9),
+        districtHint: normalizeText(options.district),
+        sourceImage,
+        sourcePublishedAt,
+        publishedAt: sourcePublishedAt,
+        freshnessScore: freshness.score,
+        freshnessAgeHours: freshness.ageHours,
+        staleReason: freshness.reason,
+        isFresh: freshness.isFresh,
+        sourceHash: sourceHashFromUrl(sourceUrl)
+      };
+
+      if (!mapped.title || !mapped.sourceUrl) {
+        return null;
+      }
+
+      stats.total += 1;
+      updateSourceStat(sourceStats, sourceName, "total");
+
+      if (mapped.isFresh) {
+        stats.fresh += 1;
+        updateSourceStat(sourceStats, sourceName, "fresh");
+      } else {
+        stats.stale += 1;
+        updateSourceStat(sourceStats, sourceName, "stale");
+
+        if (!mapped.sourcePublishedAt) {
+          stats.invalidDate += 1;
+        }
+      }
+
+      return mapped;
+    })
+    .filter(Boolean);
+
+  return {
+    items: options.includeStale ? mappedItems : mappedItems.filter((item) => item.isFresh),
+    allItems: mappedItems,
+    stats: {
+      ...stats,
+      sources: Object.values(sourceStats).sort((a, b) => b.total - a.total)
+    }
+  };
+}
+
+function storyHashForItem(item) {
+  const normalizedTitle = slugText(cleanGoogleTitle(item?.title || item?.sourceTitle))
+    .replace(/\b(chhattisgarh|cg|news|latest|breaking|live|update|hindi)\b/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalizedTitle ? hashValue(normalizedTitle.slice(0, 180)) : "";
+}
+
+function isChhattisgarhRelevant(item) {
+  let raw = [
+    item?.title,
+    item?.sourceTitle,
+    item?.summary,
+    item?.districtHint
+  ].filter(Boolean).join(" ");
+  const sourceLabels = [
+    item?.sourceName,
+    item?.feedSourceName,
+    ...CG_LOCAL_NEWS_SOURCES.map((source) => source.name),
+    ...DISTRICT_NEWS_SOURCES.map((source) => source.name),
+    "Daily Chhattisgarh News",
+    "Google News"
+  ].filter(Boolean);
+
+  for (const label of sourceLabels) {
+    raw = raw.replace(new RegExp(escapeRegExp(label), "gi"), " ");
+  }
+
+  const value = slugText(raw);
+
+  return CG_RELEVANCE_TERMS.some((term) => value.includes(term));
+}
+
+function mergeSourceStats(target, sourceStats = []) {
+  for (const stat of sourceStats) {
+    const name = normalizeText(stat.sourceName) || "Google News";
+    const current = target[name] || {
+      sourceName: name,
+      total: 0,
+      fresh: 0,
+      stale: 0,
+      duplicates: 0,
+      nonLocalSkipped: 0,
+      generated: 0,
+      pending: 0,
+      errors: 0
+    };
+
+    ["total", "fresh", "stale", "duplicates", "nonLocalSkipped", "generated", "pending", "errors"].forEach((field) => {
+      current[field] = Number(current[field] || 0) + Number(stat[field] || 0);
+    });
+    target[name] = current;
+  }
+}
+
+function dedupeFetchedItems(items = [], sourceStats = {}) {
+  const seenSourceHashes = new Set();
+  const seenStoryHashes = new Set();
+  const deduped = [];
+
+  for (const item of items) {
+    const sourceHash = sourceHashForItem(item);
+    const storyHash = storyHashForItem(item);
+
+    if ((sourceHash && seenSourceHashes.has(sourceHash)) || (storyHash && seenStoryHashes.has(storyHash))) {
+      updateSourceStat(sourceStats, item.sourceName, "duplicates");
+      continue;
+    }
+
+    if (sourceHash) {
+      seenSourceHashes.add(sourceHash);
+    }
+
+    if (storyHash) {
+      seenStoryHashes.add(storyHash);
+    }
+
+    deduped.push({
+      ...item,
+      storyHash
+    });
+  }
+
+  return deduped;
+}
+
+function balanceItemsBySource(items = [], limit = 8) {
+  const sorted = [...items].sort((a, b) => {
+    const priorityDiff = Number(a.sourcePriority || 9) - Number(b.sourcePriority || 9);
+
+    if (priorityDiff) {
+      return priorityDiff;
+    }
+
+    const freshnessDiff = Number(b.freshnessScore || 0) - Number(a.freshnessScore || 0);
+
+    if (freshnessDiff) {
+      return freshnessDiff;
+    }
+
+    return new Date(b.sourcePublishedAt || 0).getTime() - new Date(a.sourcePublishedAt || 0).getTime();
+  });
+  const selected = [];
+  const perSourceCounts = {};
+  const firstPass = [];
+  const overflow = [];
+
+  for (const item of sorted) {
+    const sourceKey = normalizeText(item.sourceName || item.feedSourceName || "Google News").toLowerCase();
+    const count = Number(perSourceCounts[sourceKey] || 0);
+
+    if (count < MAX_ITEMS_PER_SOURCE_PER_RUN) {
+      firstPass.push(item);
+      perSourceCounts[sourceKey] = count + 1;
+    } else {
+      overflow.push(item);
+    }
+  }
+
+  for (const item of firstPass) {
+    if (selected.length < limit) {
+      selected.push(item);
+    }
+  }
+
+  for (const item of overflow) {
+    if (selected.length < limit) {
+      selected.push(item);
+    }
+  }
+
+  return selected;
+}
+
+function localAutomationFeedPlans(settings = {}) {
+  const customQuery = normalizeText(settings.query);
+  const plans = [
+    ...CG_LOCAL_NEWS_SOURCES,
+    ...DISTRICT_NEWS_SOURCES
+  ];
+
+  if (customQuery && customQuery !== DEFAULT_AUTOMATION_QUERY) {
+    plans.push({
+      name: "Admin Custom CG Query",
+      query: customQuery,
+      priority: 3
+    });
+  }
+
+  return plans;
+}
+
+async function fetchAutomationFeedItems(settings, options = {}) {
+  const now = options.now || new Date();
+  const limit = Number(options.limit || 8);
+  const sourceStats = {};
+  const failedJobs = [];
+  const fetchPlans = async (plans, stage) => {
+    const collected = [];
+
+    for (const plan of plans) {
+      try {
+        const rssResult = await fetchGoogleNewsItems(plan.query, {
+          now,
+          sourceName: plan.name,
+          district: plan.district,
+          priority: plan.priority
+        });
+
+        const relevantItems = rssResult.items.filter(isChhattisgarhRelevant);
+        const nonLocalSkipped = rssResult.items.length - relevantItems.length;
+        collected.push(...relevantItems);
+        mergeSourceStats(sourceStats, rssResult.stats.sources);
+        if (nonLocalSkipped > 0) {
+          updateSourceStat(sourceStats, plan.name, "nonLocalSkipped", nonLocalSkipped);
+        }
+
+        await addAutomationLog("source-fetched", `${plan.name}: ${relevantItems.length} CG fresh, ${rssResult.stats.stale} stale`, {
+          query: plan.query,
+          stage,
+          total: rssResult.stats.total,
+          fresh: rssResult.stats.fresh,
+          stale: rssResult.stats.stale,
+          nonLocalSkipped
+        });
+      } catch (error) {
+        updateSourceStat(sourceStats, plan.name, "errors");
+        failedJobs.push({
+          type: "fetch",
+          sourceName: plan.name,
+          query: plan.query,
+          stage,
+          attempts: RSS_FETCH_RETRY_COUNT,
+          error: error.message,
+          createdAt: new Date()
+        });
+        await addAutomationLog("source-error", `${plan.name} RSS failed`, {
+          query: plan.query,
+          error: error.message,
+          stage
+        });
+      }
+    }
+
+    return collected;
+  };
+
+  const localItems = await fetchPlans(localAutomationFeedPlans(settings), "cg-local");
+  let deduped = dedupeFetchedItems(localItems, sourceStats);
+  let selected = balanceItemsBySource(deduped, limit);
+  let usedFallback = false;
+
+  if (selected.length < Math.min(limit, MIN_LOCAL_ITEMS_BEFORE_FALLBACK)) {
+    usedFallback = true;
+    const fallbackItems = await fetchPlans(NATIONAL_FALLBACK_NEWS_SOURCES, "national-fallback");
+    deduped = dedupeFetchedItems([...deduped, ...fallbackItems], sourceStats);
+    selected = balanceItemsBySource(deduped, limit);
+  }
+
+  return {
+    items: selected,
+    stats: {
+      total: deduped.length,
+      fresh: deduped.filter((item) => item.isFresh).length,
+      stale: Object.values(sourceStats).reduce((sum, stat) => sum + Number(stat.stale || 0), 0),
+      usedFallback,
+      sources: Object.values(sourceStats).sort((a, b) => (
+        Number(b.fresh || 0) + Number(b.pending || 0) + Number(b.generated || 0)
+      ) - (
+        Number(a.fresh || 0) + Number(a.pending || 0) + Number(a.generated || 0)
+      ))
+    },
+    failedJobs
+  };
+}
+
+function parseGeneratedArticle(outputText, fallback) {
+  const text = normalizeText(outputText);
+  const jsonText = text.match(/\{[\s\S]*\}/)?.[0] || text;
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    return {
+      title: normalizeText(parsed.title) || fallback.title,
+      summary: normalizeText(parsed.summary) || fallback.summary,
+      body: normalizeText(parsed.body) || fallback.summary,
+      category: normalizeText(parsed.category) || fallback.category,
+      city: normalizeText(parsed.city) || fallback.city,
+      breaking: normalizeBoolean(parsed.breaking)
+    };
+  } catch (error) {
+    return {
+      title: fallback.title,
+      summary: fallback.summary,
+      body: text || fallback.summary,
+      category: fallback.category,
+      city: fallback.city,
+      breaking: false
+    };
+  }
+}
+
+async function generateHindiArticle(item) {
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is missing");
+  }
+
+  const category = inferCategory(`${item.title} ${item.summary}`);
+  const city = inferCity(`${item.title} ${item.summary}`);
+  const prompt = `
+Create a Hindi news article for Khabri Junction.
+
+Source headline: ${item.title}
+Source summary: ${item.summary || "No summary available"}
+Source URL: ${item.sourceUrl}
+
+Return ONLY valid JSON with:
+{
+  "title": "Hindi headline",
+  "summary": "2 line Hindi summary",
+  "body": "Full Hindi news body, 5-7 short paragraphs, neutral and factual",
+  "category": "One of: Durg, Bhilai, Raipur, Bilaspur, Sports, Astrology, Politics, Crime, Entertainment, Health, Jobs, Breaking",
+  "city": "lowercase city slug if local, else empty string",
+  "breaking": true or false
+}
+Do not invent names, quotes, numbers or allegations. If exact details are unavailable, use careful wording.
+`;
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      input: prompt,
+      max_output_tokens: 1200
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI API failed: ${response.status} ${errorText.slice(0, 160)}`);
+  }
+
+  const payload = await response.json();
+  const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
+
+  return parseGeneratedArticle(outputText, {
+    title: item.title,
+    summary: item.summary,
+    category,
+    city
+  });
+}
+
+async function uniqueArticleSlug(title, sourceHash = "") {
+  const baseSlug = toSlug(title);
+  const suffix = normalizeText(sourceHash).slice(0, 8) || hashValue(`${baseSlug}:${Date.now()}`).slice(0, 8);
+  let candidate = baseSlug;
+  let counter = 1;
+
+  while (
+    await newsCollection.findOne({ slug: candidate }, { projection: { _id: 1 } }) ||
+    (manualNewsCollection && await manualNewsCollection.findOne({ slug: candidate }, { projection: { _id: 1 } }))
+  ) {
+    candidate = `${baseSlug}-${counter === 1 ? suffix : `${suffix}-${counter}`}`.slice(0, 110);
+    counter += 1;
+  }
+
+  return candidate;
+}
+
+async function saveGeneratedNews(item, article) {
+  const sourceHash = sourceHashForItem(item);
+  const duplicateKey = sourceHash;
+  const storyHash = normalizeText(item.storyHash || storyHashForItem(item));
+  const combinedText = `${item.title} ${item.summary} ${article.title} ${article.summary} ${article.body} ${article.category}`;
+  const detectedCategory = categoryFromValue(article.category) || categoryFromValue(inferCategory(combinedText));
+  const category = detectedCategory?.label || inferCategory(combinedText);
+  const city = article.city || inferCity(combinedText);
+  const slug = await uniqueArticleSlug(article.title, sourceHash);
+  const thumbnailFields = await buildThumbnailFields({
+    title: article.title,
+    titleHi: article.title,
+    category,
+    categoryBadge: category,
+    city,
+    sourceImage: item.sourceImage,
+    sourceUrl: item.sourceUrl
+  }, {}, { action: item.sourceImage ? "use-source" : "generate-ai" });
+  const exists = await newsCollection.findOne({
+    $or: [
+      ...(sourceHash ? [{ sourceHash }, { duplicateKey: sourceHash }] : []),
+      ...(storyHash ? [{ storyHash }] : []),
+      { sourceUrl: item.sourceUrl }
+    ].filter(Boolean)
+  });
+
+  if (exists) {
+    return { skipped: true, reason: "exact-source-duplicate", id: String(exists._id) };
+  }
+
+  const news = normalizeNews(await prepareBilingualNews({
+    title: article.title,
+    titleHi: article.title,
+    summary: article.summary,
+    summaryHi: article.summary,
+    body: article.body,
+    bodyHi: article.body,
+    category,
+    city,
+    image: thumbnailFields.image,
+    sourceImage: thumbnailFields.sourceImage,
+    optimizedThumbnail: thumbnailFields.optimizedThumbnail,
+    aiThumbnail: thumbnailFields.aiThumbnail,
+    thumbnailHash: thumbnailFields.thumbnailHash,
+    thumbnailStatus: thumbnailFields.thumbnailStatus,
+    slug,
+    createdAt: new Date(),
+    status: "pending",
+    breaking: article.breaking,
+    featured: false,
+    trending: false,
+    language: "hi",
+    tag: category,
+    sourceUrl: item.sourceUrl,
+    sourceTitle: item.sourceTitle,
+    sourceName: item.sourceName,
+    sourceImage: item.sourceImage,
+    feedSourceName: item.feedSourceName,
+    sourcePriority: item.sourcePriority,
+    districtHint: item.districtHint,
+    sourcePublishedAt: item.sourcePublishedAt || item.publishedAt,
+    sourceHash,
+    storyHash,
+    freshnessScore: item.freshnessScore,
+    duplicateKey,
+    automated: true
+  }));
+  let result;
+
+  try {
+    result = await newsCollection.insertOne(news);
+  } catch (error) {
+    if (error.code === 11000) {
+      return { skipped: true, reason: "duplicate", id: "" };
+    }
+
+    throw error;
+  }
+
+  return { skipped: false, id: String(result.insertedId) };
+}
+
+function emptyAutomationResult(status = "completed") {
+  return {
+    status,
+    fetched: 0,
+    fresh: 0,
+    stale: 0,
+    generated: 0,
+    pending: 0,
+    approved: 0,
+    rejected: 0,
+    duplicates: 0,
+    created: 0,
+    skipped: 0,
+    staleRemoved: 0,
+    sourceStats: [],
+    errors: []
+  };
+}
+
+async function cleanStalePendingArticles(now = new Date()) {
+  const cutoff = new Date(now.getTime() - NEWS_FRESHNESS_WINDOW_MS);
+  const result = await newsCollection.deleteMany({
+    automated: true,
+    status: "pending",
+    $or: [
+      { sourcePublishedAt: { $lt: cutoff } },
+      {
+        sourcePublishedAt: { $exists: false },
+        createdAt: { $lt: cutoff }
+      }
+    ]
+  });
+
+  if (result.deletedCount) {
+    await addAutomationLog("stale-removed", `Removed ${result.deletedCount} stale pending articles`, {
+      cutoff,
+      cutoffIST: formatIST(cutoff)
+    });
+  }
+
+  return result.deletedCount || 0;
+}
+
+function failedJobFromItem(item, error, attempts = 1) {
+  return {
+    type: "item",
+    title: item.title,
+    summary: item.summary,
+    sourceUrl: item.sourceUrl,
+    sourceTitle: item.sourceTitle,
+    sourceName: item.sourceName,
+    feedSourceName: item.feedSourceName,
+    sourcePriority: item.sourcePriority,
+    districtHint: item.districtHint,
+    sourcePublishedAt: item.sourcePublishedAt || item.publishedAt,
+    sourceHash: sourceHashForItem(item),
+    storyHash: item.storyHash || storyHashForItem(item),
+    freshnessScore: item.freshnessScore,
+    attempts,
+    error: normalizeText(error?.message || error),
+    createdAt: new Date()
+  };
+}
+
+function freshFailedJobs(jobs = [], now = new Date()) {
+  return (Array.isArray(jobs) ? jobs : []).filter((job) => {
+    const publishedAt = parseDateCandidate(job.sourcePublishedAt);
+    return job.type === "fetch" || freshnessInfo(publishedAt, now).isFresh;
+  }).slice(0, 25);
+}
+
+function itemFromFailedJob(job) {
+  return {
+    sourceTitle: normalizeText(job.sourceTitle || job.title),
+    title: cleanGoogleTitle(job.title),
+    summary: normalizeText(job.summary),
+    sourceUrl: normalizeText(job.sourceUrl),
+    sourceName: normalizeText(job.sourceName),
+    sourceImage: normalizeText(job.sourceImage),
+    feedSourceName: normalizeText(job.feedSourceName),
+    sourcePriority: Number(job.sourcePriority || 9),
+    districtHint: normalizeText(job.districtHint),
+    sourcePublishedAt: parseDateCandidate(job.sourcePublishedAt),
+    publishedAt: parseDateCandidate(job.sourcePublishedAt),
+    freshnessScore: Number(job.freshnessScore || 0),
+    sourceHash: normalizeText(job.sourceHash) || sourceHashFromUrl(job.sourceUrl),
+    storyHash: normalizeText(job.storyHash),
+    isFresh: true
+  };
+}
+
+function automationMessage(result) {
+  if (result.status === "openai-quota-error") {
+    return "OpenAI quota or billing error. Cron remains enabled; fresh articles will stay pending after API credits are available.";
+  }
+
+  if (result.status === "missing-openai-key") {
+    return "OPENAI_API_KEY is missing. Add it in .env and restart the server.";
+  }
+
+  return `Fresh ${result.fresh}, stale ${result.stale}, generated ${result.generated}, pending ${result.pending}, duplicates ${result.duplicates}, errors ${result.errors.length}`;
+}
+
+async function runNewsAutomation({ force = false, limit = 8, retryFailed = false } = {}) {
+  const settings = await getAutomationSettings();
+  const now = new Date();
+  const staleRunningSince = parseDateCandidate(settings.cronHealth?.runningSince);
+
+  if (automationRunning && staleRunningSince && now.getTime() - staleRunningSince.getTime() > AUTOMATION_STUCK_MS) {
+    automationRunning = false;
+    await addAutomationLog("cron-health", "Automation lock reset after timeout", { runningSince: staleRunningSince });
+  }
+
+  if (automationRunning) {
+    return {
+      ...emptyAutomationResult("running"),
+      errors: ["Automation is already running."]
+    };
+  }
+
+  const staleRemoved = await cleanStalePendingArticles(now);
+
+  if (!settings.enabled && !force) {
+    const nextRunAt = nextScheduledRunDate(Number(settings.intervalMinutes || AUTOMATION_INTERVAL_MINUTES), now);
+    await settingsCollection.updateOne(
+      { _id: "automation" },
+      {
+        $set: {
+          staleRemoved,
+          nextRunAt,
+          "cronHealth.enabled": false,
+          "cronHealth.running": false,
+          "cronHealth.nextRunAt": nextRunAt
+        }
+      }
+    );
+
+    return {
+      ...emptyAutomationResult("disabled"),
+      staleRemoved
+    };
+  }
+
+  if (!OPENAI_API_KEY) {
+    const result = {
+      ...emptyAutomationResult("missing-openai-key"),
+      staleRemoved,
+      errors: ["OPENAI_API_KEY is missing. Add it in .env and restart the server."]
+    };
+    const nextRunAt = nextScheduledRunDate(Number(settings.intervalMinutes || AUTOMATION_INTERVAL_MINUTES), now);
+
+    await settingsCollection.updateOne(
+      { _id: "automation" },
+      {
+        $set: {
+          lastRunAt: now,
+          lastRunStatus: result.status,
+          lastRunMessage: automationMessage(result),
+          staleRemoved,
+          nextRunAt,
+          "cronHealth.enabled": Boolean(settings.enabled),
+          "cronHealth.running": false,
+          "cronHealth.lastCompletedAt": now,
+          "cronHealth.nextRunAt": nextRunAt
+        }
+      }
+    );
+
+    return result;
+  }
+
+  automationRunning = true;
+  const runId = hashValue(`${now.toISOString()}:${Math.random()}`).slice(0, 12);
+  const intervalMinutes = Number(settings.intervalMinutes || AUTOMATION_INTERVAL_MINUTES);
+  const nextRunAt = nextScheduledRunDate(intervalMinutes, now);
+  const result = {
+    ...emptyAutomationResult("completed"),
+    staleRemoved
+  };
+  const sourceStats = {};
+  const failedJobs = [];
+
+  await settingsCollection.updateOne(
+    { _id: "automation" },
+    {
+      $set: {
+        lastRunStatus: "running",
+        lastRunMessage: "Automation running. Fresh RSS articles are being checked.",
+        lastCronStartedAt: now,
+        nextRunAt,
+        staleRemoved,
+        cronHealth: {
+          enabled: Boolean(settings.enabled),
+          running: true,
+          runId,
+          runningSince: now,
+          lastStartedAt: now,
+          lastHeartbeatAt: now,
+          nextRunAt
+        }
+      }
+    }
+  );
+  await addAutomationLog("cron-start", `Automation started at ${formatIST(now)} IST`, { runId, retryFailed });
+
+  try {
+    let items = [];
+    let shouldFetchRss = !retryFailed;
+
+    if (retryFailed) {
+      const retryJobs = freshFailedJobs(settings.failedJobs, now);
+      const hasFetchRetry = retryJobs.some((job) => job.type === "fetch");
+      items = retryJobs
+        .filter((job) => job.type === "item")
+        .map(itemFromFailedJob)
+        .filter((item) => item.title && item.sourceUrl)
+        .slice(0, limit);
+      result.fresh = items.length;
+      result.fetched = items.length;
+      shouldFetchRss = !items.length && hasFetchRetry;
+      await addAutomationLog("retry", `Loaded ${items.length} failed item jobs for retry`, { runId, fetchRetry: hasFetchRetry });
+    }
+
+    if (shouldFetchRss) {
+      const rssResult = await fetchAutomationFeedItems(settings, { now, limit });
+      items = rssResult.items;
+      result.fetched = items.length;
+      result.fresh = rssResult.stats.fresh;
+      result.stale = rssResult.stats.stale;
+      failedJobs.push(...rssResult.failedJobs);
+
+      for (const stat of rssResult.stats.sources) {
+        sourceStats[stat.sourceName] = { ...stat };
+      }
+
+      await addAutomationLog("fetched", `Fetched ${items.length} balanced fresh CG/local RSS items`, {
+        localFirst: true,
+        fallbackUsed: rssResult.stats.usedFallback,
+        total: rssResult.stats.total,
+        stale: rssResult.stats.stale,
+        runId
+      });
+    }
+
+    for (const item of items) {
+      const freshness = freshnessInfo(item.sourcePublishedAt || item.publishedAt, now);
+      const statName = item.sourceName || "Google News";
+
+      if (!freshness.isFresh) {
+        result.skipped += 1;
+        result.stale += 1;
+        updateSourceStat(sourceStats, statName, "stale");
+        await addAutomationLog("stale-skipped", `Stale RSS skipped: ${item.title}`, {
+          reason: freshness.reason,
+          sourcePublishedAt: item.sourcePublishedAt,
+          runId
+        });
+        continue;
+      }
+
+      item.freshnessScore = item.freshnessScore || freshness.score;
+
+      try {
+        const sourceHash = sourceHashForItem(item);
+        const exists = await newsCollection.findOne({
+          $or: [
+            ...(sourceHash ? [{ sourceHash }, { duplicateKey: sourceHash }] : []),
+            ...(item.storyHash ? [{ storyHash: item.storyHash }] : []),
+            { sourceUrl: item.sourceUrl }
+          ].filter(Boolean)
+        });
+
+        if (exists) {
+          result.skipped += 1;
+          result.duplicates += 1;
+          updateSourceStat(sourceStats, statName, "duplicates");
+          await addAutomationLog("duplicate-skipped", `Exact source duplicate skipped: ${item.title}`, {
+            sourceUrl: item.sourceUrl,
+            sourceHash,
+            runId
+          });
+          continue;
+        }
+
+        if (!item.sourceImage) {
+          item.sourceImage = await fetchSourceImageFromPage(item.sourceUrl);
+        }
+
+        const article = await generateHindiArticle(item);
+        result.generated += 1;
+        updateSourceStat(sourceStats, statName, "generated");
+        await addAutomationLog("generated", `Generated Hindi article: ${article.title}`, {
+          sourceUrl: item.sourceUrl,
+          freshnessScore: item.freshnessScore,
+          runId
+        });
+        const saved = await saveGeneratedNews(item, article);
+
+        if (saved.skipped) {
+          result.skipped += 1;
+          result.duplicates += 1;
+          updateSourceStat(sourceStats, statName, "duplicates");
+          await addAutomationLog("duplicate-skipped", `Exact source duplicate skipped after generation: ${article.title}`, {
+            sourceUrl: item.sourceUrl,
+            runId
+          });
+        } else {
+          result.created += 1;
+          result.pending += 1;
+          updateSourceStat(sourceStats, statName, "pending");
+          await addAutomationLog("pending", `Saved pending article: ${article.title}`, {
+            id: saved.id,
+            sourcePublishedAt: item.sourcePublishedAt,
+            freshnessScore: item.freshnessScore,
+            runId
+          });
+        }
+      } catch (error) {
+        result.errors.push(`${item.title}: ${error.message}`);
+        updateSourceStat(sourceStats, statName, "errors");
+        failedJobs.push(failedJobFromItem(item, error));
+        await addAutomationLog("error", `Automation error: ${item.title}`, {
+          error: error.message,
+          runId
+        });
+      }
+
+      await settingsCollection.updateOne(
+        { _id: "automation" },
+        {
+          $set: {
+            "cronHealth.lastHeartbeatAt": new Date()
+          }
+        }
+      );
+    }
+
+    const quotaError = result.errors.some((message) => /429|quota|billing/i.test(message));
+
+    if (quotaError) {
+      result.status = "openai-quota-error";
+    } else if (result.errors.length) {
+      result.status = "completed-with-errors";
+    }
+  } catch (error) {
+    result.status = "failed";
+    result.errors.push(error.message);
+    failedJobs.push({
+      type: "fetch",
+      query: settings.query,
+      attempts: RSS_FETCH_RETRY_COUNT,
+      error: error.message,
+      createdAt: new Date()
+    });
+    await addAutomationLog("error", "RSS fetch failed", { error: error.message, runId });
+  } finally {
+    automationRunning = false;
+  }
+
+  const completedAt = new Date();
+  const nextScheduled = nextScheduledRunDate(intervalMinutes, completedAt);
+  const sourceStatsList = Object.values(sourceStats).sort((a, b) => (b.fresh + b.generated + b.pending) - (a.fresh + a.generated + a.pending));
+  const retainedFailedJobs = freshFailedJobs(failedJobs, completedAt);
+
+  result.sourceStats = sourceStatsList;
+
+  await settingsCollection.updateOne(
+    { _id: "automation" },
+    {
+      $set: {
+        enabled: settings.enabled,
+        intervalMinutes,
+        freshnessWindowHours: NEWS_FRESHNESS_HOURS,
+        lastRunAt: completedAt,
+        lastRunStatus: result.status,
+        lastRunMessage: automationMessage(result),
+        nextRunAt: nextScheduled,
+        staleRemoved,
+        sourceStats: sourceStatsList,
+        failedJobs: retainedFailedJobs,
+        cronHealth: {
+          enabled: Boolean(settings.enabled),
+          running: false,
+          runId,
+          runningSince: null,
+          lastStartedAt: now,
+          lastCompletedAt: completedAt,
+          lastHeartbeatAt: completedAt,
+          nextRunAt: nextScheduled
+        }
+      }
+    }
+  );
+
+  await addAutomationLog("cron-complete", `Automation finished: ${automationMessage(result)}`, {
+    runId,
+    completedAtIST: formatIST(completedAt),
+    nextRunAt: nextScheduled
+  });
+
+  return result;
+}
+
+function startAutomationCron() {
+  if (automationTask) {
+    automationTask.stop();
+  }
+
+  automationTask = cron.schedule(AUTOMATION_CRON_EXPRESSION, () => {
+    runNewsAutomation().catch((error) => console.error("Automation run failed:", error.message));
+  });
+}
+
+async function findRelatedNews(news, limit = 4) {
+  const conditions = [];
+
+  if (news.categorySlug) {
+    conditions.push({ categorySlug: news.categorySlug });
+  }
+
+  if (news.city) {
+    conditions.push({ city: news.city });
+  }
+
+  if (!conditions.length) {
+    conditions.push({ breaking: true });
+  }
+
+  const aiNews = await newsCollection
+    .find({
+      _id: { $ne: news._id },
+      status: "published",
+      $or: conditions
+    })
+    .sort({ featured: -1, trending: -1, breaking: -1, createdAt: -1 })
+    .limit(limit)
+    .toArray();
+  const manualNews = manualNewsCollection ? await manualNewsCollection
+    .find({
+      _id: { $ne: news._id },
+      status: "published",
+      $or: conditions
+    })
+    .sort({ featured: -1, trending: -1, breaking: -1, publishedAt: -1, createdAt: -1 })
+    .limit(limit)
+    .toArray() : [];
+
+  return [...manualNews, ...aiNews].slice(0, limit);
+}
+
+async function getCombinedPublishedNews(query = {}, limit = 24) {
+  const mongoQuery = buildNewsQuery(query);
+  const manualQuery = { ...mongoQuery };
+  const shouldIncludeManual = !normalizeBoolean(query.all) && !normalizeBoolean(query.includeAll) && query.includeManual !== "false";
+
+  if (!shouldIncludeManual || !manualNewsCollection) {
+    return newsCollection
+      .find(mongoQuery)
+      .sort({ featured: -1, trending: -1, breaking: -1, publishedAt: -1, createdAt: -1 })
+      .limit(limit)
+      .toArray();
+  }
+
+  manualQuery.status = query.status || "published";
+  const manualLimit = Math.ceil(limit * 0.65);
+  const aiLimit = limit;
+  const [manualNews, aiNews] = await Promise.all([
+    manualNewsCollection
+      .find(manualQuery)
+      .sort({ featured: -1, trending: -1, breaking: -1, publishedAt: -1, createdAt: -1 })
+      .limit(manualLimit)
+      .toArray(),
+    newsCollection
+      .find(mongoQuery)
+      .sort({ featured: -1, trending: -1, breaking: -1, publishedAt: -1, createdAt: -1 })
+      .limit(aiLimit)
+      .toArray()
+  ]);
+
+  return [...manualNews, ...aiNews].slice(0, limit);
+}
+
+async function findPublishedArticleBySlug(slug, category = "") {
+  const categorySlug = category ? toSlug(category) : "";
+  const categoryFilter = categorySlug
+    ? { $or: [{ categorySlug }, { city: categorySlug }] }
+    : {};
+  const query = { slug, status: "published", ...categoryFilter };
+
+  return (manualNewsCollection && await manualNewsCollection.findOne(query)) ||
+    await newsCollection.findOne(query);
+}
+
+async function incrementAnalytics(news, type = "view") {
+  if (!newsAnalyticsCollection || !news?._id) {
+    return;
+  }
+
+  const source = news.contentSource || (news.automated ? "ai" : "manual");
+  const field = type === "click" ? "clicks" : "views";
+  await newsAnalyticsCollection.updateOne(
+    { articleId: String(news._id), source },
+    {
+      $setOnInsert: {
+        articleId: String(news._id),
+        source,
+        slug: news.slug,
+        title: news.title,
+        category: news.category,
+        createdAt: new Date()
+      },
+      $inc: { [field]: 1 },
+      $set: { updatedAt: new Date() }
+    },
+    { upsert: true }
+  );
+
+  const collection = source === "manual" ? manualNewsCollection : newsCollection;
+  await collection.updateOne({ _id: news._id }, { $inc: { [field]: 1 }, $set: { analyticsUpdatedAt: new Date() } });
+}
+
+async function backfillNewsMetadata() {
+  const docs = await newsCollection
+    .find({
+      $or: [
+        { categorySlug: { $exists: false } },
+        { categoryPage: { $exists: false } },
+        { categoryBadge: { $exists: false } },
+        { slug: { $exists: false } },
+        { metaTitle: { $exists: false } },
+        { titleEn: { $exists: false } },
+        { summaryEn: { $exists: false } },
+        { bodyEn: { $exists: false } },
+        { summaryHi: { $exists: false } },
+        { bodyHi: { $exists: false } }
+      ]
+    })
+    .limit(500)
+    .toArray();
+
+  for (const doc of docs) {
+    const prepared = normalizeNews(
+      await prepareBilingualNews({
+        ...doc,
+        slug: doc.slug || `${toSlug(doc.title)}-${String(doc._id).slice(-6)}`
+      }, doc),
+      doc
+    );
+
+    await newsCollection.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          category: prepared.category,
+          categorySlug: prepared.categorySlug,
+          categoryPage: prepared.categoryPage,
+          categoryBadge: prepared.categoryBadge,
+          city: prepared.city,
+          image: prepared.image,
+          titleEn: prepared.titleEn,
+          summaryEn: prepared.summaryEn,
+          bodyEn: prepared.bodyEn,
+          titleHi: prepared.titleHi,
+          summaryHi: prepared.summaryHi,
+          bodyHi: prepared.bodyHi,
+          slug: prepared.slug,
+          metaTitle: prepared.metaTitle,
+          metaDescription: prepared.metaDescription,
+          ogTitle: prepared.ogTitle,
+          ogDescription: prepared.ogDescription,
+          schemaType: prepared.schemaType,
+          keywords: prepared.keywords,
+          translationStatus: prepared.translationStatus,
+          translationError: prepared.translationError,
+          trending: prepared.trending,
+          publishedAt: prepared.publishedAt
+        }
+      }
+    );
+  }
+}
+
+async function backfillNewsThumbnails() {
+  const docs = await newsCollection
+    .find({
+      $or: [
+        { sourceImage: { $exists: false } },
+        { thumbnailStatus: { $exists: false } },
+        { thumbnailHash: { $exists: false } },
+        {
+          $and: [
+            { optimizedThumbnail: { $exists: false } },
+            { aiThumbnail: { $exists: false } }
+          ]
+        }
+      ]
+    })
+    .limit(1000)
+    .toArray();
+
+  let updated = 0;
+
+  for (const doc of docs) {
+    try {
+      const prepared = normalizeNews({
+        ...doc,
+        slug: doc.slug || `${toSlug(doc.title || doc.titleEn || doc.titleHi || "news")}-${String(doc._id).slice(-6)}`,
+        sourceImage: preferredSourceImage(doc, doc)
+      }, doc);
+      const sourceImage = preferredSourceImage(prepared, doc);
+      const thumbnailFields = await buildThumbnailFields(
+        {
+          ...prepared,
+          sourceImage
+        },
+        doc,
+        {
+          action: sourceImage ? "use-source" : "backfill",
+          allowAi: false,
+          force: true
+        }
+      );
+      const update = {
+        image: thumbnailFields.image,
+        thumbnailHash: thumbnailFields.thumbnailHash,
+        thumbnailStatus: thumbnailFields.thumbnailStatus,
+        updatedAt: new Date()
+      };
+
+      if (thumbnailFields.sourceImage) {
+        update.sourceImage = thumbnailFields.sourceImage;
+      }
+
+      if (thumbnailFields.optimizedThumbnail) {
+        update.optimizedThumbnail = thumbnailFields.optimizedThumbnail;
+      }
+
+      if (thumbnailFields.aiThumbnail) {
+        update.aiThumbnail = thumbnailFields.aiThumbnail;
+      }
+
+      await newsCollection.updateOne({ _id: doc._id }, { $set: update });
+      updated += 1;
+    } catch (error) {
+      console.warn(`Thumbnail backfill skipped for ${doc._id}: ${error.message}`);
+    }
+  }
+
+  return updated;
+}
+
+function requestedLanguage(req) {
+  return req?.query?.lang === "en" ? "en" : "hi";
+}
+
+function localizedValue(news, field, language) {
+  if (language === "hi") {
+    return normalizeText(news[`${field}Hi`] || news[field] || news[`${field}En`]);
+  }
+
+  return normalizeText(news[`${field}En`] || news[field] || news[`${field}Hi`]);
+}
+
+function localizedNews(news, language) {
+  return {
+    ...news,
+    displayLanguage: language,
+    title: localizedValue(news, "title", language),
+    summary: localizedValue(news, "summary", language),
+    body: localizedValue(news, "body", language),
+    metaTitle: language === "hi" ? `${localizedValue(news, "title", language)} | Khabri Junction` : news.metaTitle,
+    metaDescription: language === "hi" ? trimForMeta(localizedValue(news, "summary", language)) : news.metaDescription,
+    ogTitle: language === "hi" ? localizedValue(news, "title", language) : news.ogTitle,
+    ogDescription: language === "hi" ? localizedValue(news, "summary", language) : news.ogDescription
+  };
+}
+
+function renderNewsSchema(news, related, req) {
+  const url = articleUrl(news, req);
+  const schema = {
+    "@context": "https://schema.org",
+    "@type": "NewsArticle",
+    headline: news.title,
+    description: news.metaDescription || news.summary,
+    image: [news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE],
+    datePublished: news.publishedAt || news.createdAt,
+    dateModified: news.updatedAt || news.createdAt,
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": url
+    },
+    author: {
+      "@type": "Person",
+      name: "Khabri Junction Desk",
+      image: `${publicBaseUrl(req)}/assets/logo-kj.png`
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Khabri Junction",
+      logo: {
+        "@type": "ImageObject",
+        url: `${publicBaseUrl(req)}/assets/logo-kj.png`
+      }
+    },
+    articleSection: news.category,
+    keywords: news.keywords,
+    thumbnailUrl: news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE,
+    creditText: news.sourceName || "Khabri Junction Desk",
+    isPartOf: {
+      "@type": "NewsMediaOrganization",
+      name: "Khabri Junction"
+    }
+  };
+
+  if (related.length) {
+    schema.relatedLink = related.map((item) => articleUrl(item, req));
+  }
+
+  return JSON.stringify(schema);
+}
+
+function formatArticleDate(value) {
+  return new Date(value || Date.now()).toLocaleString("hi-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
+  const language = requestedLanguage(req);
+  const article = localizedNews(news, language);
+  const url = articleUrl(news, req);
+  const categoryUrl = `/${landingPageForNews(news)}`;
+  const shareText = encodeURIComponent(article.title);
+  const shareUrl = encodeURIComponent(url);
+  const sourceName = news.sourceName || news.feedSourceName || "Khabri Junction";
+  const publishedAt = news.publishedAt || news.sourcePublishedAt || news.createdAt;
+  const updatedAt = news.updatedAt || publishedAt;
+  const articleBanner = news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE;
+  const sourceFigure = news.sourceImage && news.sourceImage !== articleBanner
+    ? `<figure class="article-source-figure"><img class="article-source-image" src="${escapeHTML(news.sourceImage)}" alt="${escapeHTML(article.title)} original image" loading="lazy" decoding="async"><figcaption>Image credit: ${escapeHTML(sourceName)}</figcaption></figure>`
+    : "";
+  const relatedCards = related.map((item) => `
+    <a class="article-related-card" href="${escapeHTML(articleUrl(item, req))}?lang=${language}">
+      <span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+      <strong>${escapeHTML(localizedValue(item, "title", language))}</strong>
+    </a>
+  `).join("");
+  const prevLink = adjacent.previous
+    ? `<a href="${escapeHTML(articleUrl(adjacent.previous, req))}?lang=${language}"><span>पिछली खबर</span><strong>${escapeHTML(localizedValue(adjacent.previous, "title", language))}</strong></a>`
+    : "";
+  const nextLink = adjacent.next
+    ? `<a href="${escapeHTML(articleUrl(adjacent.next, req))}?lang=${language}"><span>अगली खबर</span><strong>${escapeHTML(localizedValue(adjacent.next, "title", language))}</strong></a>`
+    : "";
+  const paragraphs = escapeHTML(article.body || article.summary)
+    .split(/\n{2,}/)
+    .filter(Boolean)
+    .map((paragraph) => `<p>${paragraph}</p>`)
+    .join("");
+  const adTop = settings.ads?.["article-top"] || settings.ads?.inArticle || "ADVERTISEMENT";
+  const adBottom = settings.ads?.["article-bottom"] || settings.ads?.inArticle || "ADVERTISEMENT";
+  const sidebarAd = settings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250";
+  const mobileStickyAd = settings.ads?.["mobile-sticky"] || "ADVERTISEMENT";
+
+  return `<!DOCTYPE html>
+<html lang="${escapeHTML(language)}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHTML(article.metaTitle || article.title)}</title>
+  <meta name="description" content="${escapeHTML(article.metaDescription || article.summary)}">
+  <meta name="keywords" content="${escapeHTML(news.keywords || "")}">
+  <link rel="canonical" href="${escapeHTML(url)}">
+  <link rel="alternate" hreflang="en" href="${escapeHTML(url)}?lang=en">
+  <link rel="alternate" hreflang="hi" href="${escapeHTML(url)}?lang=hi">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${escapeHTML(article.ogTitle || article.title)}">
+  <meta property="og:description" content="${escapeHTML(article.ogDescription || article.summary)}">
+  <meta property="og:image" content="${escapeHTML(articleBanner)}">
+  <meta property="og:url" content="${escapeHTML(url)}">
+  <meta property="article:section" content="${escapeHTML(news.category || "News")}">
+  <meta property="article:published_time" content="${new Date(news.publishedAt || news.createdAt).toISOString()}">
+  <meta property="article:modified_time" content="${new Date(news.updatedAt || news.createdAt).toISOString()}">
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="apple-touch-icon" href="/assets/logo-kj.png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">${renderNewsSchema(article, related, req)}</script>
+</head>
+<body class="article-page">
+  <header class="portal-site-header">
+    <a class="portal-brand" href="/index.html" aria-label="Khabri Junction home">
+      <img src="/assets/logo-kj.png" alt="Khabri Junction logo">
+      <div><strong>KHABRI JUNCTION</strong><span>छत्तीसगढ़ की ताजा खबरें</span></div>
+    </a>
+    <nav class="portal-main-nav" aria-label="News pages">
+      <a href="/index.html">होम</a>
+      <a href="/durg.html">दुर्ग</a>
+      <a href="/bhilai.html">भिलाई</a>
+      <a href="/raipur.html">रायपुर</a>
+      <a href="/bilaspur.html">बिलासपुर</a>
+      <a href="/politics.html">राजनीति</a>
+      <a href="/crime.html">क्राइम</a>
+      <a href="/sports.html">खेल</a>
+      <a href="/astrology.html">राशिफल</a>
+    </nav>
+    <div class="portal-language-switch" aria-label="Article language">
+      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">हिंदी</a>
+      <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(url)}?lang=en">English</a>
+    </div>
+  </header>
+  <main class="article-shell">
+    <article class="article-main">
+      <a class="portal-back" href="${escapeHTML(categoryUrl)}">Home / ${escapeHTML(news.category || "News")}</a>
+      <span class="tag">${escapeHTML(news.categoryBadge || news.category || "NEWS")}</span>
+      <h1>${escapeHTML(article.title)}</h1>
+      <p class="article-summary">${escapeHTML(article.summary)}</p>
+      <div class="article-meta">
+        <span>Published: ${escapeHTML(formatArticleDate(publishedAt))}</span>
+        <span>Updated: ${escapeHTML(formatArticleDate(updatedAt))}</span>
+        <span>Source: ${escapeHTML(sourceName)}</span>
+        <span>Khabri Junction Desk</span>
+      </div>
+      <div class="share-row" aria-label="Share article">
+        <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareText}" target="_blank" rel="noopener">X</a>
+        <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+      <img class="article-hero-image" src="${escapeHTML(articleBanner)}" alt="${escapeHTML(article.title)}" loading="eager" decoding="async">
+      <div class="ad-slot in-article-ad">${adTop}</div>
+      ${sourceFigure}
+      <div class="article-body">${paragraphs}</div>
+      <div class="ad-slot in-article-ad">${adBottom}</div>
+      <nav class="article-next-prev" aria-label="Next and previous articles">${prevLink}${nextLink}</nav>
+    </article>
+    <aside class="article-sidebar">
+      <div class="portal-side-ad">${sidebarAd}</div>
+      <section class="article-related">
+        <h2>संबंधित खबरें</h2>
+        ${relatedCards || "<p>No related news yet.</p>"}
+      </section>
+    </aside>
+  </main>
+  <div class="mobile-sticky-ad">${mobileStickyAd}</div>
+  <footer class="portal-footer">&copy; 2026 KHABRI JUNCTION - All Rights Reserved</footer>
+</body>
+</html>`;
+}
+
+function renderSearchPage(results, query, req) {
+  const language = requestedLanguage(req);
+  const title = query ? `${language === "hi" ? "Search result" : "Search results"} for ${query} | Khabri Junction` : "Search News | Khabri Junction";
+  const description = query ? `Latest Khabri Junction news results for ${query}.` : "Search latest Khabri Junction news by keyword, city or category.";
+  const resultCards = results.map((rawItem) => {
+    const item = localizedNews(rawItem, language);
+
+    return `
+    <article class="search-result-card">
+      <a href="${escapeHTML(articleUrl(rawItem, req))}?lang=${language}">
+        <img src="${escapeHTML(item.image || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
+        <div>
+          <span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+          <h2>${escapeHTML(item.title)}</h2>
+          <p>${escapeHTML(item.summary || "")}</p>
+        </div>
+      </a>
+    </article>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="${escapeHTML(language)}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHTML(title)}</title>
+  <meta name="description" content="${escapeHTML(description)}">
+  <link rel="canonical" href="${escapeHTML(publicBaseUrl(req))}/search?q=${encodeURIComponent(query || "")}&lang=${language}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${escapeHTML(title)}">
+  <meta property="og:description" content="${escapeHTML(description)}">
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SearchResultsPage","name":${JSON.stringify(title)},"description":${JSON.stringify(description)}}</script>
+</head>
+<body class="article-page">
+  <header class="portal-site-header">
+    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>Fast local news for Chhattisgarh</span></div></a>
+    <nav class="portal-main-nav"><a href="/index.html">Home</a><a href="/durg.html">Durg</a><a href="/sports.html">Sports</a><a href="/politics.html">Politics</a><a href="/crime.html">Crime</a></nav>
+  </header>
+  <main class="search-shell">
+    <form class="portal-search-form" action="/search" method="get">
+      <input name="q" value="${escapeHTML(query || "")}" placeholder="Search news, city, category">
+      <input name="lang" value="${escapeHTML(language)}" type="hidden">
+      <button class="read-btn" type="submit">Search</button>
+    </form>
+    <h1>${escapeHTML(query ? `Search: ${query}` : "Search News")}</h1>
+    <div class="search-results">${resultCards || "<p>No published news found.</p>"}</div>
+  </main>
+  <footer class="portal-footer">&copy; 2026 KHABRI JUNCTION - All Rights Reserved</footer>
+</body>
+</html>`;
+}
+
+async function findAdjacentNews(news) {
+  const publishedAt = news.publishedAt || news.createdAt || new Date();
+  const baseQuery = { status: "published", _id: { $ne: news._id } };
+  const previous = await newsCollection
+    .findOne({ ...baseQuery, publishedAt: { $lt: publishedAt } }, { sort: { publishedAt: -1, createdAt: -1 } });
+  const next = await newsCollection
+    .findOne({ ...baseQuery, publishedAt: { $gt: publishedAt } }, { sort: { publishedAt: 1, createdAt: 1 } });
+
+  return { previous, next };
+}
+
+function renderCategoryLandingPage(route, articles, settings, req) {
+  const title = `${route.title} | Khabri Junction`;
+  const canonical = `${publicBaseUrl(req)}${route.path}`;
+  const cards = articles.map((rawItem) => {
+    const item = localizedNews(rawItem, "hi");
+    return `
+      <article class="news-card">
+        <img src="${escapeHTML(item.optimizedThumbnail || item.aiThumbnail || item.image || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
+        <div class="card-body">
+          <span class="tag">${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+          <h3>${escapeHTML(item.title)}</h3>
+          <p>${escapeHTML(item.summary || "")}</p>
+          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">पूरी खबर पढ़ें</a>
+        </div>
+      </article>`;
+  }).join("");
+  const videos = (settings.videos || []).slice(0, 3).map((video) => `
+    <a class="portal-side-item" href="${escapeHTML(video.url || "/viral-videos")}" target="${video.url ? "_blank" : "_self"}" rel="noopener">
+      <div><strong>${escapeHTML(video.title || "Viral Video")}</strong><span>${escapeHTML(video.type || "Video")}</span></div>
+      <img src="${escapeHTML(video.thumbnail || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(video.title || "Viral Video")}" loading="lazy" decoding="async">
+    </a>
+  `).join("");
+  const weather = (settings.weather || []).map((item) => `
+    <div class="market-row"><div><strong>${escapeHTML(item.city)}</strong><small>${escapeHTML(item.condition || "Weather")}</small></div><span>${escapeHTML(item.temp || "--")}</span></div>
+  `).join("");
+  const market = (settings.market || []).map((item) => `
+    <div class="market-row"><div><strong>${escapeHTML(item.name)}</strong><small>Live tracker</small></div><span class="up">${escapeHTML(item.value || "--")} ${escapeHTML(item.change || "")}</span></div>
+  `).join("");
+  const mainWidget = route.path === "/weather-update"
+    ? `<section class="market-card category-focus-card">
+        <div class="section-title small"><span></span><strong>दुर्ग, भिलाई और रायपुर मौसम</strong></div>
+        <div class="weather-mini-grid">${(settings.weather || []).map((item) => `
+          <div class="weather-mini-card">
+            <strong>${escapeHTML(item.city || "City")}</strong>
+            <span>${escapeHTML(item.temp || "--")}</span>
+            <small>${escapeHTML(item.condition || "Weather update")}</small>
+          </div>
+        `).join("")}</div>
+      </section>`
+    : route.path === "/market-news"
+      ? `<section class="market-card category-focus-card">
+          <div class="section-title small"><span></span><strong>रीयल-टाइम मार्केट ट्रैकर</strong></div>
+          <div class="market-list">${market}</div>
+          <p class="market-note">Admin panel से values manually update कर सकते हैं।</p>
+        </section>`
+      : "";
+
+  return `<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHTML(title)}</title>
+  <meta name="description" content="${escapeHTML(route.description)}">
+  <link rel="canonical" href="${escapeHTML(canonical)}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${escapeHTML(title)}">
+  <meta property="og:description" content="${escapeHTML(route.description)}">
+  <meta property="og:url" content="${escapeHTML(canonical)}">
+  <meta property="og:image" content="${escapeHTML(publicBaseUrl(req))}/assets/logo-kj.png">
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(title)},"description":${JSON.stringify(route.description)},"url":${JSON.stringify(canonical)}}</script>
+</head>
+<body class="article-page">
+  <div class="ad-slot article-top-ad">${settings.ads?.header || "ADVERTISEMENT"}</div>
+  <header class="portal-site-header">
+    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>छत्तीसगढ़ की ताजा खबरें</span></div></a>
+    <nav class="portal-main-nav">
+      <a href="/index.html">होम</a>
+      <a href="/durg.html">दुर्ग</a>
+      <a href="/bhilai.html">भिलाई</a>
+      <a href="/raipur-news">रायपुर</a>
+      <a href="/market-news">आज का बाजार</a>
+      <a href="/weather-update">मौसम</a>
+      <a href="/viral-videos">ट्रेंडिंग रील</a>
+      <a href="/desh-duniya-news">देश-दुनिया</a>
+      <a href="/mp-shahdol-news">शहडोल</a>
+    </nav>
+  </header>
+  <main class="portal-shell">
+    <section class="portal-layout">
+      <div>
+        <div class="section-title"><span></span><strong>${escapeHTML(route.title)}</strong></div>
+        <p class="article-summary">${escapeHTML(route.description)}</p>
+        ${mainWidget}
+        <div class="news-grid latest-grid">${cards || `<div class="ad-slot">इस सेक्शन में जल्द नई खबरें आएंगी।</div>`}</div>
+      </div>
+      <aside class="portal-sidebar">
+        <div class="portal-side-ad">${settings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
+        <section class="market-card"><div class="section-title small"><span></span><strong>मौसम अपडेट</strong></div><div class="market-list">${weather}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>मार्केट ट्रैकर</strong></div><div class="market-list">${market}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>वायरल वीडियो</strong></div>${videos || "<p>No videos yet.</p>"}</section>
+      </aside>
+    </section>
+  </main>
+  <footer class="portal-footer">&copy; 2026 KHABRI JUNCTION - All Rights Reserved</footer>
+</body>
+</html>`;
+}
+
+function storySlides(news) {
+  const paragraphs = normalizeText(news.body || news.summary).split(/\n{2,}/).filter(Boolean);
+  return [
+    { title: news.title, text: news.summary || news.title },
+    ...paragraphs.slice(0, 4).map((paragraph, index) => ({ title: index ? "Update" : news.category || "News", text: paragraph }))
+  ].slice(0, 5);
+}
+
+function renderWebStory(news, req) {
+  const language = requestedLanguage(req);
+  const storyNews = localizedNews(news, language);
+  const canonical = articleUrl(news, req);
+  const storyUrl = `${publicBaseUrl(req)}/web-stories/${news.slug}?lang=${language}`;
+  const slides = storySlides(storyNews).map((slide, index) => `
+    <amp-story-page id="page-${index + 1}">
+      <amp-story-grid-layer template="fill">
+        <amp-img src="${escapeHTML(news.image || DEFAULT_NEWS_IMAGE)}" width="720" height="1280" layout="responsive" alt="${escapeHTML(storyNews.title)}"></amp-img>
+      </amp-story-grid-layer>
+      <amp-story-grid-layer template="vertical" class="story-layer">
+        <span>${escapeHTML(news.categoryBadge || news.category || "NEWS")}</span>
+        <h1>${escapeHTML(slide.title)}</h1>
+        <p>${escapeHTML(slide.text)}</p>
+      </amp-story-grid-layer>
+    </amp-story-page>
+  `).join("");
+
+  return `<!doctype html>
+<html amp lang="${escapeHTML(language)}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1">
+  <title>${escapeHTML(storyNews.title)} | Khabri Junction Web Story</title>
+  <meta name="description" content="${escapeHTML(storyNews.metaDescription || storyNews.summary)}">
+  <link rel="canonical" href="${escapeHTML(canonical)}">
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <script async custom-element="amp-story" src="https://cdn.ampproject.org/v0/amp-story-1.0.js"></script>
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <style amp-boilerplate>body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-o-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}</style>
+  <noscript><style amp-boilerplate>body{-webkit-animation:none;-moz-animation:none;-ms-animation:none;animation:none}</style></noscript>
+  <style amp-custom>
+    amp-story{font-family:Arial,sans-serif;color:#fff}
+    .story-layer{align-content:end;padding:42px;background:linear-gradient(180deg,rgba(0,0,0,0.05),rgba(0,0,0,0.72))}
+    .story-layer span{width:max-content;padding:7px 10px;border-radius:6px;background:#d70f1c;font-weight:800;font-size:13px}
+    .story-layer h1{font-size:34px;line-height:1.08;margin:14px 0 8px}
+    .story-layer p{font-size:18px;line-height:1.45}
+  </style>
+</head>
+<body>
+  <amp-story standalone title="${escapeHTML(storyNews.title)}" publisher="Khabri Junction" publisher-logo-src="${publicBaseUrl(req)}/assets/logo-kj.png" poster-portrait-src="${escapeHTML(news.image || DEFAULT_NEWS_IMAGE)}">
+    ${slides}
+    <amp-story-bookend src="${publicBaseUrl(req)}/api/web-story-bookend/${news.slug}" layout="nodisplay"></amp-story-bookend>
+  </amp-story>
+</body>
+</html>`;
+}
+
+function renderWebStoriesIndex(news, req) {
+  const language = requestedLanguage(req);
+  const cards = news.map((rawItem) => {
+    const item = localizedNews(rawItem, language);
+
+    return `
+      <a class="web-story-card" href="/web-stories/${escapeHTML(item.slug)}?lang=${language}">
+        <img src="${escapeHTML(item.image || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
+        <span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+        <strong>${escapeHTML(item.title)}</strong>
+      </a>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html lang="${escapeHTML(language)}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Khabri Junction Web Stories</title>
+  <meta name="description" content="Mobile-first Web Stories from Khabri Junction.">
+  <link rel="canonical" href="${publicBaseUrl(req)}/web-stories">
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="article-page">
+  <header class="portal-site-header"><a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>Web Stories</span></div></a></header>
+  <main class="web-stories-shell"><h1>Web Stories</h1><div class="web-story-grid">${cards || "<p>No published stories yet.</p>"}</div></main>
+  <footer class="portal-footer">&copy; 2026 KHABRI JUNCTION - All Rights Reserved</footer>
+</body>
+</html>`;
+}
+
+app.get("/api/health", (req, res) => {
+  res.json({
+    ok: true,
+    database: MONGODB_DB,
+    collection: NEWS_COLLECTION,
+    collections: [NEWS_COLLECTION, MANUAL_NEWS_COLLECTION, ADS_COLLECTION, NEWS_ANALYTICS_COLLECTION],
+    mongoConnected: mongoReady,
+    mongoError: mongoError ? mongoError.message : null,
+    automationRunning,
+    openAIConfigured: Boolean(OPENAI_API_KEY)
+  });
+});
+
+app.get("/api/automation", requireDatabase, async (req, res, next) => {
+  try {
+    const settings = await getAutomationSettings();
+    res.json(serializeAutomationSettings(settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/automation", requireDatabase, async (req, res, next) => {
+  try {
+    const current = await getAutomationSettings();
+    const enabled = normalizeBoolean(req.body.enabled);
+    const query = normalizeText(req.body.query) || current.query || DEFAULT_AUTOMATION_QUERY;
+    const update = {
+      enabled,
+      query,
+      intervalMinutes: AUTOMATION_INTERVAL_MINUTES,
+      nextRunAt: nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES),
+      "cronHealth.enabled": enabled,
+      "cronHealth.nextRunAt": nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES),
+      updatedAt: new Date()
+    };
+
+    await settingsCollection.updateOne({ _id: "automation" }, { $set: update }, { upsert: true });
+    const settings = await getAutomationSettings();
+    res.json(serializeAutomationSettings(settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/automation/run", requireDatabase, async (req, res, next) => {
+  try {
+    const rawLimit = Number(req.body?.limit || req.query.limit || 8);
+    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 8, 1), 15);
+    const result = await runNewsAutomation({ force: true, limit });
+    const settings = await getAutomationSettings();
+
+    res.json({
+      ...result,
+      settings: serializeAutomationSettings(settings)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/automation/run-failed", requireDatabase, async (req, res, next) => {
+  try {
+    const rawLimit = Number(req.body?.limit || req.query.limit || 8);
+    const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 8, 1), 15);
+    const result = await runNewsAutomation({ force: true, limit, retryFailed: true });
+    const settings = await getAutomationSettings();
+
+    res.json({
+      ...result,
+      settings: serializeAutomationSettings(settings)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/automation/logs", requireDatabase, async (req, res, next) => {
+  try {
+    const settings = await getAutomationSettings();
+    res.json(Array.isArray(settings.logs) ? settings.logs : []);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/site-settings", requireDatabase, async (req, res, next) => {
+  try {
+    const settings = await getSiteSettings();
+    res.json(settings);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/site-settings", requireDatabase, async (req, res, next) => {
+  try {
+    const current = await getSiteSettings();
+    const update = {
+      weather: Array.isArray(req.body?.weather) ? req.body.weather : current.weather,
+      market: Array.isArray(req.body?.market) ? req.body.market : current.market,
+      videos: Array.isArray(req.body?.videos) ? req.body.videos : current.videos,
+      ads: { ...(current.ads || {}), ...(req.body?.ads || {}) },
+      notification: { ...(current.notification || {}), ...(req.body?.notification || {}) },
+      updatedAt: new Date()
+    };
+
+    await settingsCollection.updateOne({ _id: "site" }, { $set: update }, { upsert: true });
+    res.json(await getSiteSettings());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/ads", requireDatabase, async (req, res, next) => {
+  try {
+    const query = normalizeBoolean(req.query.active) ? { enabled: true } : {};
+
+    if (req.query.position) {
+      query.position = normalizeText(req.query.position);
+    }
+
+    const ads = await adsCollection.find(query).sort({ position: 1, updatedAt: -1 }).toArray();
+    res.json(ads.map(serializeAd));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ads", requireDatabase, async (req, res, next) => {
+  try {
+    const ad = normalizeAd(req.body || {});
+    const result = await adsCollection.insertOne(ad);
+    res.status(201).json(serializeAd(await adsCollection.findOne({ _id: result.insertedId })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/ads/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await adsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "ad not found" });
+    }
+
+    await adsCollection.updateOne({ _id }, { $set: normalizeAd(req.body || {}, existing) });
+    res.json(serializeAd(await adsCollection.findOne({ _id })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/ads/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const result = await adsCollection.deleteOne({ _id: parseObjectId(req.params.id) });
+
+    if (!result.deletedCount) {
+      return res.status(404).json({ error: "ad not found" });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/uploads", requireDatabase, async (req, res, next) => {
+  try {
+    const dataUrl = normalizeText(req.body?.dataUrl);
+    const originalName = normalizeText(req.body?.filename || "upload.png");
+    const match = dataUrl.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([\s\S]+)$/i);
+
+    if (!match) {
+      return res.status(400).json({ error: "valid image dataUrl is required" });
+    }
+
+    const extByMime = { "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/webp": "webp", "image/gif": "gif" };
+    const ext = extByMime[match[1].toLowerCase()] || path.extname(originalName).replace(".", "") || "png";
+    const uploadDir = path.join(__dirname, "assets", "uploads");
+    fs.mkdirSync(uploadDir, { recursive: true });
+    const filename = `${Date.now()}-${hashValue(originalName).slice(0, 8)}.${ext}`;
+    const filePath = path.join(uploadDir, filename);
+    fs.writeFileSync(filePath, Buffer.from(match[2], "base64"));
+    res.status(201).json({ url: `/assets/uploads/${filename}` });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/manual-news", requireDatabase, async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 300);
+    const news = await manualNewsCollection
+      .find(buildNewsQuery(req.query))
+      .sort({ featured: -1, trending: -1, breaking: -1, publishedAt: -1, createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    res.json(news.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/manual-news", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await normalizeManualNews(req.body || {});
+    const result = await manualNewsCollection.insertOne(news);
+    res.status(201).json(serializeNews(await manualNewsCollection.findOne({ _id: result.insertedId })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/manual-news/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await manualNewsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "manual news not found" });
+    }
+
+    const news = await normalizeManualNews(req.body || {}, existing);
+    await manualNewsCollection.updateOne({ _id }, { $set: news });
+    res.json(serializeNews(await manualNewsCollection.findOne({ _id })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/manual-news/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const result = await manualNewsCollection.deleteOne({ _id: parseObjectId(req.params.id) });
+
+    if (!result.deletedCount) {
+      return res.status(404).json({ error: "manual news not found" });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news-analytics", requireDatabase, async (req, res, next) => {
+  try {
+    const analytics = await newsAnalyticsCollection.find({}).sort({ views: -1, clicks: -1, updatedAt: -1 }).limit(200).toArray();
+    res.json(analytics.map((item) => ({ ...item, _id: String(item._id) })));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news-analytics/click", requireDatabase, async (req, res, next) => {
+  try {
+    const id = normalizeText(req.body?.id);
+    const source = normalizeText(req.body?.source || "manual");
+    const collection = source === "ai" ? newsCollection : manualNewsCollection;
+    const news = ObjectId.isValid(id) ? await collection.findOne({ _id: new ObjectId(id) }) : null;
+
+    if (!news) {
+      return res.status(404).json({ error: "article not found" });
+    }
+
+    await incrementAnalytics(news, "click");
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+CLEAN_CATEGORY_ROUTES.forEach((route) => {
+  app.get(route.path, requireDatabase, async (req, res, next) => {
+    try {
+      const category = categoryFromValue(route.category);
+      const articles = await getCombinedPublishedNews(
+        category ? { status: "published", section: category.slug } : { status: "published", q: route.category },
+        24
+      );
+      const settings = await getSiteSettings();
+
+      res.type("html").send(renderCategoryLandingPage(route, articles, settings, req));
+    } catch (error) {
+      next(error);
+    }
+  });
+});
+
+app.get("/news-sitemap.xml", requireDatabase, async (req, res, next) => {
+  try {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const [manualNews, aiNews] = await Promise.all([
+      manualNewsCollection.find({
+        status: "published",
+        publishedAt: { $gte: twoDaysAgo }
+      }).sort({ publishedAt: -1, createdAt: -1 }).limit(500).toArray(),
+      newsCollection
+      .find({
+        status: "published",
+        publishedAt: { $gte: twoDaysAgo }
+      })
+      .sort({ publishedAt: -1, createdAt: -1 })
+      .limit(1000)
+      .toArray()
+    ]);
+    const news = [...manualNews, ...aiNews].slice(0, 1000);
+    const items = news.map((item) => `
+  <url>
+    <loc>${escapeXML(articleUrl(item, req))}</loc>
+    <news:news>
+      <news:publication>
+        <news:name>Khabri Junction</news:name>
+        <news:language>${escapeXML(item.language || "hi")}</news:language>
+      </news:publication>
+      <news:publication_date>${new Date(item.publishedAt || item.createdAt).toISOString()}</news:publication_date>
+      <news:title>${escapeXML(item.title)}</news:title>
+    </news:news>
+  </url>`).join("");
+
+    res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">${items}
+</urlset>`);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/sitemap.xml", requireDatabase, async (req, res, next) => {
+  try {
+    const staticPages = [
+      "index.html",
+      "breaking.html",
+      "durg.html",
+      "bhilai.html",
+      "raipur.html",
+      "bilaspur.html",
+      "sports.html",
+      "astrology.html",
+      "politics.html",
+      "crime.html",
+      "entertainment.html",
+      "health.html",
+      "jobs.html",
+      "web-stories",
+      ...CLEAN_CATEGORY_ROUTES.map((route) => route.path.replace(/^\/+/, ""))
+    ];
+    const [manualNews, aiNews] = await Promise.all([
+      manualNewsCollection.find({ status: "published" }).sort({ publishedAt: -1, createdAt: -1 }).limit(1000).toArray(),
+      newsCollection.find({ status: "published" }).sort({ publishedAt: -1, createdAt: -1 }).limit(5000).toArray()
+    ]);
+    const news = [...manualNews, ...aiNews].slice(0, 5000);
+    const urls = [
+      ...staticPages.map((page) => ({ loc: `${publicBaseUrl(req)}/${page}`, lastmod: new Date() })),
+      ...news.flatMap((item) => [
+        { loc: articleUrl(item, req), lastmod: item.updatedAt || item.publishedAt || item.createdAt },
+        { loc: `${publicBaseUrl(req)}/web-stories/${item.slug}`, lastmod: item.updatedAt || item.publishedAt || item.createdAt }
+      ])
+    ];
+
+    res.type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map((item) => `  <url><loc>${escapeXML(item.loc)}</loc><lastmod>${new Date(item.lastmod).toISOString()}</lastmod></url>`).join("\n")}
+</urlset>`);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/robots.txt", (req, res) => {
+  const base = publicBaseUrl(req);
+
+  res.type("text/plain").send(`User-agent: *
+Allow: /
+Disallow: /admin.html
+Disallow: /api/
+
+Sitemap: ${base}/sitemap.xml
+Sitemap: ${base}/news-sitemap.xml
+`);
+});
+
+app.get("/search", requireDatabase, async (req, res, next) => {
+  try {
+    const q = normalizeText(req.query.q);
+    const results = q ? await getCombinedPublishedNews({ q, status: "published" }, 50) : [];
+
+    res.type("html").send(renderSearchPage(results, q, req));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/search", requireDatabase, async (req, res, next) => {
+  try {
+    const q = normalizeText(req.query.q);
+    const results = q ? await getCombinedPublishedNews({ q, status: "published" }, 30) : [];
+
+    res.json(results.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/web-stories", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await getCombinedPublishedNews({ status: "published" }, 30);
+    res.type("html").send(renderWebStoriesIndex(news, req));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/web-stories/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await findPublishedArticleBySlug(req.params.slug);
+
+    if (!news) {
+      return res.status(404).send("Story not found");
+    }
+
+    res.type("html").send(renderWebStory(news, req));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/web-story-bookend/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await findPublishedArticleBySlug(req.params.slug);
+
+    if (!news) {
+      return res.status(404).json({ error: "story not found" });
+    }
+
+    const related = await findRelatedNews(news, 3);
+    res.json({
+      bookendVersion: "v1.0",
+      shareProviders: ["facebook", "twitter", "whatsapp"],
+      components: [
+        {
+          type: "heading",
+          text: "Related News"
+        },
+        ...related.map((item) => ({
+          type: "small",
+          title: item.title,
+          url: articleUrl(item, req),
+          image: item.image || DEFAULT_NEWS_IMAGE
+        }))
+      ]
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/news/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await findPublishedArticleBySlug(req.params.slug);
+
+    if (!news) {
+      return res.status(404).send("News not found");
+    }
+
+    await incrementAnalytics(news, "view");
+    const related = await findRelatedNews(news, 4);
+    const adjacent = await findAdjacentNews(news);
+    const settings = await getSiteSettings();
+    res.type("html").send(renderArticlePage(news, related, req, adjacent, settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/:category/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    if (!categoryFromValue(req.params.category)) {
+      return next();
+    }
+
+    const category = toSlug(req.params.category);
+    const news = await findPublishedArticleBySlug(req.params.slug, category);
+
+    if (!news) {
+      return next();
+    }
+
+    await incrementAnalytics(news, "view");
+    const related = await findRelatedNews(news, 4);
+    const adjacent = await findAdjacentNews(news);
+    const settings = await getSiteSettings();
+    res.type("html").send(renderArticlePage(news, related, req, adjacent, settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news", requireDatabase, async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 300);
+    const news = await getCombinedPublishedNews(req.query, limit);
+
+    res.json(news.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news/by-slug/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const news = (manualNewsCollection && await manualNewsCollection.findOne({ slug: req.params.slug })) ||
+      await newsCollection.findOne({ slug: req.params.slug });
+
+    if (!news) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    res.json(serializeNews(news));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news/:id/related", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await newsCollection.findOne({ _id: parseObjectId(req.params.id) });
+
+    if (!news) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const related = await findRelatedNews(news, 6);
+    res.json(related.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news/:id/translate", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const force = normalizeBoolean(req.body?.force);
+    const input = force
+      ? {
+          ...existing,
+          titleEn: existing.language === "hi" ? "" : existing.titleEn,
+          summaryEn: existing.language === "hi" ? "" : existing.summaryEn,
+          bodyEn: existing.language === "hi" ? "" : existing.bodyEn,
+          titleHi: existing.language === "hi" ? existing.titleHi : "",
+          summaryHi: existing.language === "hi" ? existing.summaryHi : "",
+          bodyHi: existing.language === "hi" ? existing.bodyHi : ""
+        }
+      : existing;
+    const news = normalizeNews(await prepareBilingualNews(input, existing), existing);
+
+    await newsCollection.updateOne({ _id }, { $set: news });
+    const updated = await newsCollection.findOne({ _id });
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news/:id/thumbnail", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const action = normalizeText(req.body?.action || "use-source");
+    const existingImageAsSource = !isLikelyLowQualityImage(existing.image) && !normalizeText(existing.image).startsWith("data:")
+      ? existing.image
+      : "";
+    const sourceImage = normalizeText(req.body?.sourceImage || existing.sourceImage || existing.sourceImageUrl || existingImageAsSource);
+    const thumbnailFields = await buildThumbnailFields(
+      {
+        ...existing,
+        sourceImage,
+        categoryBadge: existing.categoryBadge || existing.category,
+        city: existing.city
+      },
+      existing,
+      {
+        action,
+        force: action === "regenerate-ai"
+      }
+    );
+    const update = {
+      sourceImage: thumbnailFields.sourceImage,
+      optimizedThumbnail: thumbnailFields.optimizedThumbnail,
+      aiThumbnail: thumbnailFields.aiThumbnail,
+      thumbnailHash: thumbnailFields.thumbnailHash,
+      thumbnailStatus: thumbnailFields.thumbnailStatus,
+      image: thumbnailFields.image,
+      updatedAt: new Date()
+    };
+
+    await newsCollection.updateOne({ _id }, { $set: update });
+    const updated = await newsCollection.findOne({ _id });
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const news = await newsCollection.findOne({ _id: parseObjectId(req.params.id) });
+
+    if (!news) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    res.json(serializeNews(news));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news", requireDatabase, async (req, res, next) => {
+  try {
+    const news = normalizeNews(await prepareBilingualNews(req.body));
+    const result = await newsCollection.insertOne(news);
+    const created = await newsCollection.findOne({ _id: result.insertedId });
+
+    res.status(201).json(serializeNews(created));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/news/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const news = normalizeNews(await prepareBilingualNews(req.body, existing), existing);
+    await newsCollection.updateOne({ _id }, { $set: news });
+    const updated = await newsCollection.findOne({ _id });
+    const previousStatus = existing.status || "published";
+    const nextStatus = updated.status || "published";
+
+    if (previousStatus !== nextStatus) {
+      if (nextStatus === "published") {
+        await addAutomationLog("approved", `Approved and published: ${updated.title}`, { id: String(updated._id) });
+      } else if (nextStatus === "rejected") {
+        await addAutomationLog("rejected", `Rejected article: ${updated.title}`, { id: String(updated._id) });
+      } else if (nextStatus === "pending") {
+        await addAutomationLog("pending", `Moved article to pending: ${updated.title}`, { id: String(updated._id) });
+      }
+    }
+
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news/:id/approve", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const news = normalizeNews(await prepareBilingualNews({ ...existing, ...req.body, status: "published" }, existing), existing);
+    await newsCollection.updateOne({ _id }, { $set: news });
+    const updated = await newsCollection.findOne({ _id });
+    await addAutomationLog("approved", `Approved and published: ${updated.title}`, { id: String(updated._id) });
+
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news/:id/reject", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const news = normalizeNews(await prepareBilingualNews({ ...existing, ...req.body, status: "rejected", featured: false, breaking: false, trending: false }, existing), existing);
+    await newsCollection.updateOne({ _id }, { $set: news });
+    const updated = await newsCollection.findOne({ _id });
+    await addAutomationLog("rejected", `Rejected article: ${updated.title}`, { id: String(updated._id) });
+
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/news/bulk-approve", requireDatabase, async (req, res, next) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(ObjectId.isValid).map((id) => new ObjectId(id)) : [];
+    const filter = ids.length ? { _id: { $in: ids }, status: "pending" } : { status: "pending" };
+    const pending = await newsCollection.find(filter).toArray();
+    let approved = 0;
+
+    for (const item of pending) {
+      const news = normalizeNews(await prepareBilingualNews({ ...item, status: "published" }, item), item);
+      await newsCollection.updateOne({ _id: item._id }, { $set: news });
+      approved += 1;
+      await addAutomationLog("approved", `Bulk approved: ${item.title}`, { id: String(item._id) });
+    }
+
+    res.json({ approved });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete("/api/news/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+    const result = await newsCollection.deleteOne({ _id });
+
+    if (!result.deletedCount) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    if (existing) {
+      await addAutomationLog("deleted", `Deleted article: ${existing.title}`, { id: String(existing._id), status: existing.status });
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.use((req, res) => {
+  res.status(404).json({ error: "not found" });
+});
+
+app.use((error, req, res, next) => {
+  const status = error.status || (error.code === 11000 ? 409 : 500);
+  const message = error.code === 11000 ? "duplicate news already exists" : status >= 500 ? "server error" : error.message;
+
+  if (status >= 500) {
+    console.error(error);
+  }
+
+  res.status(status).json({ error: message });
+});
+
+async function connectToMongo() {
+  if (mongoReady) {
+    return;
+  }
+
+  try {
+    await client.connect();
+    const database = client.db(MONGODB_DB);
+    newsCollection = database.collection(NEWS_COLLECTION);
+    adsCollection = database.collection(ADS_COLLECTION);
+    manualNewsCollection = database.collection(MANUAL_NEWS_COLLECTION);
+    newsAnalyticsCollection = database.collection(NEWS_ANALYTICS_COLLECTION);
+    settingsCollection = database.collection(SETTINGS_COLLECTION);
+    await newsCollection.updateMany({ status: "review" }, { $set: { status: "pending", publishedAt: null } });
+    await backfillNewsMetadata();
+    const thumbnailBackfillCount = await backfillNewsThumbnails();
+    await newsCollection.createIndex({ status: 1, category: 1, city: 1, createdAt: -1 });
+    await newsCollection.createIndex({ status: 1, categorySlug: 1, city: 1, createdAt: -1 });
+    await newsCollection.createIndex({ featured: 1, breaking: 1, createdAt: -1 });
+    await newsCollection.createIndex({ trending: 1, createdAt: -1 });
+    await newsCollection.createIndex({ duplicateKey: 1 }, { unique: true, sparse: true });
+    await newsCollection.createIndex({ sourceUrl: 1 }, { unique: true, sparse: true });
+    await newsCollection.createIndex({ sourceHash: 1 }, { unique: true, sparse: true });
+    await newsCollection.createIndex({ storyHash: 1 }, { unique: true, sparse: true });
+    await newsCollection.createIndex({ status: 1, sourcePublishedAt: -1, freshnessScore: -1 });
+    await newsCollection.createIndex({ slug: 1 }, { unique: true, sparse: true });
+    await manualNewsCollection.createIndex({ status: 1, categorySlug: 1, city: 1, createdAt: -1 });
+    await manualNewsCollection.createIndex({ featured: 1, trending: 1, breaking: 1, publishedAt: -1 });
+    await manualNewsCollection.createIndex({ slug: 1 }, { unique: true, sparse: true });
+    await adsCollection.createIndex({ position: 1, enabled: 1, updatedAt: -1 });
+    await newsAnalyticsCollection.createIndex({ articleId: 1, source: 1 }, { unique: true });
+    await newsAnalyticsCollection.createIndex({ views: -1, clicks: -1 });
+    await getAutomationSettings();
+    await getSiteSettings();
+    await settingsCollection.updateOne(
+      { _id: "automation" },
+      {
+        $set: {
+          enabled: true,
+          intervalMinutes: AUTOMATION_INTERVAL_MINUTES,
+          freshnessWindowHours: NEWS_FRESHNESS_HOURS,
+          nextRunAt: nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES),
+          "cronHealth.enabled": true,
+          "cronHealth.nextRunAt": nextScheduledRunDate(AUTOMATION_INTERVAL_MINUTES),
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+    startAutomationCron();
+    mongoReady = true;
+    mongoError = null;
+    if (thumbnailBackfillCount) {
+      console.log(`Thumbnail backfill updated ${thumbnailBackfillCount} articles.`);
+    }
+    console.log(`MongoDB connected: ${MONGODB_DB}.${NEWS_COLLECTION}`);
+  } catch (error) {
+    mongoReady = false;
+    mongoError = error;
+    console.warn(`MongoDB not connected yet: ${error.message}`);
+  }
+}
+
+async function startServer() {
+  await connectToMongo();
+
+  setInterval(() => {
+    if (!mongoReady) {
+      connectToMongo().catch((error) => console.warn(`MongoDB reconnect failed: ${error.message}`));
+    }
+  }, 10000);
+
+  app.listen(PORT, () => {
+    console.log(`Khabri Junction API running at http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error("Failed to start API server:", error);
+  process.exit(1);
+});

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Khabri Junction Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="locked">
+  <section class="login-screen" id="loginScreen">
+    <form class="login-card" id="adminLoginForm">
+      <img src="assets/logo-kj.png" alt="Khabri Junction logo">
+      <span>Secure access</span>
+      <h1>Admin Login</h1>
+      <label>
+        Username
+        <input id="loginUsername" type="text" autocomplete="username" required>
+      </label>
+      <label>
+        Password
+        <input id="loginPassword" type="password" autocomplete="current-password" required>
+      </label>
+      <p class="login-error" id="loginError"></p>
+      <button class="primary-btn" type="submit"><i class="fa-solid fa-lock-open"></i> Open Admin Panel</button>
+      <a href="index.html">Back to website</a>
+    </form>
+  </section>
+
+  <aside class="admin-sidebar">
+    <div class="admin-brand">
+      <img src="assets/logo-kj.png" alt="Khabri Junction logo">
+      <div>
+        <strong>KHABRI JUNCTION</strong>
+        <span>Admin Panel</span>
+      </div>
+    </div>
+
+    <nav aria-label="Admin sections">
+      <a href="#topStory"><i class="fa-solid fa-bolt"></i> Top Story</a>
+      <a href="#ticker"><i class="fa-solid fa-lines-leaning"></i> Breaking Ticker</a>
+      <a href="#newsEditor"><i class="fa-solid fa-newspaper"></i> News Updates</a>
+      <a href="#manualCms"><i class="fa-solid fa-pen-to-square"></i> Manual CMS</a>
+      <a href="#adManager"><i class="fa-solid fa-rectangle-ad"></i> Ad Manager</a>
+      <a href="#siteSettings"><i class="fa-solid fa-sliders"></i> Site Settings</a>
+      <a href="#automationPanel"><i class="fa-solid fa-robot"></i> AI Automation</a>
+      <a href="index.html"><i class="fa-solid fa-house"></i> Website Preview</a>
+    </nav>
+  </aside>
+
+  <main class="admin-main">
+    <header class="admin-header">
+      <div>
+        <p>Website editor</p>
+        <h1>News Update Panel</h1>
+      </div>
+      <div class="admin-actions">
+        <button class="ghost-btn" id="logoutAdmin" type="button"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
+        <button class="ghost-btn" id="resetAll" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        <button class="primary-btn" id="publishAll" type="button"><i class="fa-solid fa-floppy-disk"></i> Publish Changes</button>
+      </div>
+    </header>
+
+    <div class="status-line" id="statusLine">Changes save in this browser and show on index.html preview.</div>
+
+    <section class="panel automation-panel" id="automationPanel">
+      <div class="panel-head">
+        <div>
+          <span>Pending-only automation</span>
+          <h2>AI News Automation</h2>
+        </div>
+        <label class="toggle">
+          <input id="automationEnabled" type="checkbox">
+          <span>Enable every 30 minutes</span>
+        </label>
+      </div>
+
+      <div class="automation-grid">
+        <label class="wide">
+          Google News RSS Query
+          <input id="automationQuery" type="text" placeholder="Chhattisgarh Durg Bhilai Raipur sports astrology">
+        </label>
+        <button class="ghost-btn" id="runAutomationNow" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Run Now</button>
+        <button class="ghost-btn" id="runFailedJobs" type="button"><i class="fa-solid fa-rotate-right"></i> Run Last Failed Jobs</button>
+        <button class="primary-btn" id="saveAutomation" type="button"><i class="fa-solid fa-floppy-disk"></i> Save Automation</button>
+      </div>
+
+      <div class="automation-status" id="automationStatus" aria-live="polite">
+        Connect MongoDB API to manage automation.
+      </div>
+      <div class="automation-log" id="automationLog" aria-live="polite"></div>
+    </section>
+
+    <section class="panel" id="topStory">
+      <div class="panel-head">
+        <div>
+          <span>Featured</span>
+          <h2>Top Story</h2>
+        </div>
+        <label class="toggle">
+          <input id="topEnabled" type="checkbox">
+          <span>Show on homepage</span>
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          Kicker
+          <input id="topKicker" type="text" placeholder="BREAKING NEWS">
+        </label>
+        <label>
+          Kicker Hindi
+          <input id="topKickerHi" type="text" placeholder="ब्रेकिंग न्यूज़">
+        </label>
+        <label>
+          Title
+          <input id="topTitle" type="text" placeholder="Main headline">
+        </label>
+        <label>
+          Title Hindi
+          <input id="topTitleHi" type="text" placeholder="मुख्य हेडलाइन">
+        </label>
+        <label class="wide">
+          Summary
+          <textarea id="topSummary" rows="3" placeholder="Short homepage summary"></textarea>
+        </label>
+        <label class="wide">
+          Body
+          <textarea id="topBody" rows="4" placeholder="Full news text shown in popup"></textarea>
+        </label>
+        <label class="wide">
+          Image URL
+          <input id="topImage" type="url" placeholder="https://images.unsplash.com/...">
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="ticker">
+      <div class="panel-head">
+        <div>
+          <span>Live strip</span>
+          <h2>Breaking Ticker</h2>
+        </div>
+      </div>
+      <label>
+        Ticker lines
+        <textarea id="tickerLines" rows="5" placeholder="Write one breaking update per line"></textarea>
+      </label>
+    </section>
+
+    <section class="panel site-settings-panel" id="siteSettings">
+      <div class="panel-head">
+        <div>
+          <span>Live widgets</span>
+          <h2>Site Settings</h2>
+        </div>
+        <button class="primary-btn" id="saveSiteSettings" type="button"><i class="fa-solid fa-floppy-disk"></i> Save Site Settings</button>
+      </div>
+
+      <div class="form-grid">
+        <label class="wide">
+          Weather Updates
+          <textarea id="weatherSettings" rows="4" placeholder="Durg | 34°C | साफ मौसम"></textarea>
+        </label>
+        <label class="wide">
+          Market Tracker
+          <textarea id="marketSettings" rows="4" placeholder="SENSEX | 77958.52 | +1.22%"></textarea>
+        </label>
+        <label class="wide">
+          Viral Video / Reel URLs
+          <textarea id="videoSettings" rows="5" placeholder="लोकल मार्केट रील | https://youtube.com/shorts/... | Reel | thumbnail-url"></textarea>
+        </label>
+        <label>
+          Header Ad Code
+          <textarea id="headerAdCode" rows="4" placeholder="Paste AdSense header ad code"></textarea>
+        </label>
+        <label>
+          Sidebar Ad Code
+          <textarea id="sidebarAdCode" rows="4" placeholder="Paste sidebar ad code"></textarea>
+        </label>
+        <label>
+          In-Article Ad Code
+          <textarea id="articleAdCode" rows="4" placeholder="Paste in-article ad code"></textarea>
+        </label>
+        <label>
+          Footer Ad Code
+          <textarea id="footerAdCode" rows="4" placeholder="Paste footer ad code"></textarea>
+        </label>
+        <label>
+          Notification Title
+          <input id="notificationTitle" type="text" placeholder="ताजा खबरों की सूचना पाएं">
+        </label>
+        <label>
+          Notification Text
+          <input id="notificationDescription" type="text" placeholder="लोकल न्यूज अपडेट पाने के लिए सब्सक्राइब करें">
+        </label>
+      </div>
+    </section>
+
+    <section class="panel" id="adManager">
+      <div class="panel-head">
+        <div>
+          <span>MongoDB ads</span>
+          <h2>Ad Manager</h2>
+        </div>
+        <button class="ghost-btn" id="clearAdForm" type="button"><i class="fa-solid fa-plus"></i> New Ad</button>
+      </div>
+
+      <div class="editor-layout compact-editor">
+        <form class="news-form" id="adForm">
+          <input id="adId" type="hidden">
+          <div class="form-grid">
+            <label>
+              Ad Title
+              <input id="adTitle" type="text" placeholder="Header campaign / Adsense block">
+            </label>
+            <label>
+              Position
+              <select id="adPosition">
+                <option value="header">header</option>
+                <option value="homepage">homepage</option>
+                <option value="article-top">article-top</option>
+                <option value="article-bottom">article-bottom</option>
+                <option value="sidebar">sidebar</option>
+                <option value="mobile-sticky">mobile-sticky</option>
+              </select>
+            </label>
+            <label>
+              Target
+              <select id="adTarget">
+                <option value="all">Mobile + Desktop</option>
+                <option value="mobile">Mobile only</option>
+                <option value="desktop">Desktop only</option>
+              </select>
+            </label>
+            <label class="toggle field-toggle">
+              <input id="adEnabled" type="checkbox" checked>
+              <span>Enable ad</span>
+            </label>
+            <label>
+              Banner Image URL
+              <input id="adImage" type="url" placeholder="/assets/uploads/ad.jpg">
+            </label>
+            <label>
+              Upload Banner
+              <input id="adUpload" type="file" accept="image/*">
+            </label>
+            <label class="wide">
+              Link URL
+              <input id="adLinkUrl" type="url" placeholder="https://sponsor-site.com">
+            </label>
+            <label class="wide">
+              Google AdSense / Ad Code
+              <textarea id="adCode" rows="5" placeholder="Paste Google AdSense code here"></textarea>
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="ghost-btn" id="deleteAd" type="button"><i class="fa-solid fa-trash"></i> Delete</button>
+            <button class="primary-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Ad</button>
+          </div>
+        </form>
+        <div class="news-list" id="adList" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="manualCms">
+      <div class="panel-head">
+        <div>
+          <span>Hindi first editor</span>
+          <h2>Manual News CMS</h2>
+        </div>
+        <button class="ghost-btn" id="clearManualForm" type="button"><i class="fa-solid fa-plus"></i> New Manual News</button>
+      </div>
+
+      <div class="editor-layout compact-editor">
+        <form class="news-form" id="manualNewsForm">
+          <input id="manualId" type="hidden">
+          <div class="form-grid">
+            <label>
+              Hindi Headline
+              <input id="manualTitleHi" type="text" placeholder="हिंदी हेडलाइन पहले लिखें" required>
+            </label>
+            <label>
+              English Headline Optional
+              <input id="manualTitleEn" type="text" placeholder="English headline optional">
+            </label>
+            <label>
+              Category
+              <select id="manualCategory">
+                <option value="Durg">Durg</option>
+                <option value="Bhilai">Bhilai</option>
+                <option value="Raipur">Raipur</option>
+                <option value="Bilaspur">Bilaspur</option>
+                <option value="Sports">Sports</option>
+                <option value="Politics">Politics</option>
+                <option value="Crime">Crime</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Health">Health</option>
+                <option value="Astrology">Astrology</option>
+                <option value="Jobs">Jobs</option>
+                <option value="Breaking">Breaking</option>
+              </select>
+            </label>
+            <label>
+              District
+              <select id="manualCity">
+                <option value="">Auto / None</option>
+                <option value="durg">Durg</option>
+                <option value="bhilai">Bhilai</option>
+                <option value="raipur">Raipur</option>
+                <option value="bilaspur">Bilaspur</option>
+                <option value="rajnandgaon">Rajnandgaon</option>
+                <option value="kawardha">Kawardha</option>
+                <option value="khairagarh">Khairagarh</option>
+              </select>
+            </label>
+            <label>
+              Status
+              <select id="manualStatus">
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="published">Published</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label>
+              Slug
+              <input id="manualSlug" type="text" placeholder="auto generated">
+            </label>
+            <label class="wide">
+              Thumbnail URL
+              <input id="manualImage" type="url" placeholder="/assets/uploads/thumb.jpg">
+            </label>
+            <label>
+              Upload Thumbnail
+              <input id="manualUpload" type="file" accept="image/*">
+            </label>
+            <label class="wide">
+              Hindi Summary
+              <textarea id="manualSummaryHi" rows="3" placeholder="हिंदी सारांश"></textarea>
+            </label>
+            <label class="wide">
+              Rich Text Body Hindi
+              <textarea id="manualBodyHi" rows="8" placeholder="पूरी खबर यहां लिखें"></textarea>
+            </label>
+            <label>
+              SEO Meta Title
+              <input id="manualMetaTitle" type="text" placeholder="SEO title">
+            </label>
+            <label>
+              SEO Meta Description
+              <input id="manualMetaDescription" type="text" placeholder="SEO description">
+            </label>
+            <div class="inline-checks wide">
+              <label class="toggle"><input id="manualBreaking" type="checkbox"><span>Breaking</span></label>
+              <label class="toggle"><input id="manualTrending" type="checkbox"><span>Trending</span></label>
+              <label class="toggle"><input id="manualFeatured" type="checkbox"><span>Top story</span></label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="ghost-btn" id="previewManual" type="button"><i class="fa-solid fa-eye"></i> Preview</button>
+            <button class="ghost-btn" id="deleteManual" type="button"><i class="fa-solid fa-trash"></i> Delete</button>
+            <button class="primary-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Manual News</button>
+          </div>
+        </form>
+        <div class="news-list" id="manualNewsList" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="newsEditor">
+      <div class="panel-head">
+        <div>
+          <span>Review workflow</span>
+          <h2>News Review Queue</h2>
+        </div>
+        <div class="panel-tools">
+          <button class="ghost-btn" id="bulkApprovePending" type="button"><i class="fa-solid fa-check-double"></i> Bulk Approve Pending</button>
+          <button class="ghost-btn" id="addNews" type="button"><i class="fa-solid fa-plus"></i> Add News</button>
+        </div>
+      </div>
+
+      <div class="review-tabs" role="tablist" aria-label="News review tabs">
+        <button class="active" type="button" data-status-filter="pending">Pending <span id="pendingCount">0</span></button>
+        <button type="button" data-status-filter="published">Published <span id="publishedCount">0</span></button>
+        <button type="button" data-status-filter="rejected">Rejected <span id="rejectedCount">0</span></button>
+      </div>
+
+      <div class="editor-layout">
+        <form class="news-form" id="newsForm">
+          <input id="editingIndex" type="hidden">
+          <div class="form-grid">
+            <label>
+              Badge
+              <input id="newsTag" type="text" placeholder="DURG">
+            </label>
+            <label>
+              Category
+              <select id="newsCategory">
+                <option value="Durg">Durg</option>
+                <option value="Bhilai">Bhilai</option>
+                <option value="Raipur">Raipur</option>
+                <option value="Raipur Promotion">Raipur Promotion</option>
+                <option value="Market">Market</option>
+                <option value="Weather">Weather</option>
+                <option value="Viral Videos">Viral Videos</option>
+                <option value="Local News">Local News</option>
+                <option value="MP Shahdol">MP Shahdol</option>
+                <option value="World">World</option>
+                <option value="Bilaspur">Bilaspur</option>
+                <option value="Sports">Sports</option>
+                <option value="Astrology">Astrology</option>
+                <option value="Politics">Politics</option>
+                <option value="Crime">Crime</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Health">Health</option>
+                <option value="Jobs">Jobs</option>
+                <option value="Breaking">Breaking</option>
+              </select>
+            </label>
+            <label>
+              Status
+              <select id="newsStatus">
+                <option value="pending">Pending</option>
+                <option value="published">Published</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label>
+              Image URL
+              <input id="newsImage" type="url" placeholder="https://images.unsplash.com/...">
+            </label>
+            <div class="thumbnail-tools">
+              <button class="ghost-btn" id="useSourceImage" type="button"><i class="fa-solid fa-image"></i> Use Source Image</button>
+              <button class="ghost-btn" id="generateAiThumbnail" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate AI Thumbnail</button>
+              <button class="ghost-btn" id="regenerateThumbnail" type="button"><i class="fa-solid fa-rotate"></i> Regenerate Thumbnail</button>
+            </div>
+            <label>
+              Title
+              <input id="newsTitle" type="text" placeholder="News headline">
+            </label>
+            <label>
+              Title Hindi
+              <input id="newsTitleHi" type="text" placeholder="हिंदी हेडलाइन">
+            </label>
+            <label class="wide">
+              Summary
+              <textarea id="newsSummary" rows="3" placeholder="Short card summary"></textarea>
+            </label>
+            <label class="wide">
+              Summary Hindi
+              <textarea id="newsSummaryHi" rows="3" placeholder="Hindi summary auto fills on save"></textarea>
+            </label>
+            <label class="wide">
+              Body
+              <textarea id="newsBody" rows="5" placeholder="Full news details"></textarea>
+            </label>
+            <label class="wide">
+              Body Hindi
+              <textarea id="newsBodyHi" rows="5" placeholder="Hindi full news auto fills on save"></textarea>
+            </label>
+            <div class="inline-checks wide">
+              <label class="toggle">
+                <input id="newsBreaking" type="checkbox">
+                <span>Breaking news</span>
+              </label>
+              <label class="toggle">
+                <input id="newsFeatured" type="checkbox">
+                <span>Top story</span>
+              </label>
+              <label class="toggle">
+                <input id="newsTrending" type="checkbox">
+                <span>Trending</span>
+              </label>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="ghost-btn" id="clearNewsForm" type="button">Clear</button>
+            <button class="ghost-btn" id="autoTranslateNews" type="button"><i class="fa-solid fa-language"></i> Auto Translate</button>
+            <button class="primary-btn" type="submit"><i class="fa-solid fa-check"></i> Save News Item</button>
+          </div>
+        </form>
+
+        <div class="news-list" id="newsList" aria-live="polite"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="admin-preview-modal" id="adminPreviewModal" aria-hidden="true">
+    <article class="admin-preview-card" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <button class="modal-x" id="closePreview" type="button" aria-label="Close preview">&times;</button>
+      <span id="previewBadge">PREVIEW</span>
+      <img id="previewImage" src="" alt="">
+      <h2 id="previewTitle"></h2>
+      <p id="previewSummary"></p>
+      <div id="previewBody"></div>
+    </article>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

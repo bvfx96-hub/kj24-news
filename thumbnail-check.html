@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thumbnail Check | Khabri Junction</title>
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body.thumbnail-check-page {
+      min-height: 100vh;
+      background: #f3f5f8;
+    }
+
+    .thumb-check-shell {
+      width: min(1280px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 56px;
+    }
+
+    .thumb-check-header {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 24px;
+    }
+
+    .thumb-brand,
+    .thumb-summary {
+      background: #ffffff;
+      border: 1px solid #e3e8ef;
+      border-radius: 18px;
+      box-shadow: 0 14px 34px rgba(17, 24, 39, 0.08);
+      padding: 22px;
+    }
+
+    .thumb-brand {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .thumb-brand img {
+      width: 84px;
+      height: 84px;
+      border-radius: 50%;
+      object-fit: cover;
+      flex: 0 0 auto;
+    }
+
+    .thumb-brand h1,
+    .thumb-summary h2 {
+      margin: 0 0 8px;
+      font-size: clamp(1.5rem, 2vw, 2rem);
+      line-height: 1.1;
+    }
+
+    .thumb-brand p,
+    .thumb-summary p {
+      margin: 0;
+      color: #606a79;
+      line-height: 1.6;
+    }
+
+    .thumb-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .thumb-actions a {
+      text-decoration: none;
+    }
+
+    .thumb-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border-radius: 12px;
+      border: 1px solid #d70f1c;
+      background: #d70f1c;
+      color: #ffffff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .thumb-btn.secondary {
+      background: #ffffff;
+      color: #18202c;
+      border-color: #d4dce6;
+    }
+
+    .thumb-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .thumb-stat {
+      background: linear-gradient(180deg, #fff6f7 0%, #ffffff 100%);
+      border: 1px solid #f0d9dc;
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+
+    .thumb-stat strong {
+      display: block;
+      font-size: 1.4rem;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .thumb-stat span {
+      color: #6a7280;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .thumb-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .thumb-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .thumb-filter {
+      border: 1px solid #d5dbe5;
+      background: #ffffff;
+      color: #243041;
+      border-radius: 999px;
+      padding: 10px 15px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .thumb-filter.active {
+      background: #d70f1c;
+      border-color: #d70f1c;
+      color: #ffffff;
+    }
+
+    .thumb-meta-note {
+      color: #616b79;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 18px;
+    }
+
+    .thumb-card {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+      border: 1px solid #e3e8ef;
+      border-radius: 16px;
+      box-shadow: 0 16px 36px rgba(17, 24, 39, 0.08);
+    }
+
+    .thumb-card-image {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      object-fit: cover;
+      background: #edf1f6;
+    }
+
+    .thumb-card-body {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+    }
+
+    .thumb-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .thumb-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 10px;
+      border-radius: 999px;
+      background: #fff1f2;
+      color: #b0121d;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+
+    .thumb-badge.status-source-watermarked {
+      background: #eef9f1;
+      color: #177a44;
+    }
+
+    .thumb-badge.status-ai-generated {
+      background: #edf4ff;
+      color: #1b5ed7;
+    }
+
+    .thumb-badge.status-fallback {
+      background: #fff7e7;
+      color: #a96800;
+    }
+
+    .thumb-card h3 {
+      margin: 0;
+      font-size: 1.08rem;
+      line-height: 1.4;
+    }
+
+    .thumb-card p {
+      margin: 0;
+      color: #646d7b;
+      line-height: 1.6;
+      font-size: 0.96rem;
+    }
+
+    .thumb-card dl {
+      display: grid;
+      grid-template-columns: 88px 1fr;
+      gap: 6px 10px;
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .thumb-card dt {
+      color: #6c7483;
+      font-weight: 700;
+    }
+
+    .thumb-card dd {
+      margin: 0;
+      color: #18202c;
+      overflow-wrap: anywhere;
+    }
+
+    .thumb-card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: auto;
+    }
+
+    .thumb-empty {
+      padding: 30px 18px;
+      border: 1px dashed #d4dbe4;
+      border-radius: 16px;
+      text-align: center;
+      color: #697383;
+      font-weight: 700;
+      background: #ffffff;
+    }
+
+    @media (max-width: 900px) {
+      .thumb-check-header {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="thumbnail-check-page">
+  <main class="thumb-check-shell">
+    <section class="thumb-check-header">
+      <div class="thumb-brand">
+        <img src="/assets/logo-kj.png" alt="Khabri Junction logo">
+        <div>
+          <h1>Thumbnail Check Page</h1>
+          <p>Yahan se tum existing news cards ke thumbnail system ko easily verify kar sakte ho. Source image, AI thumbnail, fallback status aur article link sab ek jagah dikh raha hai.</p>
+          <div class="thumb-actions">
+            <a class="thumb-btn" href="/index.html">Open Homepage</a>
+            <a class="thumb-btn secondary" href="/admin.html">Open Admin</a>
+          </div>
+        </div>
+      </div>
+      <div class="thumb-summary">
+        <h2>Live Summary</h2>
+        <p>Page direct live API se data le raha hai. Agar thumbnail update hua hoga to isi page par turant reflect karega.</p>
+        <div class="thumb-stats" id="thumbStats">
+          <div class="thumb-stat"><strong>...</strong><span>Loading</span></div>
+          <div class="thumb-stat"><strong>...</strong><span>Loading</span></div>
+          <div class="thumb-stat"><strong>...</strong><span>Loading</span></div>
+          <div class="thumb-stat"><strong>...</strong><span>Loading</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="thumb-toolbar">
+      <div class="thumb-filters" id="thumbFilters">
+        <button class="thumb-filter active" data-filter="all" type="button">All</button>
+        <button class="thumb-filter" data-filter="source-watermarked" type="button">Source Watermarked</button>
+        <button class="thumb-filter" data-filter="ai-generated" type="button">AI Generated</button>
+        <button class="thumb-filter" data-filter="fallback" type="button">Fallback</button>
+        <button class="thumb-filter" data-filter="published" type="button">Published</button>
+        <button class="thumb-filter" data-filter="pending" type="button">Pending</button>
+      </div>
+      <div class="thumb-meta-note" id="thumbMetaNote">Loading live article data...</div>
+    </section>
+
+    <section class="thumb-grid" id="thumbGrid">
+      <div class="thumb-empty">Loading thumbnail cards...</div>
+    </section>
+  </main>
+
+  <script>
+    const grid = document.getElementById("thumbGrid");
+    const stats = document.getElementById("thumbStats");
+    const note = document.getElementById("thumbMetaNote");
+    const filters = Array.from(document.querySelectorAll(".thumb-filter"));
+    let activeFilter = "all";
+    let items = [];
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function normalizeTitle(item) {
+      return item.titleHi || item.title || item.titleEn || "Untitled news";
+    }
+
+    function normalizeSummary(item) {
+      return item.summaryHi || item.summary || item.summaryEn || "No summary available.";
+    }
+
+    function cardLink(item) {
+      if (item.status === "published" && item.articleUrl) {
+        return item.articleUrl;
+      }
+
+      return "/admin.html";
+    }
+
+    function statCard(label, value) {
+      return '<div class="thumb-stat"><strong>' + escapeHtml(value) + '</strong><span>' + escapeHtml(label) + '</span></div>';
+    }
+
+    function updateStats(list) {
+      const sourceCount = list.filter((item) => item.thumbnailStatus === "source-watermarked").length;
+      const aiCount = list.filter((item) => item.thumbnailStatus === "ai-generated").length;
+      const fallbackCount = list.filter((item) => item.thumbnailStatus === "fallback").length;
+      stats.innerHTML = [
+        statCard("Total News", list.length),
+        statCard("Source Watermarked", sourceCount),
+        statCard("AI Generated", aiCount),
+        statCard("Fallback", fallbackCount)
+      ].join("");
+    }
+
+    function filteredItems() {
+      if (activeFilter === "all") {
+        return items;
+      }
+
+      if (activeFilter === "published" || activeFilter === "pending") {
+        return items.filter((item) => item.status === activeFilter);
+      }
+
+      return items.filter((item) => item.thumbnailStatus === activeFilter);
+    }
+
+    function renderCards() {
+      const list = filteredItems();
+      note.textContent = list.length + " article(s) visible | Live source: /api/news?all=true";
+
+      if (!list.length) {
+        grid.innerHTML = '<div class="thumb-empty">Is filter me abhi koi article nahi mila.</div>';
+        return;
+      }
+
+      grid.innerHTML = list.map((item) => {
+        const thumb = item.optimizedThumbnail || item.aiThumbnail || item.sourceImage || item.image || "/assets/logo-kj.png";
+        const statusClass = "status-" + (item.thumbnailStatus || "fallback");
+        const publishedAt = item.publishedAt || item.createdAt;
+        const metaDate = publishedAt ? new Date(publishedAt).toLocaleString("en-IN") : "N/A";
+
+        return `
+          <article class="thumb-card">
+            <img class="thumb-card-image" src="${escapeHtml(thumb)}" alt="${escapeHtml(normalizeTitle(item))}" loading="lazy" decoding="async">
+            <div class="thumb-card-body">
+              <div class="thumb-badges">
+                <span class="thumb-badge ${escapeHtml(statusClass)}">${escapeHtml(item.thumbnailStatus || "fallback")}</span>
+                <span class="thumb-badge">${escapeHtml(item.categoryBadge || item.category || "NEWS")}</span>
+                <span class="thumb-badge">${escapeHtml(item.status || "draft")}</span>
+              </div>
+              <h3>${escapeHtml(normalizeTitle(item))}</h3>
+              <p>${escapeHtml(normalizeSummary(item))}</p>
+              <dl>
+                <dt>Source</dt>
+                <dd>${escapeHtml(item.sourceName || "Khabri Junction")}</dd>
+                <dt>City</dt>
+                <dd>${escapeHtml(item.city || "-")}</dd>
+                <dt>Date</dt>
+                <dd>${escapeHtml(metaDate)}</dd>
+                <dt>Slug</dt>
+                <dd>${escapeHtml(item.slug || "-")}</dd>
+              </dl>
+              <div class="thumb-card-actions">
+                <a class="thumb-btn" href="${escapeHtml(cardLink(item))}" target="_blank" rel="noopener">Open</a>
+                <a class="thumb-btn secondary" href="/admin.html" target="_blank" rel="noopener">Admin</a>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function setFilter(nextFilter) {
+      activeFilter = nextFilter;
+      filters.forEach((button) => {
+        button.classList.toggle("active", button.dataset.filter === nextFilter);
+      });
+      renderCards();
+    }
+
+    async function loadNews() {
+      try {
+        const response = await fetch("/api/news?all=true", { cache: "no-store" });
+
+        if (!response.ok) {
+          throw new Error("Failed to load news API");
+        }
+
+        items = await response.json();
+        updateStats(items);
+        renderCards();
+      } catch (error) {
+        note.textContent = "Failed to load live data";
+        grid.innerHTML = '<div class="thumb-empty">API load error: ' + escapeHtml(error.message) + '</div>';
+      }
+    }
+
+    filters.forEach((button) => {
+      button.addEventListener("click", () => setFilter(button.dataset.filter));
+    });
+
+    loadNews();
+  </script>
+</body>
+</html>
