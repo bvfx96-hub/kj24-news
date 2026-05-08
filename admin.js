@@ -4,6 +4,96 @@ const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "kjadmin123";
 const API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "https://kj24-news.onrender.com" : "");
 const fallbackImage = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
+const CMS_CATEGORIES = [
+  "Breaking",
+  "Durg",
+  "Bhilai",
+  "Raipur",
+  "Bilaspur",
+  "Rajnandgaon",
+  "Kawardha",
+  "Khairagarh",
+  "Raipur Promotion",
+  "Market",
+  "Weather",
+  "Viral Videos",
+  "Local News",
+  "MP Shahdol",
+  "World",
+  "Sports",
+  "Astrology",
+  "Politics",
+  "Crime",
+  "Entertainment",
+  "Health",
+  "Jobs",
+  "Education",
+  "Business",
+  "Agriculture",
+  "Technology",
+  "Lifestyle",
+  "Travel",
+  "Fashion",
+  "Movie",
+  "Music",
+  "Events",
+  "Balod",
+  "Bemetara",
+  "Dhamtari",
+  "Mahasamund",
+  "Gariaband",
+  "Mungeli",
+  "Korba",
+  "Raigarh",
+  "Janjgir-Champa",
+  "Sakti",
+  "Sarangarh",
+  "Surguja",
+  "Bastar",
+  "Kanker",
+  "Kondagaon",
+  "Dantewada",
+  "Sukma",
+  "Bijapur",
+  "Narayanpur",
+  "Jashpur",
+  "Koriya",
+  "Balrampur",
+  "Surajpur"
+];
+const CMS_DISTRICTS = [
+  { label: "Auto / None", value: "" },
+  { label: "Durg", value: "durg" },
+  { label: "Bhilai", value: "bhilai" },
+  { label: "Raipur", value: "raipur" },
+  { label: "Bilaspur", value: "bilaspur" },
+  { label: "Rajnandgaon", value: "rajnandgaon" },
+  { label: "Kawardha", value: "kawardha" },
+  { label: "Khairagarh", value: "khairagarh" },
+  { label: "Balod", value: "balod" },
+  { label: "Bemetara", value: "bemetara" },
+  { label: "Dhamtari", value: "dhamtari" },
+  { label: "Mahasamund", value: "mahasamund" },
+  { label: "Gariaband", value: "gariaband" },
+  { label: "Mungeli", value: "mungeli" },
+  { label: "Korba", value: "korba" },
+  { label: "Raigarh", value: "raigarh" },
+  { label: "Janjgir-Champa", value: "janjgir-champa" },
+  { label: "Sakti", value: "sakti" },
+  { label: "Sarangarh", value: "sarangarh" },
+  { label: "Surguja", value: "surguja" },
+  { label: "Bastar", value: "bastar" },
+  { label: "Kanker", value: "kanker" },
+  { label: "Kondagaon", value: "kondagaon" },
+  { label: "Dantewada", value: "dantewada" },
+  { label: "Sukma", value: "sukma" },
+  { label: "Bijapur", value: "bijapur" },
+  { label: "Narayanpur", value: "narayanpur" },
+  { label: "Jashpur", value: "jashpur" },
+  { label: "Koriya", value: "koriya" },
+  { label: "Balrampur", value: "balrampur" },
+  { label: "Surajpur", value: "surajpur" }
+];
 
 let state = {
   topStory: {
@@ -43,6 +133,7 @@ const fields = {
   editingIndex: document.getElementById("editingIndex"),
   newsTag: document.getElementById("newsTag"),
   newsCategory: document.getElementById("newsCategory"),
+  newsCity: document.getElementById("newsCity"),
   newsStatus: document.getElementById("newsStatus"),
   newsImage: document.getElementById("newsImage"),
   newsTitle: document.getElementById("newsTitle"),
@@ -129,6 +220,33 @@ let automationCountdownTimer = null;
 
 function hasAccess() {
   return sessionStorage.getItem(AUTH_SESSION_KEY) === "granted";
+}
+
+function setSelectOptions(select, options) {
+  if (!select) return;
+  const currentValue = select.value;
+  select.innerHTML = options
+    .map((option) => `<option value="${option.value}">${option.label}</option>`)
+    .join("");
+  if (currentValue && options.some((option) => option.value === currentValue)) {
+    select.value = currentValue;
+  }
+}
+
+function ensureSelectValue(select, value) {
+  if (!select || !value) return;
+  const exists = Array.from(select.options).some((option) => option.value === value);
+  if (!exists) {
+    select.appendChild(new Option(value, value));
+  }
+}
+
+function populateCmsTaxonomy() {
+  const categoryOptions = CMS_CATEGORIES.map((category) => ({ label: category, value: category }));
+  setSelectOptions(fields.newsCategory, categoryOptions);
+  setSelectOptions(fields.manualCategory, categoryOptions);
+  setSelectOptions(fields.newsCity, CMS_DISTRICTS);
+  setSelectOptions(fields.manualCity, CMS_DISTRICTS);
 }
 
 function setAccess(isAllowed) {
@@ -604,6 +722,8 @@ function fillManualForm(item) {
   fields.manualId.value = item._id || "";
   fields.manualTitleHi.value = item.titleHi || item.title || "";
   fields.manualTitleEn.value = item.titleEn || "";
+  ensureSelectValue(fields.manualCategory, item.category);
+  ensureSelectValue(fields.manualCity, item.city);
   fields.manualCategory.value = item.category || "Durg";
   fields.manualCity.value = item.city || "";
   fields.manualStatus.value = item.status || "draft";
@@ -880,7 +1000,7 @@ async function runLastFailedJobs() {
 
 function inferCity(value) {
   const text = String(value || "").toLowerCase();
-  const cities = ["durg", "bhilai", "raipur", "bilaspur", "kawardha", "khairagarh", "rajnandgaon"];
+  const cities = CMS_DISTRICTS.map((district) => district.value).filter(Boolean);
 
   return cities.find((city) => text.includes(city)) || "";
 }
@@ -904,16 +1024,25 @@ function detectCategory(value) {
     ["Crime", ["murder", "police", "theft", "crime", "arrest"]],
     ["Politics", ["government", "minister", "election", "politics"]],
     ["Entertainment", ["film", "movie", "cinema", "actor", "entertainment"]],
+    ["Education", ["education", "school", "college", "exam", "admission"]],
+    ["Business", ["business", "startup", "industry", "trade"]],
+    ["Agriculture", ["agriculture", "farmer", "crop", "mandi", "farming"]],
+    ["Technology", ["technology", "digital", "ai", "app", "tech"]],
+    ["Lifestyle", ["lifestyle", "fashion", "food", "travel"]],
     ["Health", ["health", "hospital", "doctor", "medical"]],
     ["Jobs", ["job", "jobs", "recruitment", "vacancy"]],
-    ["Durg", ["durg"]],
-    ["Bhilai", ["bhilai"]],
-    ["Raipur", ["raipur"]],
-    ["Bilaspur", ["bilaspur"]]
+    ...CMS_DISTRICTS
+      .filter((district) => district.value)
+      .map((district) => [district.label, [district.value, district.label.toLowerCase()]])
   ];
+  const directCategory = CMS_CATEGORIES.find((category) => {
+    const categoryText = category.toLowerCase();
+    const categorySlug = slugifyAdmin(category).replace(/-/g, " ");
+    return text.includes(categoryText) || text.includes(categorySlug);
+  });
   const match = rules.find(([, keywords]) => keywords.some((keyword) => text.includes(keyword)));
 
-  return match ? match[0] : "Breaking";
+  return directCategory || (match ? match[0] : "Breaking");
 }
 
 function apiToAdminItem(news) {
@@ -1143,6 +1272,7 @@ function clearNewsForm() {
   fields.editingIndex.value = "";
   fields.newsTag.value = "";
   fields.newsCategory.value = "Durg";
+  if (fields.newsCity) fields.newsCity.value = "";
   fields.newsStatus.value = "pending";
   fields.newsImage.value = "";
   fields.newsTitle.value = "";
@@ -1165,7 +1295,10 @@ function fillNewsForm(index) {
 
   fields.editingIndex.value = String(index);
   fields.newsTag.value = item.categoryBadge || item.tag || "";
+  ensureSelectValue(fields.newsCategory, item.category);
+  ensureSelectValue(fields.newsCity, item.city);
   fields.newsCategory.value = item.category || detectCategory(`${item.title} ${item.summary} ${item.tag}`);
+  if (fields.newsCity) fields.newsCity.value = item.city || "";
   fields.newsStatus.value = item.status || "published";
   fields.newsImage.value = item.sourceImage || item.optimizedThumbnail || item.aiThumbnail || item.image || "";
   fields.newsTitle.value = item.title || "";
@@ -1193,7 +1326,7 @@ async function saveNewsItem(event) {
     tag: fields.newsTag.value.trim() || category,
     categoryBadge: fields.newsTag.value.trim() || category,
     category,
-    city: inferCity(`${fields.newsTag.value} ${fields.newsTitle.value} ${fields.newsSummary.value}`),
+    city: (fields.newsCity && fields.newsCity.value) || inferCity(`${fields.newsTag.value} ${fields.newsTitle.value} ${fields.newsSummary.value}`),
     image: fields.newsImage.value.trim() || fallbackImage,
     sourceImage: fields.newsImage.value.trim(),
     title: titleInput,
@@ -1694,6 +1827,7 @@ function bindEvents() {
 }
 
 loadState();
+populateCmsTaxonomy();
 fillTopStory();
 fillTicker();
 renderNewsList();

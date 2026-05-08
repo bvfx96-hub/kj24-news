@@ -40,6 +40,16 @@ const CATEGORY_DEFINITIONS = [
   { label: "Local News", slug: "local-news", page: "local-news", badge: "LOCAL", keywords: ["local", "district", "city", "ward", "nagar", "local news"] },
   { label: "MP Shahdol", slug: "mp-shahdol", page: "mp-shahdol-news", badge: "SHAHDOL", keywords: ["shahdol", "mp shahdol", "madhya pradesh shahdol"] },
   { label: "World", slug: "world", page: "desh-duniya-news", badge: "WORLD", keywords: ["world", "global", "international", "desh duniya", "foreign"] },
+  { label: "Education", slug: "education", page: "local-news", badge: "EDUCATION", keywords: ["education", "school", "college", "exam", "admission", "शिक्षा", "स्कूल"] },
+  { label: "Business", slug: "business", page: "market-news", badge: "BUSINESS", keywords: ["business", "startup", "industry", "trade", "व्यापार", "कारोबार"] },
+  { label: "Agriculture", slug: "agriculture", page: "local-news", badge: "AGRI", keywords: ["agriculture", "farmer", "crop", "mandi", "farming", "किसान", "खेती"] },
+  { label: "Technology", slug: "technology", page: "local-news", badge: "TECH", keywords: ["technology", "digital", "ai", "app", "tech", "टेक"] },
+  { label: "Lifestyle", slug: "lifestyle", page: "entertainment.html", badge: "LIFESTYLE", keywords: ["lifestyle", "fashion", "food", "travel", "लाइफस्टाइल"] },
+  { label: "Travel", slug: "travel", page: "local-news", badge: "TRAVEL", keywords: ["travel", "tourism", "tourist", "यात्रा", "पर्यटन"] },
+  { label: "Fashion", slug: "fashion", page: "entertainment.html", badge: "FASHION", keywords: ["fashion", "style", "फैशन"] },
+  { label: "Movie", slug: "movie", page: "entertainment.html", badge: "MOVIE", keywords: ["movie", "film", "cinema", "फिल्म"] },
+  { label: "Music", slug: "music", page: "entertainment.html", badge: "MUSIC", keywords: ["music", "song", "singer", "गीत", "संगीत"] },
+  { label: "Events", slug: "events", page: "local-news", badge: "EVENTS", keywords: ["event", "programme", "festival", "कार्यक्रम", "महोत्सव"] },
   { label: "Sports", slug: "sports", page: "sports.html", badge: "SPORTS", keywords: ["ipl", "cricket", "football", "match", "tournament", "sports", "score", "team", "league"] },
   { label: "Astrology", slug: "astrology", page: "astrology.html", badge: "ASTROLOGY", keywords: ["rashifal", "astrology", "horoscope", "zodiac", "panchang"] },
   { label: "Crime", slug: "crime", page: "crime.html", badge: "CRIME", keywords: ["murder", "police", "theft", "crime", "arrest", "fraud", "case", "fir"] },
@@ -54,6 +64,29 @@ const CATEGORY_DEFINITIONS = [
   { label: "Kawardha", slug: "kawardha", page: "kawardha.html", badge: "KAWARDHA", keywords: ["kawardha", "kabirdham"] },
   { label: "Khairagarh", slug: "khairagarh", page: "khairagarh.html", badge: "KHAIRAGARH", keywords: ["khairagarh"] },
   { label: "Rajnandgaon", slug: "rajnandgaon", page: "rajnandgaon.html", badge: "RAJNANDGAON", keywords: ["rajnandgaon"] },
+  { label: "Balod", slug: "balod", page: "local-news", badge: "BALOD", keywords: ["balod"] },
+  { label: "Bemetara", slug: "bemetara", page: "local-news", badge: "BEMETARA", keywords: ["bemetara"] },
+  { label: "Dhamtari", slug: "dhamtari", page: "local-news", badge: "DHAMTARI", keywords: ["dhamtari"] },
+  { label: "Mahasamund", slug: "mahasamund", page: "local-news", badge: "MAHASAMUND", keywords: ["mahasamund"] },
+  { label: "Gariaband", slug: "gariaband", page: "local-news", badge: "GARIABAND", keywords: ["gariaband"] },
+  { label: "Mungeli", slug: "mungeli", page: "local-news", badge: "MUNGELI", keywords: ["mungeli"] },
+  { label: "Korba", slug: "korba", page: "local-news", badge: "KORBA", keywords: ["korba"] },
+  { label: "Raigarh", slug: "raigarh", page: "local-news", badge: "RAIGARH", keywords: ["raigarh"] },
+  { label: "Janjgir-Champa", slug: "janjgir-champa", page: "local-news", badge: "JANJGIR", keywords: ["janjgir", "champa"] },
+  { label: "Sakti", slug: "sakti", page: "local-news", badge: "SAKTI", keywords: ["sakti"] },
+  { label: "Sarangarh", slug: "sarangarh", page: "local-news", badge: "SARANGARH", keywords: ["sarangarh", "bilaigarh"] },
+  { label: "Surguja", slug: "surguja", page: "local-news", badge: "SURGUJA", keywords: ["surguja", "ambikapur"] },
+  { label: "Bastar", slug: "bastar", page: "local-news", badge: "BASTAR", keywords: ["bastar", "jagdalpur"] },
+  { label: "Kanker", slug: "kanker", page: "local-news", badge: "KANKER", keywords: ["kanker"] },
+  { label: "Kondagaon", slug: "kondagaon", page: "local-news", badge: "KONDAGAON", keywords: ["kondagaon"] },
+  { label: "Dantewada", slug: "dantewada", page: "local-news", badge: "DANTEWADA", keywords: ["dantewada"] },
+  { label: "Sukma", slug: "sukma", page: "local-news", badge: "SUKMA", keywords: ["sukma"] },
+  { label: "Bijapur", slug: "bijapur", page: "local-news", badge: "BIJAPUR", keywords: ["bijapur"] },
+  { label: "Narayanpur", slug: "narayanpur", page: "local-news", badge: "NARAYANPUR", keywords: ["narayanpur"] },
+  { label: "Jashpur", slug: "jashpur", page: "local-news", badge: "JASHPUR", keywords: ["jashpur"] },
+  { label: "Koriya", slug: "koriya", page: "local-news", badge: "KORIYA", keywords: ["koriya", "korea"] },
+  { label: "Balrampur", slug: "balrampur", page: "local-news", badge: "BALRAMPUR", keywords: ["balrampur"] },
+  { label: "Surajpur", slug: "surajpur", page: "local-news", badge: "SURAJPUR", keywords: ["surajpur"] },
   { label: "Breaking", slug: "breaking", page: "breaking.html", badge: "BREAKING", keywords: ["breaking", "latest", "alert", "big news", "urgent"] }
 ];
 const CLEAN_CATEGORY_ROUTES = [
@@ -73,7 +106,30 @@ const CITY_DEFINITIONS = [
   { label: "Bilaspur", slug: "bilaspur", keywords: ["bilaspur"] },
   { label: "Rajnandgaon", slug: "rajnandgaon", keywords: ["rajnandgaon"] },
   { label: "Kawardha", slug: "kawardha", keywords: ["kawardha", "kabirdham"] },
-  { label: "Khairagarh", slug: "khairagarh", keywords: ["khairagarh"] }
+  { label: "Khairagarh", slug: "khairagarh", keywords: ["khairagarh"] },
+  { label: "Balod", slug: "balod", keywords: ["balod"] },
+  { label: "Bemetara", slug: "bemetara", keywords: ["bemetara"] },
+  { label: "Dhamtari", slug: "dhamtari", keywords: ["dhamtari"] },
+  { label: "Mahasamund", slug: "mahasamund", keywords: ["mahasamund"] },
+  { label: "Gariaband", slug: "gariaband", keywords: ["gariaband"] },
+  { label: "Mungeli", slug: "mungeli", keywords: ["mungeli"] },
+  { label: "Korba", slug: "korba", keywords: ["korba"] },
+  { label: "Raigarh", slug: "raigarh", keywords: ["raigarh"] },
+  { label: "Janjgir-Champa", slug: "janjgir-champa", keywords: ["janjgir", "champa"] },
+  { label: "Sakti", slug: "sakti", keywords: ["sakti"] },
+  { label: "Sarangarh", slug: "sarangarh", keywords: ["sarangarh", "bilaigarh"] },
+  { label: "Surguja", slug: "surguja", keywords: ["surguja", "ambikapur"] },
+  { label: "Bastar", slug: "bastar", keywords: ["bastar", "jagdalpur"] },
+  { label: "Kanker", slug: "kanker", keywords: ["kanker"] },
+  { label: "Kondagaon", slug: "kondagaon", keywords: ["kondagaon"] },
+  { label: "Dantewada", slug: "dantewada", keywords: ["dantewada"] },
+  { label: "Sukma", slug: "sukma", keywords: ["sukma"] },
+  { label: "Bijapur", slug: "bijapur", keywords: ["bijapur"] },
+  { label: "Narayanpur", slug: "narayanpur", keywords: ["narayanpur"] },
+  { label: "Jashpur", slug: "jashpur", keywords: ["jashpur"] },
+  { label: "Koriya", slug: "koriya", keywords: ["koriya", "korea"] },
+  { label: "Balrampur", slug: "balrampur", keywords: ["balrampur"] },
+  { label: "Surajpur", slug: "surajpur", keywords: ["surajpur"] }
 ];
 const CG_LOCAL_NEWS_SOURCES = [
   { name: "Haribhoomi Chhattisgarh", query: "Chhattisgarh latest site:haribhoomi.com", priority: 1 },
@@ -3210,6 +3266,21 @@ app.get("/api/health", (req, res) => {
     mongoError: mongoError ? mongoError.message : null,
     automationRunning,
     openAIConfigured: Boolean(OPENAI_API_KEY)
+  });
+});
+
+app.get("/api/taxonomy", (req, res) => {
+  res.json({
+    categories: CATEGORY_DEFINITIONS.map((category) => ({
+      label: category.label,
+      slug: category.slug,
+      page: category.page,
+      badge: category.badge
+    })),
+    districts: CITY_DEFINITIONS.map((city) => ({
+      label: city.label,
+      slug: city.slug
+    }))
   });
 });
 
