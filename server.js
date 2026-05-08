@@ -207,6 +207,11 @@ let automationTask;
 
 app.use(cors({ origin: true, credentials: false }));
 app.use(express.json({ limit: "15mb" }));
+
+app.get(["/", "/index", "/index.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
+
 app.use(express.static(__dirname));
 
 app.get("/favicon.ico", (req, res) => {
