@@ -1162,6 +1162,17 @@ section {
   margin-top: 24px;
   color: #d9dee7;
   background: #11151c;
+  position: relative;
+  z-index: 5;
+  isolation: isolate;
+}
+
+.footer a,
+.footer button,
+.portal-footer a {
+  position: relative;
+  z-index: 6;
+  pointer-events: auto;
 }
 
 .footer-grid {

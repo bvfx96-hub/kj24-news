@@ -25,6 +25,10 @@ function pageSectionSlug() {
   return (window.location.pathname.split("/").pop() || "breaking.html").replace(".html", "").toLowerCase();
 }
 
+function portalCategoryPath(slug = pageSectionSlug()) {
+  return `/category/${slug || "breaking"}`;
+}
+
 function localizedValue(item, field) {
   if (portalLanguage === "hi") {
     return item[`${field}Hi`] || item[field] || item[`${field}En`] || "";
@@ -370,7 +374,7 @@ function renderPortalMongoNews(news) {
   sideBlocks.forEach((block, index) => {
     const title = block.querySelector("h2")?.outerHTML || `<h2>${index ? "Latest News" : "Top News"}</h2>`;
     const source = index ? news : topNews;
-    block.innerHTML = `${title}${source.slice(0, 5).map(portalSideItem).join("")}<a class="portal-read-more" href="${pageSectionSlug()}.html">${uiText("Read More", "और पढ़ें")}</a>`;
+    block.innerHTML = `${title}${source.slice(0, 5).map(portalSideItem).join("")}<a class="portal-read-more" href="${portalCategoryPath()}">${uiText("Read More", "और पढ़ें")}</a>`;
   });
 
   bindPortalNewsCards();

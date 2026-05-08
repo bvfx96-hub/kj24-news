@@ -99,6 +99,30 @@ const CLEAN_CATEGORY_ROUTES = [
   { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "मध्य प्रदेश शहडोल की ताजा खबरें।" },
   { path: "/desh-duniya-news", title: "देश-दुनिया की खबर", category: "World", description: "देश-दुनिया, अंतरराष्ट्रीय अपडेट और ग्लोबल खबरें।" }
 ];
+const CATEGORY_ROUTE_ALIASES = new Map([
+  ["home", "breaking"],
+  ["latest", "breaking"],
+  ["breaking-news", "breaking"],
+  ["market-news", "market"],
+  ["weather-update", "weather"],
+  ["mausam", "weather"],
+  ["viral", "viral-videos"],
+  ["viral-video", "viral-videos"],
+  ["viral-videos", "viral-videos"],
+  ["reels", "viral-videos"],
+  ["local", "local-news"],
+  ["local-news", "local-news"],
+  ["mp", "mp-shahdol"],
+  ["shahdol", "mp-shahdol"],
+  ["mp-shahdol-news", "mp-shahdol"],
+  ["des", "world"],
+  ["desh", "world"],
+  ["desh-duniya", "world"],
+  ["desh-duniya-news", "world"],
+  ["world-news", "world"],
+  ["raipur-news", "raipur"],
+  ["raipur-promotion-news", "raipur-promotion"]
+]);
 const CITY_DEFINITIONS = [
   { label: "Durg", slug: "durg", keywords: ["durg"] },
   { label: "Bhilai", slug: "bhilai", keywords: ["bhilai"] },
@@ -768,13 +792,20 @@ async function buildThumbnailFields(input = {}, existing = {}, options = {}) {
 
 function categoryFromValue(value) {
   const slug = toSlug(value);
+  const aliasedSlug = CATEGORY_ROUTE_ALIASES.get(slug) || slug;
   const normalized = slugText(value);
 
   return CATEGORY_DEFINITIONS.find((category) => (
-    category.slug === slug ||
+    category.slug === aliasedSlug ||
+    category.page === slug ||
     slugText(category.label) === normalized ||
     slugText(category.badge) === normalized
   )) || null;
+}
+
+function categoryRoutePath(categoryOrValue = "breaking") {
+  const category = typeof categoryOrValue === "object" ? categoryOrValue : categoryFromValue(categoryOrValue);
+  return `/category/${category?.slug || "breaking"}`;
 }
 
 function inferCategory(text) {
@@ -1043,11 +1074,11 @@ function landingPageForNews(doc) {
   const routeSlug = routeSlugForNews(doc);
   const routeCategory = categoryFromValue(routeSlug);
 
-  return routeCategory?.page || doc.categoryPage || "breaking.html";
+  return categoryRoutePath(routeCategory || routeSlug);
 }
 
 function articleUrl(doc, req) {
-  return `${publicBaseUrl(req)}/${routeSlugForNews(doc)}/${doc.slug || toSlug(doc.title)}`;
+  return `${publicBaseUrl(req)}${categoryRoutePath(routeSlugForNews(doc))}/${doc.slug || toSlug(doc.title)}`;
 }
 
 function normalizeNews(input, existing = {}) {
@@ -1241,8 +1272,34 @@ function serializeNews(doc) {
   };
 }
 
-function requireDatabase(req, res, next) {
+async function requireDatabase(req, res, next) {
   if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection) {
+    await connectToMongo();
+  }
+
+  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection) {
+    if (req.accepts("html")) {
+      return res.status(503).type("html").send(`<!DOCTYPE html>
+<html lang="hi" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Loading News | Khabri Junction</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="article-page">
+  <main class="portal-shell">
+    <section class="market-card category-focus-card">
+      <div class="section-title"><span></span><strong>न्यूज सर्वर कनेक्ट हो रहा है</strong></div>
+      <p class="article-summary">कृपया कुछ सेकंड बाद पेज refresh करें. MongoDB connection अभी तैयार नहीं है.</p>
+      <a class="read-btn" href="/index.html">होम पर जाएं</a>
+    </section>
+  </main>
+</body>
+</html>`);
+    }
+
     return res.status(503).json({
       error: "MongoDB is not connected",
       detail: mongoError ? mongoError.message : "Check MONGODB_URI and start MongoDB."
@@ -2919,10 +2976,11 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const mobileStickyAd = settings.ads?.["mobile-sticky"] || "ADVERTISEMENT";
 
   return `<!DOCTYPE html>
-<html lang="${escapeHTML(language)}">
+<html lang="${escapeHTML(language)}" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>${escapeHTML(article.metaTitle || article.title)}</title>
   <meta name="description" content="${escapeHTML(article.metaDescription || article.summary)}">
   <meta name="keywords" content="${escapeHTML(news.keywords || "")}">
@@ -3023,10 +3081,11 @@ function renderSearchPage(results, query, req) {
   }).join("");
 
   return `<!DOCTYPE html>
-<html lang="${escapeHTML(language)}">
+<html lang="${escapeHTML(language)}" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>${escapeHTML(title)}</title>
   <meta name="description" content="${escapeHTML(description)}">
   <link rel="canonical" href="${escapeHTML(publicBaseUrl(req))}/search?q=${encodeURIComponent(query || "")}&lang=${language}">
@@ -3115,10 +3174,11 @@ function renderCategoryLandingPage(route, articles, settings, req) {
       : "";
 
   return `<!DOCTYPE html>
-<html lang="hi">
+<html lang="hi" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>${escapeHTML(title)}</title>
   <meta name="description" content="${escapeHTML(route.description)}">
   <link rel="canonical" href="${escapeHTML(canonical)}">
@@ -3238,10 +3298,11 @@ function renderWebStoriesIndex(news, req) {
   }).join("");
 
   return `<!DOCTYPE html>
-<html lang="${escapeHTML(language)}">
+<html lang="${escapeHTML(language)}" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
   <title>Khabri Junction Web Stories</title>
   <meta name="description" content="Mobile-first Web Stories from Khabri Junction.">
   <link rel="canonical" href="${publicBaseUrl(req)}/web-stories">
@@ -3546,20 +3607,44 @@ app.post("/api/news-analytics/click", requireDatabase, async (req, res, next) =>
   }
 });
 
-CLEAN_CATEGORY_ROUTES.forEach((route) => {
-  app.get(route.path, requireDatabase, async (req, res, next) => {
-    try {
-      const category = categoryFromValue(route.category);
-      const articles = await getCombinedPublishedNews(
-        category ? { status: "published", section: category.slug } : { status: "published", q: route.category },
-        24
-      );
-      const settings = await getSiteSettings();
+async function sendCategoryPage(req, res, next, rawSlug) {
+  try {
+    const category = categoryFromValue(rawSlug);
+    const settings = await getSiteSettings();
 
-      res.type("html").send(renderCategoryLandingPage(route, articles, settings, req));
-    } catch (error) {
-      next(error);
+    if (!category) {
+      return res.status(404).type("html").send(renderCategoryLandingPage({
+        path: req.path,
+        title: "Category Not Found",
+        category: "Breaking",
+        description: "यह कैटेगरी अभी उपलब्ध नहीं है. ताजा खबरों के लिए होम या ब्रेकिंग न्यूज देखें."
+      }, [], settings, req));
     }
+
+    const matchedRoute = CLEAN_CATEGORY_ROUTES.find((item) => categoryFromValue(item.category)?.slug === category.slug);
+    const route = matchedRoute ? { ...matchedRoute } : {
+      path: categoryRoutePath(category),
+      title: `${category.label} News`,
+      category: category.label,
+      description: `${category.label} की ताजा खबरें, अपडेट और लोकल रिपोर्ट Khabri Junction पर पढ़ें.`
+    };
+    route.path = categoryRoutePath(category);
+    const articles = await getCombinedPublishedNews({ status: "published", section: category.slug }, 24);
+
+    res.type("html").send(renderCategoryLandingPage(route, articles, settings, req));
+  } catch (error) {
+    next(error);
+  }
+}
+
+app.get("/category/:slug", requireDatabase, (req, res, next) => {
+  sendCategoryPage(req, res, next, req.params.slug);
+});
+
+CLEAN_CATEGORY_ROUTES.forEach((route) => {
+  app.get(route.path, (req, res) => {
+    const category = categoryFromValue(route.category);
+    res.redirect(301, categoryRoutePath(category || route.category));
   });
 });
 
@@ -3620,7 +3705,7 @@ app.get("/sitemap.xml", requireDatabase, async (req, res, next) => {
       "health.html",
       "jobs.html",
       "web-stories",
-      ...CLEAN_CATEGORY_ROUTES.map((route) => route.path.replace(/^\/+/, ""))
+      ...CATEGORY_DEFINITIONS.map((category) => categoryRoutePath(category).replace(/^\/+/, ""))
     ];
     const [manualNews, aiNews] = await Promise.all([
       manualNewsCollection.find({ status: "published" }).sort({ publishedAt: -1, createdAt: -1 }).limit(1000).toArray(),
@@ -3738,6 +3823,30 @@ app.get("/news/:slug", requireDatabase, async (req, res, next) => {
 
     if (!news) {
       return res.status(404).send("News not found");
+    }
+
+    await incrementAnalytics(news, "view");
+    const related = await findRelatedNews(news, 4);
+    const adjacent = await findAdjacentNews(news);
+    const settings = await getSiteSettings();
+    res.type("html").send(renderArticlePage(news, related, req, adjacent, settings));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/category/:category/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const category = categoryFromValue(req.params.category);
+
+    if (!category) {
+      return next();
+    }
+
+    const news = await findPublishedArticleBySlug(req.params.slug, category.slug);
+
+    if (!news) {
+      return next();
     }
 
     await incrementAnalytics(news, "view");
@@ -4027,7 +4136,48 @@ app.delete("/api/news/:id", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.get("/:slug", async (req, res, next) => {
+  const slug = toSlug(req.params.slug);
+
+  if (!slug || req.path.includes(".") || req.path.startsWith("/api")) {
+    return next();
+  }
+
+  const category = categoryFromValue(slug);
+  if (!category) {
+    return next();
+  }
+
+  return res.redirect(301, categoryRoutePath(category));
+});
+
 app.use((req, res) => {
+  if (req.accepts("html")) {
+    return res.status(404).type("html").send(`<!DOCTYPE html>
+<html lang="hi" translate="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google" content="notranslate">
+  <title>Page Not Found | Khabri Junction</title>
+  <link rel="icon" href="/assets/logo-kj.png" type="image/png">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body class="article-page">
+  <main class="portal-shell">
+    <section class="market-card category-focus-card">
+      <div class="section-title"><span></span><strong>पेज नहीं मिला</strong></div>
+      <p class="article-summary">यह लिंक उपलब्ध नहीं है. नीचे से सही कैटेगरी खोलें.</p>
+      <div class="quick-links">
+        ${CATEGORY_DEFINITIONS.slice(0, 24).map((category) => `<a href="${categoryRoutePath(category)}">${escapeHTML(category.label)}</a>`).join("")}
+      </div>
+      <a class="read-btn" href="/index.html">होम पर जाएं</a>
+    </section>
+  </main>
+</body>
+</html>`);
+  }
+
   res.status(404).json({ error: "not found" });
 });
 
@@ -4119,7 +4269,13 @@ async function startServer() {
   });
 }
 
-startServer().catch((error) => {
-  console.error("Failed to start API server:", error);
-  process.exit(1);
-});
+if (require.main === module) {
+  startServer().catch((error) => {
+    console.error("Failed to start API server:", error);
+    process.exit(1);
+  });
+} else {
+  connectToMongo().catch((error) => console.warn(`MongoDB initial connect failed: ${error.message}`));
+}
+
+module.exports = app;

@@ -6,6 +6,34 @@ const markets = [
 
 const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
 const API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "http://localhost:3000" : "");
+const CATEGORY_LINKS = {
+  "breaking.html": "/category/breaking",
+  "durg.html": "/category/durg",
+  "bhilai.html": "/category/bhilai",
+  "raipur.html": "/category/raipur",
+  "bilaspur.html": "/category/bilaspur",
+  "kawardha.html": "/category/kawardha",
+  "khairagarh.html": "/category/khairagarh",
+  "rajnandgaon.html": "/category/rajnandgaon",
+  "sports.html": "/category/sports",
+  "astrology.html": "/category/astrology",
+  "politics.html": "/category/politics",
+  "crime.html": "/category/crime",
+  "entertainment.html": "/category/entertainment",
+  "health.html": "/category/health",
+  "jobs.html": "/category/jobs",
+  "/raipur-news": "/category/raipur",
+  "/raipur-promotion-news": "/category/raipur-promotion",
+  "/market-news": "/category/market",
+  "/weather-update": "/category/weather",
+  "/viral-videos": "/category/viral-videos",
+  "/local-news": "/category/local-news",
+  "/mp-shahdol-news": "/category/mp-shahdol",
+  "/desh-duniya-news": "/category/world",
+  "/weather": "/category/weather",
+  "/mp": "/category/mp-shahdol",
+  "/des": "/category/world"
+};
 let currentLanguage = "hi";
 let storyIndex = 0;
 const HINDI_TEXT_BY_EN = {
@@ -422,7 +450,7 @@ function renderAdminUpdates(data) {
     const titleHi = escapeHTML(title.hi);
     const summaryEn = escapeHTML(summary.en);
     const summaryHi = escapeHTML(summary.hi);
-    const pageUrl = escapeHTML(item.categoryPage || (item.categorySlug ? `${item.categorySlug}.html` : "breaking.html"));
+    const pageUrl = escapeHTML(item.categoryPage || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking"));
     const articleUrl = pageUrl;
     const article = document.createElement("article");
 
@@ -624,7 +652,7 @@ function renderWeatherWidget(weather = []) {
     <div class="section-title"><span></span><strong>मौसम की जानकारी</strong></div>
     <div class="weather-mini-grid">
       ${weather.map((item) => `
-        <a class="weather-mini-card" href="/weather-update">
+        <a class="weather-mini-card" href="/category/weather">
           <strong>${escapeHTML(item.city || "City")}</strong>
           <span>${escapeHTML(item.temp || "--")}</span>
           <small>${escapeHTML(item.condition || "Weather update")}</small>
@@ -680,7 +708,7 @@ function renderAdminVideos(videos = []) {
 
   grid.innerHTML = videos.slice(0, 6).map((video) => {
     const image = video.thumbnail || youtubeThumbnail(video.url) || "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop";
-    const href = video.url || "/viral-videos";
+    const href = video.url || "/category/viral-videos";
 
     return `
       <a class="video-card linked-news-card" href="${escapeHTML(href)}" target="${video.url ? "_blank" : "_self"}" rel="noopener">
@@ -715,11 +743,11 @@ function renderWebStoriesSegment() {
     <div class="section-title"><span></span><strong>Web Stories</strong></div>
     <div class="page-link-grid">
       <a href="/web-stories">ताजा वेब स्टोरी</a>
-      <a href="/viral-videos">वायरल वीडियो</a>
-      <a href="/raipur-news">रायपुर न्यूज</a>
-      <a href="/market-news">मार्केट न्यूज</a>
-      <a href="/weather-update">मौसम अपडेट</a>
-      <a href="/mp-shahdol-news">MP Shahdol</a>
+      <a href="/category/viral-videos">वायरल वीडियो</a>
+      <a href="/category/raipur">रायपुर न्यूज</a>
+      <a href="/category/market">मार्केट न्यूज</a>
+      <a href="/category/weather">मौसम अपडेट</a>
+      <a href="/category/mp-shahdol">MP Shahdol</a>
     </div>
   `;
   main.insertBefore(section, bottomAd);
@@ -783,6 +811,7 @@ async function loadSiteSettings() {
     reorderHomepageSections();
     addCardMeta();
     renderNotificationFooter(settings.notification || {});
+    normalizeCategoryLinks();
     applyAdCode(".header-ad", settings.ads?.header);
     applyAdCode(".vertical-ad", settings.ads?.sidebar || settings.ads?.homepage);
     applyAdCode(".wide-bottom-ad", settings.ads?.footer || settings.ads?.homepage);
@@ -790,6 +819,7 @@ async function loadSiteSettings() {
   } catch (error) {
     renderWebStoriesSegment();
     reorderHomepageSections();
+    normalizeCategoryLinks();
   }
 }
 
@@ -892,7 +922,7 @@ function bindActions() {
   });
 
   document.querySelector(".weather-chip")?.addEventListener("click", () => {
-    window.location.href = "/weather-update";
+    window.location.href = "/category/weather";
   });
 
   document.querySelector(".city-market-card")?.addEventListener("click", (event) => {
@@ -900,7 +930,7 @@ function bindActions() {
       return;
     }
 
-    window.location.href = "/market-news";
+    window.location.href = "/category/market";
   });
 
   bindNewsOpenButtons();
@@ -1058,7 +1088,21 @@ function startLiveUpdates() {
   }, 6500);
 }
 
+function normalizeCategoryLinks() {
+  document.querySelectorAll("a[href]").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (!href) return;
+    const cleanHref = href.replace(/^\.?\//, "").split(/[?#]/)[0];
+    const mappedHref = CATEGORY_LINKS[href] || CATEGORY_LINKS[`/${cleanHref}`] || CATEGORY_LINKS[cleanHref];
+
+    if (mappedHref) {
+      link.setAttribute("href", mappedHref);
+    }
+  });
+}
+
 initLoader();
+normalizeCategoryLinks();
 applyAdminData();
 duplicateTicker();
 revealOnScroll();
