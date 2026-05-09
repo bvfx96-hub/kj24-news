@@ -208,8 +208,14 @@ let automationTask;
 app.use(cors({ origin: true, credentials: false }));
 app.use(express.json({ limit: "15mb" }));
 
+function renderHomepage(req) {
+  const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
+  const base = publicBaseUrl(req);
+  return html.replaceAll("http://localhost:3000", base);
+}
+
 app.get(["/", "/index", "/index.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
+  res.type("html").send(renderHomepage(req));
 });
 
 app.use(express.static(__dirname));
@@ -2072,6 +2078,14 @@ Source headline: ${item.title}
 Source summary: ${item.summary || "No summary available"}
 Source URL: ${item.sourceUrl}
 
+Rewrite rules:
+- Do NOT copy-paste the source headline, source summary, or source wording.
+- Create a fresh Hindi headline in Khabri Junction's own style.
+- Rewrite the story in original Hindi language while keeping only the verified facts.
+- Do not reuse more than 7 consecutive words from the source text.
+- Do not translate word-for-word; paraphrase naturally for local Hindi readers.
+- Do not add fake quotes, fake names, fake numbers, or unverified allegations.
+
 Return ONLY valid JSON with:
 {
   "title": "Hindi headline",
@@ -2081,7 +2095,7 @@ Return ONLY valid JSON with:
   "city": "lowercase city slug if local, else empty string",
   "breaking": true or false
 }
-Do not invent names, quotes, numbers or allegations. If exact details are unavailable, use careful wording.
+If exact details are unavailable, use careful wording and keep the article neutral.
 `;
 
   const response = await fetch("https://api.openai.com/v1/responses", {
