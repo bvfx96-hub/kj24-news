@@ -5,7 +5,7 @@ const markets = [
 ];
 
 const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
-const API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "http://localhost:3000" : "");
+const API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "https://kj24-news.onrender.com" : "");
 const FALLBACK_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CATEGORY_LINKS = {
   "breaking.html": "/category/breaking",
