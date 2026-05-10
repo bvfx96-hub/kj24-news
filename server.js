@@ -15,10 +15,18 @@ const MONGODB_DB = process.env.MONGODB_DB || "khabri_junction";
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.2";
 const OPENAI_IMAGE_MODEL = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+const WEATHER_API_URL = process.env.WEATHER_API_URL || "";
+const WEATHER_API_KEY = process.env.WEATHER_API_KEY || "";
+const MARKET_API_URL = process.env.MARKET_API_URL || "";
+const MARKET_API_KEY = process.env.MARKET_API_KEY || "";
+const CRICKET_API_URL = process.env.CRICKET_API_URL || "";
+const CRICKET_API_KEY = process.env.CRICKET_API_KEY || "";
+const FIREBASE_SERVER_KEY = process.env.FIREBASE_SERVER_KEY || "";
 const NEWS_COLLECTION = "news";
 const ADS_COLLECTION = "ads";
 const MANUAL_NEWS_COLLECTION = "manual_news";
 const NEWS_ANALYTICS_COLLECTION = "news_analytics";
+const PUSH_SUBSCRIBERS_COLLECTION = "push_subscribers";
 const SETTINGS_COLLECTION = "settings";
 const DEFAULT_AUTOMATION_QUERY = process.env.GOOGLE_NEWS_QUERY || "Chhattisgarh Durg Bhilai Raipur Bilaspur sports astrology";
 const AUTOMATION_INTERVAL_MINUTES = 30;
@@ -199,6 +207,7 @@ let newsCollection;
 let adsCollection;
 let manualNewsCollection;
 let newsAnalyticsCollection;
+let pushSubscribersCollection;
 let settingsCollection;
 let mongoReady = false;
 let mongoError = null;
@@ -381,6 +390,75 @@ function formatIST(value) {
     second: "2-digit",
     hour12: false
   }).format(date);
+}
+
+function startOfISTDay(value = new Date()) {
+  const date = parseDateCandidate(value) || new Date();
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value || 0);
+  const month = Number(parts.find((part) => part.type === "month")?.value || 1);
+  const day = Number(parts.find((part) => part.type === "day")?.value || 1);
+
+  return new Date(Date.UTC(year, month - 1, day, 0, -330, 0, 0));
+}
+
+function wordCount(value) {
+  const text = stripHTML(value);
+  return text ? text.split(/\s+/u).filter(Boolean).length : 0;
+}
+
+function normalizeTagList(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeText(item)).filter(Boolean);
+  }
+
+  return normalizeText(value)
+    .split(",")
+    .map((item) => normalizeText(item))
+    .filter(Boolean);
+}
+
+function deriveNewsTagString(input = {}, existing = {}, category = "", city = "") {
+  const tags = Array.from(new Set([
+    ...normalizeTagList(input.tags),
+    ...normalizeTagList(input.tag),
+    ...normalizeTagList(existing.tags),
+    ...normalizeTagList(existing.tag),
+    normalizeText(category),
+    normalizeText(city),
+    "Khabri Junction"
+  ].filter(Boolean)));
+
+  return tags.slice(0, 8).join(", ");
+}
+
+function normalizeImageCrop(value) {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const x = Number(value.x ?? value.left);
+  const y = Number(value.y ?? value.top);
+  const width = Number(value.width ?? value.w);
+  const height = Number(value.height ?? value.h);
+
+  if (![x, y, width, height].every(Number.isFinite)) {
+    return null;
+  }
+
+  return { x, y, width, height };
+}
+
+function createValidationError(message, details = []) {
+  const error = new Error(message);
+  error.status = 400;
+  error.details = details;
+  return error;
 }
 
 function nextScheduledRunDate(intervalMinutes = AUTOMATION_INTERVAL_MINUTES, from = new Date()) {
@@ -1134,6 +1212,8 @@ function normalizeNews(input, existing = {}) {
     sourceImage
   }));
   const image = optimizedThumbnail || aiThumbnail || sourceImage || normalizeText(input.image || existing.image) || fallbackThumbnail;
+  const tag = deriveNewsTagString(input, existing, categoryDefinition.label, city) || normalizeText(input.categoryBadge || categoryDefinition.badge);
+  const imageCrop = normalizeImageCrop(input.imageCrop || existing.imageCrop);
   const news = {
     title,
     summary: normalizeText(input.summary),
@@ -1157,7 +1237,9 @@ function normalizeNews(input, existing = {}) {
     thumbnailStatus: normalizeText(input.thumbnailStatus || existing.thumbnailStatus || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
     createdAt: existing.createdAt || input.createdAt || now,
     updatedAt: now,
-    publishedAt: status === "published" ? input.publishedAt || existing.publishedAt || now : existing.publishedAt || null,
+    publishedAt: status === "published"
+      ? parseDateCandidate(input.publishedAt || existing.publishedAt || now) || now
+      : parseDateCandidate(existing.publishedAt),
     status,
     breaking: normalizeBoolean(input.breaking) || categoryDefinition.slug === "breaking",
     featured: normalizeBoolean(input.featured),
@@ -1165,7 +1247,14 @@ function normalizeNews(input, existing = {}) {
     language: normalizeText(input.language || existing.language || "en"),
     translationStatus: normalizeText(input.translationStatus || existing.translationStatus),
     translationError: normalizeText(input.translationError || existing.translationError),
-    tag: normalizeText(input.tag || input.categoryBadge || categoryDefinition.badge),
+    tag,
+    tags: normalizeTagList(input.tags || existing.tags || tag),
+    author: normalizeText(input.author || existing.author || "Khabri Junction Desk"),
+    imageAlt: normalizeText(input.imageAlt || existing.imageAlt || title),
+    imageCredit: normalizeText(input.imageCredit || existing.imageCredit),
+    imageSource: normalizeText(input.imageSource || existing.imageSource || sourceUrl),
+    imageCrop,
+    reviewNotes: normalizeText(input.reviewNotes || existing.reviewNotes),
     sourceUrl,
     sourceTitle: normalizeText(input.sourceTitle || existing.sourceTitle),
     sourceName: normalizeText(input.sourceName || existing.sourceName),
@@ -1206,6 +1295,10 @@ function normalizeNews(input, existing = {}) {
       delete normalized[field];
     }
   });
+
+  if (!normalized.imageCrop) {
+    delete normalized.imageCrop;
+  }
 
   return normalized;
 }
@@ -1260,12 +1353,19 @@ function serializeNews(doc) {
     translationStatus: doc.translationStatus,
     translationError: doc.translationError,
     tag: doc.tag,
+    tags: Array.isArray(doc.tags) ? doc.tags : normalizeTagList(doc.tag),
+    author: doc.author || "Khabri Junction Desk",
     metaTitle: doc.metaTitle,
     metaDescription: doc.metaDescription,
     ogTitle: doc.ogTitle,
     ogDescription: doc.ogDescription,
     schemaType: doc.schemaType,
     keywords: doc.keywords,
+    imageAlt: doc.imageAlt || doc.title,
+    imageCredit: doc.imageCredit || "",
+    imageSource: doc.imageSource || doc.sourceUrl || "",
+    imageCrop: doc.imageCrop || null,
+    reviewNotes: doc.reviewNotes || "",
     sourceUrl: doc.sourceUrl,
     sourceTitle: doc.sourceTitle,
     sourceName: doc.sourceName,
@@ -1284,11 +1384,11 @@ function serializeNews(doc) {
 }
 
 async function requireDatabase(req, res, next) {
-  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection) {
+  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection || !pushSubscribersCollection) {
     await connectToMongo();
   }
 
-  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection) {
+  if (!mongoReady || !newsCollection || !settingsCollection || !adsCollection || !manualNewsCollection || !newsAnalyticsCollection || !pushSubscribersCollection) {
     if (req.accepts("html")) {
       return res.status(503).type("html").send(`<!DOCTYPE html>
 <html lang="hi" translate="no">
@@ -1337,15 +1437,53 @@ function serializeAd(doc) {
 
 function normalizeAd(input, existing = {}) {
   const now = new Date();
+  const rawPosition = normalizeText(input.position || existing.position || "homepage").toLowerCase();
+  const positionAliases = {
+    "in-article": "article-top",
+    article: "article-top",
+    "article-top": "article-top",
+    "article-bottom": "article-bottom",
+    "mobile sticky": "mobile-sticky",
+    mobile: "mobile-sticky"
+  };
   return {
     title: normalizeText(input.title || existing.title || "Advertisement"),
-    position: normalizeText(input.position || existing.position || "homepage"),
+    position: positionAliases[rawPosition] || rawPosition,
     enabled: input.enabled === undefined ? normalizeBoolean(existing.enabled) : normalizeBoolean(input.enabled),
     target: normalizeText(input.target || existing.target || "all"),
     image: normalizeText(input.image || existing.image),
     linkUrl: normalizeText(input.linkUrl || existing.linkUrl),
     adsenseCode: normalizeText(input.adsenseCode || existing.adsenseCode),
     createdAt: existing.createdAt || now,
+    integrations: {
+      weather: {
+        enabled: Boolean(WEATHER_API_URL),
+        providerUrl: WEATHER_API_URL,
+        apiKeyConfigured: Boolean(WEATHER_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      market: {
+        enabled: Boolean(MARKET_API_URL),
+        providerUrl: MARKET_API_URL,
+        apiKeyConfigured: Boolean(MARKET_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      cricket: {
+        enabled: Boolean(CRICKET_API_URL),
+        providerUrl: CRICKET_API_URL,
+        apiKeyConfigured: Boolean(CRICKET_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      firebase: {
+        enabled: Boolean(FIREBASE_SERVER_KEY),
+        apiKeyConfigured: Boolean(FIREBASE_SERVER_KEY),
+        lastSentAt: null,
+        lastError: ""
+      }
+    },
     updatedAt: now
   };
 }
@@ -1368,7 +1506,7 @@ async function uniqueSlugAcrossCollections(title, sourceHash = "", existingId = 
   return candidate;
 }
 
-async function normalizeManualNews(input, existing = {}) {
+async function normalizeManualNews(input, existing = {}, options = {}) {
   const existingId = existing._id || null;
   const prepared = await prepareBilingualNews({
     ...input,
@@ -1382,7 +1520,7 @@ async function normalizeManualNews(input, existing = {}) {
     ? requestedSlug
     : await uniqueSlugAcrossCollections(requestedSlug || normalized.title, normalized.duplicateKey, existingId, manualNewsCollection);
 
-  return {
+  const manualNews = {
     ...normalized,
     slug,
     automated: false,
@@ -1392,6 +1530,83 @@ async function normalizeManualNews(input, existing = {}) {
     views: Number(existing.views || 0),
     clicks: Number(existing.clicks || 0)
   };
+
+  if (options.validatePublish && (manualNews.status || "published") === "published") {
+    validatePublishableNews(manualNews);
+  }
+
+  return manualNews;
+}
+
+function primaryNewsImage(news = {}) {
+  return normalizeText(news.optimizedThumbnail || news.aiThumbnail || news.sourceImage || news.image);
+}
+
+function validatePublishableNews(news) {
+  const details = [];
+  const bodyWords = Math.max(
+    wordCount(news.body),
+    wordCount(news.bodyHi),
+    wordCount(news.bodyEn)
+  );
+
+  if (bodyWords < 400) {
+    details.push("minimum 400 words required before publish");
+  }
+
+  if (!normalizeText(news.slug)) {
+    details.push("unique slug is required");
+  }
+
+  if (!primaryNewsImage(news)) {
+    details.push("featured image is required");
+  }
+
+  if (!normalizeText(news.metaTitle)) {
+    details.push("meta title is required");
+  }
+
+  if (!normalizeText(news.metaDescription)) {
+    details.push("meta description is required");
+  }
+
+  if (!normalizeText(news.author)) {
+    details.push("author is required");
+  }
+
+  if (!parseDateCandidate(news.publishedAt || news.sourcePublishedAt)) {
+    details.push("publish date is required");
+  }
+
+  if (details.length) {
+    throw createValidationError("publish validation failed", details);
+  }
+}
+
+async function normalizeManagedNews(input, existing = {}, options = {}) {
+  const existingId = existing._id || null;
+  const prepared = await prepareBilingualNews({
+    ...input,
+    sourceName: normalizeText(input.sourceName || existing.sourceName || "Khabri Junction Desk")
+  }, existing);
+  const normalized = normalizeNews(prepared, existing);
+  const requestedSlug = normalizeText(input.slug || existing.slug);
+  const slug = requestedSlug && requestedSlug === existing.slug
+    ? requestedSlug
+    : await uniqueSlugAcrossCollections(requestedSlug || normalized.title, normalized.duplicateKey, existingId, newsCollection);
+  const managed = {
+    ...normalized,
+    slug,
+    author: normalizeText(input.author || existing.author || normalized.author || "Khabri Junction Desk"),
+    views: Number(existing.views || 0),
+    clicks: Number(existing.clicks || 0)
+  };
+
+  if (options.validatePublish && (managed.status || "pending") === "published") {
+    validatePublishableNews(managed);
+  }
+
+  return managed;
 }
 
 function adHtml(ad) {
@@ -1441,6 +1656,10 @@ function buildNewsQuery(query) {
     }
   });
 
+  if (query.district && !mongoQuery.city) {
+    mongoQuery.city = toSlug(query.district);
+  }
+
   if (query.section) {
     const section = toSlug(query.section);
     const sectionCategory = categoryFromValue(section);
@@ -1461,7 +1680,9 @@ function buildNewsQuery(query) {
       $or: [
         { title: { $regex: search, $options: "i" } },
         { summary: { $regex: search, $options: "i" } },
-        { body: { $regex: search, $options: "i" } }
+        { body: { $regex: search, $options: "i" } },
+        { tag: { $regex: search, $options: "i" } },
+        { author: { $regex: search, $options: "i" } }
       ]
     });
   }
@@ -1535,6 +1756,11 @@ function defaultSiteSettings() {
       { name: "NIFTY 50", value: "24,330.95", change: "+1.24%" },
       { name: "BANK NIFTY", value: "55,981.05", change: "+2.63%" }
     ],
+    cricket: [
+      { match: "IPL: CSK vs RCB", score: "RCB 184/6", status: "Innings break" },
+      { match: "Ranji Update", score: "CG 248/7", status: "Stumps" },
+      { match: "Local League", score: "Durg XI 126/3", status: "Live" }
+    ],
     videos: [
       { title: "लोकल मार्केट रील वायरल", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
       { title: "शहर ट्रैफिक अपडेट वीडियो", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
@@ -1564,13 +1790,284 @@ async function getSiteSettings() {
       ...defaults,
       ...existing,
       ads: { ...defaults.ads, ...(existing.ads || {}), ...dynamicAds },
-      notification: { ...defaults.notification, ...(existing.notification || {}) }
+      notification: { ...defaults.notification, ...(existing.notification || {}) },
+      integrations: {
+        ...defaults.integrations,
+        ...(existing.integrations || {}),
+        weather: { ...defaults.integrations.weather, ...(existing.integrations?.weather || {}) },
+        market: { ...defaults.integrations.market, ...(existing.integrations?.market || {}) },
+        cricket: { ...defaults.integrations.cricket, ...(existing.integrations?.cricket || {}) },
+        firebase: { ...defaults.integrations.firebase, ...(existing.integrations?.firebase || {}) }
+      }
     };
   }
 
   const defaults = defaultSiteSettings();
   await settingsCollection.insertOne(defaults);
   return { ...defaults, ads: { ...defaults.ads, ...dynamicAds } };
+}
+
+function sanitizeIntegrationConfig(type, config = {}) {
+  const envDefaults = {
+    weather: { providerUrl: WEATHER_API_URL, apiKey: WEATHER_API_KEY },
+    market: { providerUrl: MARKET_API_URL, apiKey: MARKET_API_KEY },
+    cricket: { providerUrl: CRICKET_API_URL, apiKey: CRICKET_API_KEY },
+    firebase: { apiKey: FIREBASE_SERVER_KEY }
+  };
+  const defaults = envDefaults[type] || {};
+  const providerUrl = normalizeText(config.providerUrl || defaults.providerUrl);
+  const apiKey = normalizeText(config.apiKey || defaults.apiKey);
+
+  return {
+    enabled: config.enabled === undefined ? Boolean(providerUrl || apiKey) : normalizeBoolean(config.enabled),
+    providerUrl,
+    apiKeyConfigured: Boolean(apiKey),
+    apiKey,
+    lastSyncAt: config.lastSyncAt || null,
+    lastSentAt: config.lastSentAt || null,
+    lastError: normalizeText(config.lastError),
+    sourceName: normalizeText(config.sourceName || `${type}-api`)
+  };
+}
+
+function arrayFromPayload(payload, keys = []) {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  for (const key of keys) {
+    if (Array.isArray(payload?.[key])) {
+      return payload[key];
+    }
+  }
+
+  return [];
+}
+
+function normalizeWeatherFeed(payload) {
+  return arrayFromPayload(payload, ["items", "data", "weather", "list", "results"])
+    .map((item) => ({
+      city: normalizeText(item.city || item.name || item.location || item.district),
+      temp: normalizeText(item.temp || item.temperature || item.current || item.value),
+      condition: normalizeText(item.condition || item.description || item.weather || item.summary),
+      updatedAt: new Date()
+    }))
+    .filter((item) => item.city);
+}
+
+function normalizeMarketFeed(payload) {
+  return arrayFromPayload(payload, ["items", "data", "market", "list", "results", "quotes"])
+    .map((item) => ({
+      name: normalizeText(item.name || item.symbol || item.index || item.title),
+      value: normalizeText(item.value || item.price || item.last || item.close),
+      change: normalizeText(item.change || item.delta || item.percent || item.changePercent)
+    }))
+    .filter((item) => item.name);
+}
+
+function normalizeCricketFeed(payload) {
+  return arrayFromPayload(payload, ["items", "data", "matches", "list", "results"])
+    .map((item) => ({
+      match: normalizeText(item.match || item.name || item.title || `${item.team1 || ""} vs ${item.team2 || ""}`),
+      score: normalizeText(item.score || item.summary || item.result || item.statusText),
+      status: normalizeText(item.status || item.state || item.note || item.stage)
+    }))
+    .filter((item) => item.match);
+}
+
+async function fetchExternalJson(url, apiKey = "") {
+  const headers = { Accept: "application/json" };
+
+  if (apiKey) {
+    headers.Authorization = apiKey.startsWith("Bearer ") ? apiKey : `Bearer ${apiKey}`;
+    headers["x-api-key"] = apiKey;
+  }
+
+  const response = await fetch(url, { headers });
+
+  if (!response.ok) {
+    throw new Error(`integration request failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+async function syncIntegrationData(type, overrides = {}) {
+  const current = await getSiteSettings();
+  const config = sanitizeIntegrationConfig(type, { ...(current.integrations?.[type] || {}), ...overrides });
+  const fieldMap = {
+    weather: { field: "weather", normalize: normalizeWeatherFeed },
+    market: { field: "market", normalize: normalizeMarketFeed },
+    cricket: { field: "cricket", normalize: normalizeCricketFeed }
+  };
+  const target = fieldMap[type];
+
+  if (!target) {
+    throw createValidationError("invalid integration type");
+  }
+
+  if (!config.providerUrl) {
+    return {
+      configured: false,
+      items: Array.isArray(current[target.field]) ? current[target.field] : [],
+      integration: config
+    };
+  }
+
+  try {
+    const payload = await fetchExternalJson(config.providerUrl, config.apiKey);
+    const items = target.normalize(payload).slice(0, 20);
+    const integrationUpdate = {
+      ...config,
+      apiKeyConfigured: config.apiKeyConfigured,
+      lastSyncAt: new Date(),
+      lastError: ""
+    };
+
+    await settingsCollection.updateOne(
+      { _id: "site" },
+      {
+        $set: {
+          [target.field]: items.length ? items : current[target.field],
+          [`integrations.${type}`]: integrationUpdate,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    return { configured: true, items, integration: integrationUpdate };
+  } catch (error) {
+    const integrationUpdate = {
+      ...config,
+      lastError: error.message
+    };
+
+    await settingsCollection.updateOne(
+      { _id: "site" },
+      {
+        $set: {
+          [`integrations.${type}`]: integrationUpdate,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    throw error;
+  }
+}
+
+function normalizePushSubscriber(input, existing = {}) {
+  const token = normalizeText(input.token || existing.token);
+
+  if (!token) {
+    throw createValidationError("firebase token is required");
+  }
+
+  const now = new Date();
+  return {
+    token,
+    platform: normalizeText(input.platform || existing.platform || "web"),
+    language: normalizeText(input.language || existing.language || "hi"),
+    district: normalizeText(input.district || existing.district),
+    active: input.active === undefined ? existing.active !== false : normalizeBoolean(input.active),
+    createdAt: existing.createdAt || now,
+    updatedAt: now,
+    unsubscribedAt: input.active === false || input.active === "false" ? now : existing.unsubscribedAt || null
+  };
+}
+
+async function sendFirebaseNotification(payload, filter = {}) {
+  if (!pushSubscribersCollection) {
+    return { sent: 0, skipped: true, reason: "subscriber collection unavailable" };
+  }
+
+  const subscribers = await pushSubscribersCollection.find({ active: true, ...filter }).limit(500).toArray();
+
+  if (!subscribers.length) {
+    return { sent: 0, skipped: true, reason: "no subscribers" };
+  }
+
+  if (!FIREBASE_SERVER_KEY) {
+    return { sent: 0, skipped: true, reason: "FIREBASE_SERVER_KEY missing" };
+  }
+
+  const response = await fetch("https://fcm.googleapis.com/fcm/send", {
+    method: "POST",
+    headers: {
+      Authorization: `key=${FIREBASE_SERVER_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      registration_ids: subscribers.map((item) => item.token),
+      notification: {
+        title: normalizeText(payload.title),
+        body: normalizeText(payload.body),
+        image: normalizeText(payload.image)
+      },
+      data: {
+        url: normalizeText(payload.url),
+        slug: normalizeText(payload.slug),
+        category: normalizeText(payload.category),
+        district: normalizeText(payload.district)
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`firebase push failed: ${response.status} ${errorText.slice(0, 160)}`);
+  }
+
+  const result = await response.json();
+  await settingsCollection.updateOne(
+    { _id: "site" },
+    {
+      $set: {
+        "integrations.firebase.lastSentAt": new Date(),
+        "integrations.firebase.lastError": "",
+        updatedAt: new Date()
+      }
+    },
+    { upsert: true }
+  );
+
+  return {
+    sent: Number(result.success || 0),
+    failed: Number(result.failure || 0),
+    total: subscribers.length
+  };
+}
+
+function buildPublishNotification(news) {
+  return {
+    title: normalizeText(news.titleHi || news.title || "ताज़ा खबर"),
+    body: trimForMeta(news.summaryHi || news.summary || news.metaDescription || "", 110),
+    image: primaryNewsImage(news),
+    url: articleUrl(news),
+    slug: news.slug,
+    category: news.category,
+    district: news.city
+  };
+}
+
+async function notifyPublishedArticle(news) {
+  try {
+    return await sendFirebaseNotification(buildPublishNotification(news));
+  } catch (error) {
+    await settingsCollection.updateOne(
+      { _id: "site" },
+      {
+        $set: {
+          "integrations.firebase.lastError": error.message,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+    return { sent: 0, failed: 0, error: error.message };
+  }
 }
 
 function serializeAutomationSettings(settings) {
@@ -2708,6 +3205,58 @@ async function getCombinedPublishedNews(query = {}, limit = 24) {
   return [...manualNews, ...aiNews].slice(0, limit);
 }
 
+async function findNewsRecordById(id, source = "") {
+  const _id = parseObjectId(id);
+
+  if (source === "manual") {
+    return manualNewsCollection.findOne({ _id });
+  }
+
+  if (source === "ai") {
+    return newsCollection.findOne({ _id });
+  }
+
+  return (manualNewsCollection && await manualNewsCollection.findOne({ _id })) ||
+    await newsCollection.findOne({ _id });
+}
+
+async function getTrendingNews(limit = 12) {
+  const analytics = newsAnalyticsCollection
+    ? await newsAnalyticsCollection.find({})
+      .sort({ views: -1, clicks: -1, updatedAt: -1 })
+      .limit(limit * 4)
+      .toArray()
+    : [];
+  const manualIds = analytics
+    .filter((item) => item.source === "manual" && ObjectId.isValid(item.articleId))
+    .map((item) => new ObjectId(item.articleId));
+  const aiIds = analytics
+    .filter((item) => item.source !== "manual" && ObjectId.isValid(item.articleId))
+    .map((item) => new ObjectId(item.articleId));
+  const [manualDocs, aiDocs] = await Promise.all([
+    manualIds.length ? manualNewsCollection.find({ _id: { $in: manualIds }, status: "published" }).toArray() : [],
+    aiIds.length ? newsCollection.find({ _id: { $in: aiIds }, status: "published" }).toArray() : []
+  ]);
+  const byKey = new Map();
+  [...manualDocs, ...aiDocs].forEach((item) => byKey.set(String(item._id), item));
+  const ordered = analytics.map((item) => byKey.get(item.articleId)).filter(Boolean);
+
+  if (ordered.length >= limit) {
+    return ordered.slice(0, limit);
+  }
+
+  const fallback = await getCombinedPublishedNews({ trending: true, status: "published" }, limit);
+  const combined = [...ordered];
+
+  for (const item of fallback) {
+    if (!combined.find((current) => String(current._id) === String(item._id))) {
+      combined.push(item);
+    }
+  }
+
+  return combined.slice(0, limit);
+}
+
 async function findPublishedArticleBySlug(slug, category = "") {
   const categorySlug = category ? toSlug(category) : "";
   const categoryFilter = categorySlug
@@ -2947,8 +3496,85 @@ function renderNewsSchema(news, related, req) {
   return JSON.stringify(schema);
 }
 
-function formatArticleDate(value) {
-  return new Date(value || Date.now()).toLocaleString("hi-IN", {
+function articlePageLabels(language) {
+  if (language === "en") {
+    return {
+      home: "Home",
+      news: "News",
+      published: "Published",
+      updated: "Updated",
+      source: "Source",
+      author: "Author",
+      category: "Category",
+      district: "District",
+      tags: "Tags",
+      related: "Related News",
+      noRelated: "No related news yet."
+    };
+  }
+
+  return {
+    home: "होम",
+    news: "खबर",
+    published: "प्रकाशित",
+    updated: "अपडेट",
+    source: "स्रोत",
+    author: "लेखक",
+    category: "श्रेणी",
+    district: "जिला",
+    tags: "टैग",
+    related: "संबंधित खबरें",
+    noRelated: "अभी संबंधित खबरें उपलब्ध नहीं हैं।"
+  };
+}
+
+function articleDistrictLabel(news = {}) {
+  const city = normalizeText(news.city || news.districtHint);
+  return categoryFromValue(city)?.label || city || "";
+}
+
+function articleTags(news = {}) {
+  return Array.from(new Set([
+    normalizeText(news.categoryBadge),
+    normalizeText(news.category),
+    articleDistrictLabel(news),
+    ...normalizeText(news.tag).split(",").map((item) => normalizeText(item)),
+    "Khabri Junction"
+  ].filter(Boolean))).slice(0, 6);
+}
+
+function renderBreadcrumbSchema(news, req, language) {
+  const categoryName = articleDistrictLabel(news) || news.category || (language === "hi" ? "खबर" : "News");
+  const categoryPage = `${publicBaseUrl(req)}/${landingPageForNews(news)}`;
+
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: language === "hi" ? "होम" : "Home",
+        item: `${publicBaseUrl(req)}/index.html`
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: categoryName,
+        item: categoryPage
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: localizedValue(news, "title", language) || news.title,
+        item: articleUrl(news, req)
+      }
+    ]
+  });
+}
+
+function formatArticleDate(value, language = "hi") {
+  return new Date(value || Date.now()).toLocaleString(language === "en" ? "en-IN" : "hi-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
     month: "short",
@@ -2960,18 +3586,23 @@ function formatArticleDate(value) {
 
 function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const language = requestedLanguage(req);
+  const labels = articlePageLabels(language);
   const article = localizedNews(news, language);
   const url = articleUrl(news, req);
   const categoryUrl = `/${landingPageForNews(news)}`;
   const shareText = encodeURIComponent(article.title);
   const shareUrl = encodeURIComponent(url);
   const sourceName = news.sourceName || news.feedSourceName || "Khabri Junction";
+  const authorName = normalizeText(news.author || "Khabri Junction Desk");
   const publishedAt = news.publishedAt || news.sourcePublishedAt || news.createdAt;
   const updatedAt = news.updatedAt || publishedAt;
+  const districtLabel = articleDistrictLabel(news);
+  const tags = articleTags(news);
   const articleBanner = news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE;
   const sourceFigure = news.sourceImage && news.sourceImage !== articleBanner
     ? `<figure class="article-source-figure"><img class="article-source-image" src="${escapeHTML(news.sourceImage)}" alt="${escapeHTML(article.title)} original image" loading="lazy" decoding="async"><figcaption>Image credit: ${escapeHTML(sourceName)}</figcaption></figure>`
     : "";
+  const tagChips = tags.map((tag) => `<span>${escapeHTML(tag)}</span>`).join("");
   const relatedCards = related.map((item) => `
     <a class="article-related-card" href="${escapeHTML(articleUrl(item, req))}?lang=${language}">
       <span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
@@ -2989,10 +3620,16 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
     .filter(Boolean)
     .map((paragraph) => `<p>${paragraph}</p>`)
     .join("");
-  const adTop = settings.ads?.["article-top"] || settings.ads?.inArticle || "ADVERTISEMENT";
-  const adBottom = settings.ads?.["article-bottom"] || settings.ads?.inArticle || "ADVERTISEMENT";
-  const sidebarAd = settings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250";
-  const mobileStickyAd = settings.ads?.["mobile-sticky"] || "ADVERTISEMENT";
+  const adTop = normalizeText(settings.ads?.["article-top"] || settings.ads?.inArticle);
+  const adBottom = normalizeText(settings.ads?.["article-bottom"] || settings.ads?.inArticle);
+  const sidebarAd = normalizeText(settings.ads?.sidebar);
+  const mobileStickyAd = normalizeText(settings.ads?.["mobile-sticky"]);
+  const taxonomyMeta = [
+    `<div><strong>${escapeHTML(labels.category)}</strong><span>${escapeHTML(news.category || labels.news)}</span></div>`,
+    districtLabel ? `<div><strong>${escapeHTML(labels.district)}</strong><span>${escapeHTML(districtLabel)}</span></div>` : "",
+    `<div><strong>${escapeHTML(labels.author)}</strong><span>${escapeHTML(authorName)}</span></div>`,
+    `<div><strong>${escapeHTML(labels.source)}</strong><span>${escapeHTML(sourceName)}</span></div>`
+  ].filter(Boolean).join("");
 
   return `<!DOCTYPE html>
 <html lang="${escapeHTML(language)}" translate="no">
@@ -3018,6 +3655,7 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <link rel="apple-touch-icon" href="/assets/logo-kj.png">
   <link rel="stylesheet" href="/style.css">
   <script type="application/ld+json">${renderNewsSchema(article, related, req)}</script>
+  <script type="application/ld+json">${renderBreadcrumbSchema(news, req, language)}</script>
 </head>
 <body class="article-page">
   <header class="portal-site-header">
@@ -3043,15 +3681,20 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   </header>
   <main class="article-shell">
     <article class="article-main">
-      <a class="portal-back" href="${escapeHTML(categoryUrl)}">Home / ${escapeHTML(news.category || "News")}</a>
+      <a class="portal-back" href="${escapeHTML(categoryUrl)}">${escapeHTML(labels.home)} / ${escapeHTML(news.category || labels.news)}</a>
       <span class="tag">${escapeHTML(news.categoryBadge || news.category || "NEWS")}</span>
       <h1>${escapeHTML(article.title)}</h1>
       <p class="article-summary">${escapeHTML(article.summary)}</p>
       <div class="article-meta">
-        <span>Published: ${escapeHTML(formatArticleDate(publishedAt))}</span>
-        <span>Updated: ${escapeHTML(formatArticleDate(updatedAt))}</span>
-        <span>Source: ${escapeHTML(sourceName)}</span>
-        <span>Khabri Junction Desk</span>
+        <span>${escapeHTML(labels.published)}: ${escapeHTML(formatArticleDate(publishedAt, language))}</span>
+        <span>${escapeHTML(labels.updated)}: ${escapeHTML(formatArticleDate(updatedAt, language))}</span>
+      </div>
+      <div class="article-meta-grid">
+        ${taxonomyMeta}
+      </div>
+      <div class="article-taxonomy">
+        <strong>${escapeHTML(labels.tags)}</strong>
+        <div class="article-taxonomy-chips">${tagChips}</div>
       </div>
       <div class="share-row" aria-label="Share article">
         <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}" target="_blank" rel="noopener">Facebook</a>
@@ -3059,21 +3702,21 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
         <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" rel="noopener">WhatsApp</a>
       </div>
       <img class="article-hero-image" src="${escapeHTML(articleBanner)}" alt="${escapeHTML(article.title)}" loading="eager" decoding="async">
-      <div class="ad-slot in-article-ad">${adTop}</div>
+      ${adTop ? `<div class="ad-slot in-article-ad adsense-ready">${adTop}</div>` : ""}
       ${sourceFigure}
       <div class="article-body">${paragraphs}</div>
-      <div class="ad-slot in-article-ad">${adBottom}</div>
+      ${adBottom ? `<div class="ad-slot in-article-ad adsense-ready">${adBottom}</div>` : ""}
       <nav class="article-next-prev" aria-label="Next and previous articles">${prevLink}${nextLink}</nav>
     </article>
     <aside class="article-sidebar">
-      <div class="portal-side-ad">${sidebarAd}</div>
+      ${sidebarAd ? `<div class="portal-side-ad adsense-ready">${sidebarAd}</div>` : ""}
       <section class="article-related">
-        <h2>संबंधित खबरें</h2>
-        ${relatedCards || "<p>No related news yet.</p>"}
+        <h2>${escapeHTML(labels.related)}</h2>
+        ${relatedCards || `<p>${escapeHTML(labels.noRelated)}</p>`}
       </section>
     </aside>
   </main>
-  <div class="mobile-sticky-ad">${mobileStickyAd}</div>
+  ${mobileStickyAd ? `<div class="mobile-sticky-ad adsense-ready">${mobileStickyAd}</div>` : ""}
   <footer class="portal-footer">&copy; 2026 KHABRI JUNCTION - All Rights Reserved</footer>
 </body>
 </html>`;
@@ -3341,11 +3984,17 @@ app.get("/api/health", (req, res) => {
     ok: true,
     database: MONGODB_DB,
     collection: NEWS_COLLECTION,
-    collections: [NEWS_COLLECTION, MANUAL_NEWS_COLLECTION, ADS_COLLECTION, NEWS_ANALYTICS_COLLECTION],
+    collections: [NEWS_COLLECTION, MANUAL_NEWS_COLLECTION, ADS_COLLECTION, NEWS_ANALYTICS_COLLECTION, PUSH_SUBSCRIBERS_COLLECTION],
     mongoConnected: mongoReady,
     mongoError: mongoError ? mongoError.message : null,
     automationRunning,
-    openAIConfigured: Boolean(OPENAI_API_KEY)
+    openAIConfigured: Boolean(OPENAI_API_KEY),
+    integrations: {
+      weatherConfigured: Boolean(WEATHER_API_URL),
+      marketConfigured: Boolean(MARKET_API_URL),
+      cricketConfigured: Boolean(CRICKET_API_URL),
+      firebaseConfigured: Boolean(FIREBASE_SERVER_KEY)
+    }
   });
 });
 
@@ -3437,11 +4086,19 @@ app.get("/api/automation/logs", requireDatabase, async (req, res, next) => {
   }
 });
 
-app.get("/api/site-settings", requireDatabase, async (req, res, next) => {
+app.get("/api/site-settings", async (req, res, next) => {
   try {
+    if (!mongoReady || !settingsCollection) {
+      return res.json(defaultSiteSettings());
+    }
+
     const settings = await getSiteSettings();
     res.json(settings);
   } catch (error) {
+    if (!mongoReady) {
+      return res.json(defaultSiteSettings());
+    }
+
     next(error);
   }
 });
@@ -3452,14 +4109,137 @@ app.put("/api/site-settings", requireDatabase, async (req, res, next) => {
     const update = {
       weather: Array.isArray(req.body?.weather) ? req.body.weather : current.weather,
       market: Array.isArray(req.body?.market) ? req.body.market : current.market,
+      cricket: Array.isArray(req.body?.cricket) ? req.body.cricket : current.cricket,
       videos: Array.isArray(req.body?.videos) ? req.body.videos : current.videos,
       ads: { ...(current.ads || {}), ...(req.body?.ads || {}) },
       notification: { ...(current.notification || {}), ...(req.body?.notification || {}) },
+      integrations: {
+        ...(current.integrations || {}),
+        ...(req.body?.integrations || {}),
+        weather: sanitizeIntegrationConfig("weather", { ...(current.integrations?.weather || {}), ...(req.body?.integrations?.weather || {}) }),
+        market: sanitizeIntegrationConfig("market", { ...(current.integrations?.market || {}), ...(req.body?.integrations?.market || {}) }),
+        cricket: sanitizeIntegrationConfig("cricket", { ...(current.integrations?.cricket || {}), ...(req.body?.integrations?.cricket || {}) }),
+        firebase: sanitizeIntegrationConfig("firebase", { ...(current.integrations?.firebase || {}), ...(req.body?.integrations?.firebase || {}) })
+      },
       updatedAt: new Date()
     };
 
     await settingsCollection.updateOne({ _id: "site" }, { $set: update }, { upsert: true });
     res.json(await getSiteSettings());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/integrations", requireDatabase, async (req, res, next) => {
+  try {
+    const settings = await getSiteSettings();
+    res.json(settings.integrations || defaultSiteSettings().integrations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put("/api/integrations/:type", requireDatabase, async (req, res, next) => {
+  try {
+    const type = normalizeText(req.params.type);
+
+    if (!["weather", "market", "cricket", "firebase"].includes(type)) {
+      throw createValidationError("invalid integration type");
+    }
+
+    const current = await getSiteSettings();
+    const nextConfig = sanitizeIntegrationConfig(type, {
+      ...(current.integrations?.[type] || {}),
+      ...(req.body || {})
+    });
+
+    await settingsCollection.updateOne(
+      { _id: "site" },
+      {
+        $set: {
+          [`integrations.${type}`]: nextConfig,
+          updatedAt: new Date()
+        }
+      },
+      { upsert: true }
+    );
+
+    const settings = await getSiteSettings();
+    res.json(settings.integrations?.[type] || nextConfig);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/integrations/:type/sync", requireDatabase, async (req, res, next) => {
+  try {
+    const type = normalizeText(req.params.type);
+    const result = await syncIntegrationData(type, req.body || {});
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/dashboard/analytics", requireDatabase, async (req, res, next) => {
+  try {
+    const todayStart = startOfISTDay();
+    const automation = await getAutomationSettings();
+    const [
+      totalAi,
+      totalManual,
+      todayAi,
+      todayManual,
+      pendingAi,
+      pendingManual,
+      rejectedAi,
+      rejectedManual,
+      publishedAi,
+      publishedManual,
+      subscribers,
+      analyticsSummary,
+      trending
+    ] = await Promise.all([
+      newsCollection.countDocuments({}),
+      manualNewsCollection.countDocuments({}),
+      newsCollection.countDocuments({ createdAt: { $gte: todayStart } }),
+      manualNewsCollection.countDocuments({ createdAt: { $gte: todayStart } }),
+      newsCollection.countDocuments({ status: "pending" }),
+      manualNewsCollection.countDocuments({ status: "pending" }),
+      newsCollection.countDocuments({ status: "rejected" }),
+      manualNewsCollection.countDocuments({ status: "rejected" }),
+      newsCollection.countDocuments({ status: "published" }),
+      manualNewsCollection.countDocuments({ status: "published" }),
+      pushSubscribersCollection.countDocuments({ active: true }),
+      newsAnalyticsCollection.aggregate([
+        {
+          $group: {
+            _id: null,
+            views: { $sum: "$views" },
+            clicks: { $sum: "$clicks" }
+          }
+        }
+      ]).toArray(),
+      getTrendingNews(8)
+    ]);
+    const totals = analyticsSummary[0] || { views: 0, clicks: 0 };
+
+    res.json({
+      totalNews: totalAi + totalManual,
+      todayNews: todayAi + todayManual,
+      pendingReview: pendingAi + pendingManual,
+      publishedNews: publishedAi + publishedManual,
+      rejectedNews: rejectedAi + rejectedManual,
+      failedJobs: Array.isArray(automation.failedJobs) ? automation.failedJobs.length : 0,
+      subscribers,
+      views: Number(totals.views || 0),
+      clicks: Number(totals.clicks || 0),
+      trendingArticles: trending.map(serializeNews),
+      automationLogs: Array.isArray(automation.logs) ? automation.logs.slice(0, 12) : [],
+      cronHealth: automation.cronHealth || {},
+      sourceStats: Array.isArray(automation.sourceStats) ? automation.sourceStats : []
+    });
   } catch (error) {
     next(error);
   }
@@ -3506,6 +4286,30 @@ app.put("/api/ads/:id", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.post("/api/ads/:id/toggle", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await adsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "ad not found" });
+    }
+
+    await adsCollection.updateOne(
+      { _id },
+      {
+        $set: normalizeAd(
+          { ...existing, enabled: req.body?.enabled === undefined ? !existing.enabled : req.body.enabled },
+          existing
+        )
+      }
+    );
+    res.json(serializeAd(await adsCollection.findOne({ _id })));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.delete("/api/ads/:id", requireDatabase, async (req, res, next) => {
   try {
     const result = await adsCollection.deleteOne({ _id: parseObjectId(req.params.id) });
@@ -3537,7 +4341,104 @@ app.post("/api/uploads", requireDatabase, async (req, res, next) => {
     const filename = `${Date.now()}-${hashValue(originalName).slice(0, 8)}.${ext}`;
     const filePath = path.join(uploadDir, filename);
     fs.writeFileSync(filePath, Buffer.from(match[2], "base64"));
-    res.status(201).json({ url: `/assets/uploads/${filename}` });
+    res.status(201).json({
+      url: `/assets/uploads/${filename}`,
+      previewUrl: `/assets/uploads/${filename}`,
+      imageAlt: normalizeText(req.body?.imageAlt),
+      imageCredit: normalizeText(req.body?.imageCredit),
+      imageSource: normalizeText(req.body?.imageSource),
+      imageCrop: normalizeImageCrop(req.body?.imageCrop)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/images/preview", requireDatabase, async (req, res, next) => {
+  try {
+    const url = normalizeText(req.query.url);
+
+    if (!url) {
+      throw createValidationError("image url is required");
+    }
+
+    const localPath = url.startsWith("/assets/")
+      ? path.join(__dirname, url.replace(/^\/+/, "").replaceAll("/", path.sep))
+      : "";
+
+    res.json({
+      url,
+      previewUrl: url,
+      local: Boolean(localPath && fs.existsSync(localPath)),
+      exists: Boolean(localPath && fs.existsSync(localPath)),
+      imageAlt: normalizeText(req.query.imageAlt),
+      imageCredit: normalizeText(req.query.imageCredit),
+      imageSource: normalizeText(req.query.imageSource),
+      imageCrop: normalizeImageCrop(req.query)
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/push/subscribers", requireDatabase, async (req, res, next) => {
+  try {
+    const subscribers = await pushSubscribersCollection.find({}).sort({ updatedAt: -1 }).limit(500).toArray();
+    res.json({
+      total: subscribers.length,
+      active: subscribers.filter((item) => item.active !== false).length,
+      items: subscribers.map((item) => ({
+        _id: String(item._id),
+        token: item.token,
+        platform: item.platform,
+        language: item.language,
+        district: item.district,
+        active: item.active !== false,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/push/subscribe", requireDatabase, async (req, res, next) => {
+  try {
+    const token = normalizeText(req.body?.token);
+    const existing = token ? await pushSubscribersCollection.findOne({ token }) : null;
+    const subscriber = normalizePushSubscriber(req.body || {}, existing || {});
+
+    await pushSubscribersCollection.updateOne(
+      { token: subscriber.token },
+      { $set: subscriber },
+      { upsert: true }
+    );
+
+    res.status(existing ? 200 : 201).json({ ok: true, active: subscriber.active });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/push/send", requireDatabase, async (req, res, next) => {
+  try {
+    const payload = {
+      title: normalizeText(req.body?.title),
+      body: normalizeText(req.body?.body),
+      image: normalizeText(req.body?.image),
+      url: normalizeText(req.body?.url),
+      slug: normalizeText(req.body?.slug),
+      category: normalizeText(req.body?.category),
+      district: normalizeText(req.body?.district)
+    };
+
+    if (!payload.title || !payload.body) {
+      throw createValidationError("title and body are required");
+    }
+
+    const result = await sendFirebaseNotification(payload, req.body?.district ? { district: normalizeText(req.body.district) } : {});
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -3560,9 +4461,16 @@ app.get("/api/manual-news", requireDatabase, async (req, res, next) => {
 
 app.post("/api/manual-news", requireDatabase, async (req, res, next) => {
   try {
-    const news = await normalizeManualNews(req.body || {});
+    const targetStatus = normalizeText(req.body?.status || "published");
+    const news = await normalizeManualNews(req.body || {}, {}, { validatePublish: targetStatus === "published" });
     const result = await manualNewsCollection.insertOne(news);
-    res.status(201).json(serializeNews(await manualNewsCollection.findOne({ _id: result.insertedId })));
+    const created = await manualNewsCollection.findOne({ _id: result.insertedId });
+
+    if ((created?.status || "published") === "published") {
+      await notifyPublishedArticle(created);
+    }
+
+    res.status(201).json(serializeNews(created));
   } catch (error) {
     next(error);
   }
@@ -3577,9 +4485,18 @@ app.put("/api/manual-news/:id", requireDatabase, async (req, res, next) => {
       return res.status(404).json({ error: "manual news not found" });
     }
 
-    const news = await normalizeManualNews(req.body || {}, existing);
+    const targetStatus = normalizeText(req.body?.status || existing.status || "published");
+    const news = await normalizeManualNews(req.body || {}, existing, {
+      validatePublish: targetStatus === "published" && (existing.status || "published") !== "published"
+    });
     await manualNewsCollection.updateOne({ _id }, { $set: news });
-    res.json(serializeNews(await manualNewsCollection.findOne({ _id })));
+    const updated = await manualNewsCollection.findOne({ _id });
+
+    if ((existing.status || "published") !== "published" && (updated?.status || "published") === "published") {
+      await notifyPublishedArticle(updated);
+    }
+
+    res.json(serializeNews(updated));
   } catch (error) {
     next(error);
   }
@@ -3783,6 +4700,17 @@ app.get("/api/search", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.get("/api/news/search", requireDatabase, async (req, res, next) => {
+  try {
+    const q = normalizeText(req.query.q);
+    const limit = Math.min(Math.max(Number(req.query.limit || 30), 1), 100);
+    const results = q ? await getCombinedPublishedNews({ ...req.query, q, status: req.query.status || "published" }, limit) : [];
+    res.json(results.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/web-stories", requireDatabase, async (req, res, next) => {
   try {
     const news = await getCombinedPublishedNews({ status: "published" }, 30);
@@ -3912,6 +4840,48 @@ app.get("/api/news", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.get("/api/news/trending", requireDatabase, async (req, res, next) => {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit || 12), 1), 50);
+    const news = await getTrendingNews(limit);
+    res.json(news.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news/category/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const category = categoryFromValue(req.params.slug);
+
+    if (!category) {
+      return res.status(404).json({ error: "category not found" });
+    }
+
+    const limit = Math.min(Math.max(Number(req.query.limit || 60), 1), 200);
+    const news = await getCombinedPublishedNews({ ...req.query, categorySlug: category.slug }, limit);
+    res.json(news.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/api/news/district/:slug", requireDatabase, async (req, res, next) => {
+  try {
+    const district = CITY_DEFINITIONS.find((item) => item.slug === toSlug(req.params.slug));
+
+    if (!district) {
+      return res.status(404).json({ error: "district not found" });
+    }
+
+    const limit = Math.min(Math.max(Number(req.query.limit || 60), 1), 200);
+    const news = await getCombinedPublishedNews({ ...req.query, city: district.slug }, limit);
+    res.json(news.map(serializeNews));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/news/by-slug/:slug", requireDatabase, async (req, res, next) => {
   try {
     const news = (manualNewsCollection && await manualNewsCollection.findOne({ slug: req.params.slug })) ||
@@ -3929,7 +4899,7 @@ app.get("/api/news/by-slug/:slug", requireDatabase, async (req, res, next) => {
 
 app.get("/api/news/:id/related", requireDatabase, async (req, res, next) => {
   try {
-    const news = await newsCollection.findOne({ _id: parseObjectId(req.params.id) });
+    const news = await findNewsRecordById(req.params.id, normalizeText(req.query.source));
 
     if (!news) {
       return res.status(404).json({ error: "news not found" });
@@ -4018,9 +4988,40 @@ app.post("/api/news/:id/thumbnail", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.post("/api/news/:id/image", requireDatabase, async (req, res, next) => {
+  try {
+    const _id = parseObjectId(req.params.id);
+    const existing = await newsCollection.findOne({ _id });
+
+    if (!existing) {
+      return res.status(404).json({ error: "news not found" });
+    }
+
+    const update = {
+      image: normalizeText(req.body?.image || existing.image),
+      sourceImage: normalizeText(req.body?.sourceImage || existing.sourceImage),
+      imageAlt: normalizeText(req.body?.imageAlt || existing.imageAlt || existing.title),
+      imageCredit: normalizeText(req.body?.imageCredit || existing.imageCredit),
+      imageSource: normalizeText(req.body?.imageSource || existing.imageSource || existing.sourceUrl),
+      imageCrop: normalizeImageCrop(req.body?.imageCrop || existing.imageCrop),
+      updatedAt: new Date()
+    };
+
+    if (!update.imageCrop) {
+      delete update.imageCrop;
+    }
+
+    await newsCollection.updateOne({ _id }, { $set: update });
+    const updated = await newsCollection.findOne({ _id });
+    res.json(serializeNews(updated));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/news/:id", requireDatabase, async (req, res, next) => {
   try {
-    const news = await newsCollection.findOne({ _id: parseObjectId(req.params.id) });
+    const news = await findNewsRecordById(req.params.id, normalizeText(req.query.source));
 
     if (!news) {
       return res.status(404).json({ error: "news not found" });
@@ -4034,7 +5035,8 @@ app.get("/api/news/:id", requireDatabase, async (req, res, next) => {
 
 app.post("/api/news", requireDatabase, async (req, res, next) => {
   try {
-    const news = normalizeNews(await prepareBilingualNews(req.body));
+    const targetStatus = normalizeText(req.body?.status || (normalizeBoolean(req.body?.automated) ? "pending" : "published"));
+    const news = await normalizeManagedNews(req.body || {}, {}, { validatePublish: targetStatus === "published" });
     const result = await newsCollection.insertOne(news);
     const created = await newsCollection.findOne({ _id: result.insertedId });
 
@@ -4053,7 +5055,10 @@ app.put("/api/news/:id", requireDatabase, async (req, res, next) => {
       return res.status(404).json({ error: "news not found" });
     }
 
-    const news = normalizeNews(await prepareBilingualNews(req.body, existing), existing);
+    const targetStatus = normalizeText(req.body?.status || existing.status || "published");
+    const news = await normalizeManagedNews(req.body || {}, existing, {
+      validatePublish: targetStatus === "published" && (existing.status || "pending") !== "published"
+    });
     await newsCollection.updateOne({ _id }, { $set: news });
     const updated = await newsCollection.findOne({ _id });
     const previousStatus = existing.status || "published";
@@ -4062,6 +5067,7 @@ app.put("/api/news/:id", requireDatabase, async (req, res, next) => {
     if (previousStatus !== nextStatus) {
       if (nextStatus === "published") {
         await addAutomationLog("approved", `Approved and published: ${updated.title}`, { id: String(updated._id) });
+        await notifyPublishedArticle(updated);
       } else if (nextStatus === "rejected") {
         await addAutomationLog("rejected", `Rejected article: ${updated.title}`, { id: String(updated._id) });
       } else if (nextStatus === "pending") {
@@ -4084,10 +5090,11 @@ app.post("/api/news/:id/approve", requireDatabase, async (req, res, next) => {
       return res.status(404).json({ error: "news not found" });
     }
 
-    const news = normalizeNews(await prepareBilingualNews({ ...existing, ...req.body, status: "published" }, existing), existing);
+    const news = await normalizeManagedNews({ ...existing, ...req.body, status: "published" }, existing, { validatePublish: true });
     await newsCollection.updateOne({ _id }, { $set: news });
     const updated = await newsCollection.findOne({ _id });
     await addAutomationLog("approved", `Approved and published: ${updated.title}`, { id: String(updated._id) });
+    await notifyPublishedArticle(updated);
 
     res.json(serializeNews(updated));
   } catch (error) {
@@ -4104,7 +5111,7 @@ app.post("/api/news/:id/reject", requireDatabase, async (req, res, next) => {
       return res.status(404).json({ error: "news not found" });
     }
 
-    const news = normalizeNews(await prepareBilingualNews({ ...existing, ...req.body, status: "rejected", featured: false, breaking: false, trending: false }, existing), existing);
+    const news = await normalizeManagedNews({ ...existing, ...req.body, status: "rejected", featured: false, breaking: false, trending: false }, existing);
     await newsCollection.updateOne({ _id }, { $set: news });
     const updated = await newsCollection.findOne({ _id });
     await addAutomationLog("rejected", `Rejected article: ${updated.title}`, { id: String(updated._id) });
@@ -4123,10 +5130,11 @@ app.post("/api/news/bulk-approve", requireDatabase, async (req, res, next) => {
     let approved = 0;
 
     for (const item of pending) {
-      const news = normalizeNews(await prepareBilingualNews({ ...item, status: "published" }, item), item);
+      const news = await normalizeManagedNews({ ...item, status: "published" }, item, { validatePublish: true });
       await newsCollection.updateOne({ _id: item._id }, { $set: news });
       approved += 1;
       await addAutomationLog("approved", `Bulk approved: ${item.title}`, { id: String(item._id) });
+      await notifyPublishedArticle({ ...item, ...news, _id: item._id });
     }
 
     res.json({ approved });
@@ -4208,7 +5216,10 @@ app.use((error, req, res, next) => {
     console.error(error);
   }
 
-  res.status(status).json({ error: message });
+  res.status(status).json({
+    error: message,
+    ...(Array.isArray(error.details) && error.details.length ? { details: error.details } : {})
+  });
 });
 
 async function connectToMongo() {
@@ -4223,6 +5234,7 @@ async function connectToMongo() {
     adsCollection = database.collection(ADS_COLLECTION);
     manualNewsCollection = database.collection(MANUAL_NEWS_COLLECTION);
     newsAnalyticsCollection = database.collection(NEWS_ANALYTICS_COLLECTION);
+    pushSubscribersCollection = database.collection(PUSH_SUBSCRIBERS_COLLECTION);
     settingsCollection = database.collection(SETTINGS_COLLECTION);
     await newsCollection.updateMany({ status: "review" }, { $set: { status: "pending", publishedAt: null } });
     await backfillNewsMetadata();
@@ -4243,6 +5255,8 @@ async function connectToMongo() {
     await adsCollection.createIndex({ position: 1, enabled: 1, updatedAt: -1 });
     await newsAnalyticsCollection.createIndex({ articleId: 1, source: 1 }, { unique: true });
     await newsAnalyticsCollection.createIndex({ views: -1, clicks: -1 });
+    await pushSubscribersCollection.createIndex({ token: 1 }, { unique: true });
+    await pushSubscribersCollection.createIndex({ active: 1, district: 1, updatedAt: -1 });
     await getAutomationSettings();
     await getSiteSettings();
     await settingsCollection.updateOne(

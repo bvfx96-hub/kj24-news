@@ -3,6 +3,13 @@ const PORTAL_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495020689067-9
 const PORTAL_LANGUAGE_KEY = "khabriJunctionPortalLanguage";
 const requestedPortalLanguage = new URLSearchParams(window.location.search).get("lang");
 let portalLanguage = requestedPortalLanguage === "en" ? "en" : "hi";
+
+if (document.body) {
+  document.body.classList.add("ads-pending");
+} else {
+  document.addEventListener("DOMContentLoaded", () => document.body?.classList.add("ads-pending"), { once: true });
+}
+
 const PORTAL_HINDI_TEXT = {
   "Related News": "संबंधित खबरें",
   "Open Full Page": "पूरी खबर खोलें",
