@@ -35,7 +35,7 @@ const NEWS_FRESHNESS_HOURS = 12;
 const NEWS_FRESHNESS_WINDOW_MS = NEWS_FRESHNESS_HOURS * 60 * 60 * 1000;
 const RSS_FETCH_RETRY_COUNT = 3;
 const AUTOMATION_STUCK_MS = 20 * 60 * 1000;
-const SITE_URL = (process.env.SITE_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+const SITE_URL = (process.env.SITE_URL || `https://kj24-news.onrender.com/`).replace(/\/+$/, "");
 const DEFAULT_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=1200&auto=format&fit=crop";
 const THUMBNAIL_WIDTH = 1200;
 const THUMBNAIL_HEIGHT = 675;
@@ -220,7 +220,7 @@ app.use(express.json({ limit: "15mb" }));
 function renderHomepage(req) {
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const base = publicBaseUrl(req);
-  return html.replaceAll("http://localhost:3000", base);
+  return html.replaceAll("https://kj24-news.onrender.com");", base);
 }
 
 app.get(["/", "/index", "/index.html"], (req, res) => {
