@@ -151,6 +151,8 @@ const fields = {
   newsTrending: document.getElementById("newsTrending"),
   newsList: document.getElementById("newsList"),
   statusLine: document.getElementById("statusLine"),
+  adminLoading: document.getElementById("adminLoading"),
+  adminLoadingText: document.getElementById("adminLoadingText"),
   logoutAdmin: document.getElementById("logoutAdmin"),
   automationEnabled: document.getElementById("automationEnabled"),
   automationQuery: document.getElementById("automationQuery"),
@@ -217,6 +219,7 @@ const fields = {
   previewBody: document.getElementById("previewBody")
 };
 let automationCountdownTimer = null;
+let activeAdminRequests = 0;
 
 function hasAccess() {
   return sessionStorage.getItem(AUTH_SESSION_KEY) === "granted";
@@ -316,8 +319,39 @@ function publishState() {
     .catch((error) => showStatus(`Saved locally, but MongoDB publish failed: ${error.message}`));
 }
 
+function friendlyErrorMessage(message) {
+  const cleanMessage = String(message || "")
+    .replace(/sk-[A-Za-z0-9_-]+/g, "sk-***")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/openai/i.test(cleanMessage) && /(incorrect api key|invalid api key|401)/i.test(cleanMessage)) {
+    return "OpenAI API key invalid hai. Render Environment me OPENAI_API_KEY update karke service redeploy karo.";
+  }
+
+  return cleanMessage;
+}
+
 function showStatus(message) {
-  fields.statusLine.textContent = message;
+  fields.statusLine.textContent = friendlyErrorMessage(message);
+}
+
+function setAdminLoading(isLoading, message = "Backend se data load ho raha hai...") {
+  if (!fields.adminLoading) return;
+
+  activeAdminRequests = Math.max(0, activeAdminRequests + (isLoading ? 1 : -1));
+
+  if (isLoading) {
+    if (fields.adminLoadingText) {
+      fields.adminLoadingText.textContent = message;
+    }
+    fields.adminLoading.hidden = false;
+    return;
+  }
+
+  if (activeAdminRequests === 0) {
+    fields.adminLoading.hidden = true;
+  }
 }
 
 function escapeHTML(value) {
@@ -382,32 +416,39 @@ function createLocalStateSnapshot() {
 }
 
 async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    },
-    ...options
-  });
+  const { loadingMessage, ...fetchOptions } = options;
+  setAdminLoading(true, loadingMessage || "Backend se data load ho raha hai...");
 
-  if (!response.ok) {
-    let message = `API error ${response.status}`;
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(fetchOptions.headers || {})
+      },
+      ...fetchOptions
+    });
 
-    try {
-      const payload = await response.json();
-      message = payload.error || message;
-    } catch (error) {
-      // Keep the status-based message when the response is not JSON.
+    if (!response.ok) {
+      let message = `API error ${response.status}`;
+
+      try {
+        const payload = await response.json();
+        message = payload.error || message;
+      } catch (error) {
+        // Keep the status-based message when the response is not JSON.
+      }
+
+      throw new Error(friendlyErrorMessage(message));
     }
 
-    throw new Error(message);
-  }
+    if (response.status === 204) {
+      return null;
+    }
 
-  if (response.status === 204) {
-    return null;
+    return response.json();
+  } finally {
+    setAdminLoading(false);
   }
-
-  return response.json();
 }
 
 function formatDateTime(value) {
@@ -601,9 +642,32 @@ async function uploadImage(file) {
   const dataUrl = await fileToDataUrl(file);
   const result = await apiRequest("/api/uploads", {
     method: "POST",
-    body: JSON.stringify({ filename: file.name, dataUrl })
+    body: JSON.stringify({ filename: file.name, dataUrl }),
+    loadingMessage: "Image upload ho raha hai..."
   });
   return result.url;
+}
+
+async function uploadAndFill(input, targetField, label) {
+  const file = input?.files?.[0];
+
+  if (!file || !targetField) {
+    return;
+  }
+
+  input.disabled = true;
+  showStatus(`${label} upload ho raha hai...`);
+
+  try {
+    const uploadedUrl = await uploadImage(file);
+    targetField.value = uploadedUrl;
+    input.value = "";
+    showStatus(`${label} uploaded. Ab Save dabayein.`);
+  } catch (error) {
+    showStatus(`${label} upload failed: ${error.message}`);
+  } finally {
+    input.disabled = false;
+  }
 }
 
 function clearAdForm() {
@@ -679,7 +743,8 @@ async function saveAd(event) {
     const id = fields.adId.value;
     await apiRequest(id ? `/api/ads/${id}` : "/api/ads", {
       method: id ? "PUT" : "POST",
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      loadingMessage: "Ad update save ho raha hai..."
     });
     showStatus("Ad saved. Refresh website to see placement update.");
     clearAdForm();
@@ -808,7 +873,8 @@ async function saveManualNews(event) {
     const id = fields.manualId.value;
     const saved = await apiRequest(id ? `/api/manual-news/${id}` : "/api/manual-news", {
       method: id ? "PUT" : "POST",
-      body: JSON.stringify(manualPayload(uploadedUrl))
+      body: JSON.stringify(manualPayload(uploadedUrl)),
+      loadingMessage: "Manual news save ho raha hai..."
     });
     showStatus(saved.status === "published" ? "Manual news published. Homepage priority is active." : "Manual news saved.");
     clearManualForm();
@@ -946,7 +1012,7 @@ async function runAutomationNow() {
       setAutomationStatusHTML(`
         <div>
           <strong class="status-warn">Completed with errors</strong>
-          <span>${escapeHTML(result.errors.slice(0, 2).join(" | "))}</span>
+          <span>${escapeHTML(result.errors.slice(0, 2).map(friendlyErrorMessage).join(" | "))}</span>
         </div>
         <div>
           <strong>Pending ${Number(result.pending || result.created || 0)}</strong>
@@ -1554,7 +1620,8 @@ async function runThumbnailAction(action) {
       body: JSON.stringify({
         action,
         sourceImage: fields.newsImage.value.trim() || item.sourceImage || item.image
-      })
+      }),
+      loadingMessage: action === "use-source" ? "Source image thumbnail ban raha hai..." : "AI thumbnail generate ho raha hai..."
     });
     state.news[index] = apiToAdminItem(saved);
     fillNewsForm(index);
@@ -1710,9 +1777,11 @@ function bindEvents() {
   fields.runFailedJobs?.addEventListener("click", runLastFailedJobs);
   fields.saveSiteSettings?.addEventListener("click", saveSiteSettings);
   fields.adForm?.addEventListener("submit", saveAd);
+  fields.adUpload?.addEventListener("change", () => uploadAndFill(fields.adUpload, fields.adImage, "Ad banner"));
   fields.clearAdForm?.addEventListener("click", clearAdForm);
   fields.deleteAd?.addEventListener("click", deleteCurrentAd);
   fields.manualNewsForm?.addEventListener("submit", saveManualNews);
+  fields.manualUpload?.addEventListener("change", () => uploadAndFill(fields.manualUpload, fields.manualImage, "Thumbnail"));
   fields.clearManualForm?.addEventListener("click", clearManualForm);
   fields.previewManual?.addEventListener("click", previewManualNews);
   fields.deleteManual?.addEventListener("click", deleteCurrentManualNews);

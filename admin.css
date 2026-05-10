@@ -52,6 +52,55 @@ body.locked .admin-main {
   display: none;
 }
 
+.admin-loading[hidden] {
+  display: none;
+}
+
+.admin-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(18, 21, 27, 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.admin-loader-card {
+  width: min(320px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 24px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #fff;
+  background: #161a22;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  text-align: center;
+}
+
+.admin-loader-card small {
+  color: #c9d2df;
+  line-height: 1.45;
+}
+
+.admin-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: adminSpin 0.82s linear infinite;
+}
+
+@keyframes adminSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .login-card {
   width: min(100%, 410px);
   display: grid;

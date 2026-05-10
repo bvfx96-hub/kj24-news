@@ -28,6 +28,7 @@ const MANUAL_NEWS_COLLECTION = "manual_news";
 const NEWS_ANALYTICS_COLLECTION = "news_analytics";
 const PUSH_SUBSCRIBERS_COLLECTION = "push_subscribers";
 const SETTINGS_COLLECTION = "settings";
+const UPLOADS_COLLECTION = "uploads";
 const DEFAULT_AUTOMATION_QUERY = process.env.GOOGLE_NEWS_QUERY || "Chhattisgarh Durg Bhilai Raipur Bilaspur sports astrology";
 const AUTOMATION_INTERVAL_MINUTES = 30;
 const AUTOMATION_CRON_EXPRESSION = "*/30 * * * *";
@@ -210,6 +211,7 @@ let manualNewsCollection;
 let newsAnalyticsCollection;
 let pushSubscribersCollection;
 let settingsCollection;
+let uploadsCollection;
 let mongoReady = false;
 let mongoError = null;
 let automationRunning = false;
@@ -4339,6 +4341,22 @@ app.delete("/api/ads/:id", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.get("/api/uploads/:id", requireDatabase, async (req, res, next) => {
+  try {
+    const upload = await uploadsCollection.findOne({ _id: parseObjectId(req.params.id) });
+
+    if (!upload?.data || !upload?.mimeType) {
+      return res.status(404).send("upload not found");
+    }
+
+    res.setHeader("Content-Type", upload.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(Buffer.from(upload.data, "base64"));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/uploads", requireDatabase, async (req, res, next) => {
   try {
     const dataUrl = normalizeText(req.body?.dataUrl);
@@ -4355,10 +4373,20 @@ app.post("/api/uploads", requireDatabase, async (req, res, next) => {
     fs.mkdirSync(uploadDir, { recursive: true });
     const filename = `${Date.now()}-${hashValue(originalName).slice(0, 8)}.${ext}`;
     const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, Buffer.from(match[2], "base64"));
+    const imageBuffer = Buffer.from(match[2], "base64");
+    fs.writeFileSync(filePath, imageBuffer);
+    const uploadResult = await uploadsCollection.insertOne({
+      filename,
+      originalName,
+      mimeType: match[1].toLowerCase(),
+      data: imageBuffer.toString("base64"),
+      size: imageBuffer.length,
+      createdAt: new Date()
+    });
+    const url = `/api/uploads/${uploadResult.insertedId}`;
     res.status(201).json({
-      url: `/assets/uploads/${filename}`,
-      previewUrl: `/assets/uploads/${filename}`,
+      url,
+      previewUrl: url,
       imageAlt: normalizeText(req.body?.imageAlt),
       imageCredit: normalizeText(req.body?.imageCredit),
       imageSource: normalizeText(req.body?.imageSource),
@@ -5251,6 +5279,7 @@ async function connectToMongo() {
     newsAnalyticsCollection = database.collection(NEWS_ANALYTICS_COLLECTION);
     pushSubscribersCollection = database.collection(PUSH_SUBSCRIBERS_COLLECTION);
     settingsCollection = database.collection(SETTINGS_COLLECTION);
+    uploadsCollection = database.collection(UPLOADS_COLLECTION);
     await newsCollection.updateMany({ status: "review" }, { $set: { status: "pending", publishedAt: null } });
     await backfillNewsMetadata();
     const thumbnailBackfillCount = await backfillNewsThumbnails();
