@@ -220,7 +220,8 @@ app.use(express.json({ limit: "15mb" }));
 function renderHomepage(req) {
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const base = publicBaseUrl(req);
-  return html.split("https://kj24-news.onrender.com").join(base);
+  return html.replaceAll("http://localhost:3000", base);
+}
 
 app.get(["/", "/index", "/index.html"], (req, res) => {
   res.type("html").send(renderHomepage(req));
