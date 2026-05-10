@@ -1455,35 +1455,6 @@ function normalizeAd(input, existing = {}) {
     linkUrl: normalizeText(input.linkUrl || existing.linkUrl),
     adsenseCode: normalizeText(input.adsenseCode || existing.adsenseCode),
     createdAt: existing.createdAt || now,
-    integrations: {
-      weather: {
-        enabled: Boolean(WEATHER_API_URL),
-        providerUrl: WEATHER_API_URL,
-        apiKeyConfigured: Boolean(WEATHER_API_KEY),
-        lastSyncAt: null,
-        lastError: ""
-      },
-      market: {
-        enabled: Boolean(MARKET_API_URL),
-        providerUrl: MARKET_API_URL,
-        apiKeyConfigured: Boolean(MARKET_API_KEY),
-        lastSyncAt: null,
-        lastError: ""
-      },
-      cricket: {
-        enabled: Boolean(CRICKET_API_URL),
-        providerUrl: CRICKET_API_URL,
-        apiKeyConfigured: Boolean(CRICKET_API_KEY),
-        lastSyncAt: null,
-        lastError: ""
-      },
-      firebase: {
-        enabled: Boolean(FIREBASE_SERVER_KEY),
-        apiKeyConfigured: Boolean(FIREBASE_SERVER_KEY),
-        lastSentAt: null,
-        lastError: ""
-      }
-    },
     updatedAt: now
   };
 }
@@ -1775,6 +1746,35 @@ function defaultSiteSettings() {
       enabled: true,
       title: "ताजा खबरों की सूचना पाएं",
       description: "Khabri Junction से लोकल न्यूज अपडेट पाने के लिए नोटिफिकेशन सब्सक्राइब करें।"
+    },
+    integrations: {
+      weather: {
+        enabled: Boolean(WEATHER_API_URL),
+        providerUrl: WEATHER_API_URL,
+        apiKeyConfigured: Boolean(WEATHER_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      market: {
+        enabled: Boolean(MARKET_API_URL),
+        providerUrl: MARKET_API_URL,
+        apiKeyConfigured: Boolean(MARKET_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      cricket: {
+        enabled: Boolean(CRICKET_API_URL),
+        providerUrl: CRICKET_API_URL,
+        apiKeyConfigured: Boolean(CRICKET_API_KEY),
+        lastSyncAt: null,
+        lastError: ""
+      },
+      firebase: {
+        enabled: Boolean(FIREBASE_SERVER_KEY),
+        apiKeyConfigured: Boolean(FIREBASE_SERVER_KEY),
+        lastSentAt: null,
+        lastError: ""
+      }
     },
     updatedAt: now
   };
