@@ -4214,6 +4214,8 @@ app.get("/api/dashboard/analytics", requireDatabase, async (req, res, next) => {
       rejectedManual,
       publishedAi,
       publishedManual,
+      totalAds,
+      activeAds,
       subscribers,
       analyticsSummary,
       trending
@@ -4228,6 +4230,8 @@ app.get("/api/dashboard/analytics", requireDatabase, async (req, res, next) => {
       manualNewsCollection.countDocuments({ status: "rejected" }),
       newsCollection.countDocuments({ status: "published" }),
       manualNewsCollection.countDocuments({ status: "published" }),
+      adsCollection.countDocuments({}),
+      adsCollection.countDocuments({ enabled: true }),
       pushSubscribersCollection.countDocuments({ active: true }),
       newsAnalyticsCollection.aggregate([
         {
@@ -4244,10 +4248,14 @@ app.get("/api/dashboard/analytics", requireDatabase, async (req, res, next) => {
 
     res.json({
       totalNews: totalAi + totalManual,
+      aiNews: totalAi,
+      manualNews: totalManual,
       todayNews: todayAi + todayManual,
       pendingReview: pendingAi + pendingManual,
       publishedNews: publishedAi + publishedManual,
       rejectedNews: rejectedAi + rejectedManual,
+      totalAds,
+      activeAds,
       failedJobs: Array.isArray(automation.failedJobs) ? automation.failedJobs.length : 0,
       subscribers,
       views: Number(totals.views || 0),

@@ -48,12 +48,14 @@
     </div>
 
     <nav aria-label="Admin sections">
+      <a href="#dashboardPanel"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
       <a href="#topStory"><i class="fa-solid fa-bolt"></i> Top Story</a>
       <a href="#ticker"><i class="fa-solid fa-lines-leaning"></i> Breaking Ticker</a>
       <a href="#newsEditor"><i class="fa-solid fa-newspaper"></i> News Updates</a>
       <a href="#manualCms"><i class="fa-solid fa-pen-to-square"></i> Manual CMS</a>
       <a href="#adManager"><i class="fa-solid fa-rectangle-ad"></i> Ad Manager</a>
       <a href="#siteSettings"><i class="fa-solid fa-sliders"></i> Site Settings</a>
+      <a href="#notificationPanel"><i class="fa-solid fa-bell"></i> Notifications</a>
       <a href="#automationPanel"><i class="fa-solid fa-robot"></i> AI Automation</a>
       <a href="index.html"><i class="fa-solid fa-house"></i> Website Preview</a>
     </nav>
@@ -73,6 +75,29 @@
     </header>
 
     <div class="status-line" id="statusLine">Changes save in this browser and show on index.html preview.</div>
+
+    <section class="panel dashboard-panel" id="dashboardPanel">
+      <div class="panel-head">
+        <div>
+          <span>Final report</span>
+          <h2>Website Dashboard</h2>
+        </div>
+        <button class="ghost-btn" id="refreshDashboard" type="button"><i class="fa-solid fa-rotate"></i> Refresh Report</button>
+      </div>
+      <div class="dashboard-grid" id="dashboardStats" aria-live="polite">
+        <article><strong>Loading</strong><span>Dashboard report aa raha hai...</span></article>
+      </div>
+      <div class="dashboard-split">
+        <div>
+          <h3>Top / Trending Articles</h3>
+          <div class="mini-report-list" id="dashboardTrending"></div>
+        </div>
+        <div>
+          <h3>Automation Logs</h3>
+          <div class="mini-report-list" id="dashboardLogs"></div>
+        </div>
+      </div>
+    </section>
 
     <section class="panel automation-panel" id="automationPanel">
       <div class="panel-head">
@@ -351,8 +376,16 @@
               <textarea id="manualSummaryHi" rows="3" placeholder="हिंदी सारांश"></textarea>
             </label>
             <label class="wide">
+              English Summary Optional
+              <textarea id="manualSummaryEn" rows="3" placeholder="English summary optional"></textarea>
+            </label>
+            <label class="wide">
               Rich Text Body Hindi
               <textarea id="manualBodyHi" rows="8" placeholder="पूरी खबर यहां लिखें"></textarea>
+            </label>
+            <label class="wide">
+              Rich Text Body English Optional
+              <textarea id="manualBodyEn" rows="6" placeholder="English full news optional"></textarea>
             </label>
             <label>
               SEO Meta Title
@@ -375,6 +408,51 @@
           </div>
         </form>
         <div class="news-list" id="manualNewsList" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel notification-panel" id="notificationPanel">
+      <div class="panel-head">
+        <div>
+          <span>User updates</span>
+          <h2>Notification Panel</h2>
+        </div>
+        <button class="ghost-btn" id="loadSubscribers" type="button"><i class="fa-solid fa-users"></i> Load Subscribers</button>
+      </div>
+      <div class="editor-layout compact-editor">
+        <form class="news-form" id="pushForm">
+          <div class="form-grid">
+            <label>
+              Notification Title
+              <input id="pushTitle" type="text" placeholder="ताजा खबर सबसे पहले पाएं">
+            </label>
+            <label>
+              Target District
+              <select id="pushDistrict">
+                <option value="">All districts</option>
+                <option value="durg">Durg</option>
+                <option value="bhilai">Bhilai</option>
+                <option value="raipur">Raipur</option>
+                <option value="bilaspur">Bilaspur</option>
+                <option value="rajnandgaon">Rajnandgaon</option>
+                <option value="kawardha">Kawardha</option>
+                <option value="khairagarh">Khairagarh</option>
+              </select>
+            </label>
+            <label class="wide">
+              Message
+              <textarea id="pushBody" rows="4" placeholder="लोकल न्यूज अपडेट यहां लिखें"></textarea>
+            </label>
+            <label class="wide">
+              Click URL
+              <input id="pushUrl" type="url" placeholder="https://kj24-news.onrender.com/category/durg">
+            </label>
+          </div>
+          <div class="form-actions">
+            <button class="primary-btn" id="sendPush" type="submit"><i class="fa-solid fa-paper-plane"></i> Send Notification</button>
+          </div>
+        </form>
+        <div class="news-list" id="subscriberList" aria-live="polite"></div>
       </div>
     </section>
 

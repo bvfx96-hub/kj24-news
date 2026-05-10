@@ -178,6 +178,17 @@ const UI_HI_LABELS = {
   "Khabri Junction से लोकल न्यूज़ अपडेट पाने के लिए नोटिफिकेशन सब्सक्राइब करें।": "लोकल खबरों की सूचना पाने के लिए नोटिफिकेशन सब्सक्राइब करें।"
 };
 
+const CLEAN_HI_LABELS = {
+  "Fastest digital news for Chhattisgarh": "छत्तीसगढ़ की सबसे तेज डिजिटल न्यूज़",
+  "Modern digital news platform for Chhattisgarh and India.": "छत्तीसगढ़ और भारत की भरोसेमंद डिजिटल न्यूज़ सेवा",
+  "Durg, Chhattisgarh": "दुर्ग, छत्तीसगढ़",
+  "Read Full News": "पूरी खबर पढ़ें",
+  "Visit Page": "पेज देखें",
+  "Back To Home": "होम पर वापस",
+  "Share Now": "शेयर करें",
+  "Latest News": "ताजा खबरें"
+};
+
 function looksCorruptHindi(value) {
   return /à|Â|Ã|�|ð|Ø/.test(String(value || ""));
 }
@@ -186,11 +197,15 @@ function getHindiText(en, hi) {
   const english = String(en || "").trim();
   const hindi = String(hi || "").trim();
 
-  if (UI_HI_LABELS[english]) {
+  if (CLEAN_HI_LABELS[english]) {
+    return CLEAN_HI_LABELS[english];
+  }
+
+  if (UI_HI_LABELS[english] && !looksCorruptHindi(UI_HI_LABELS[english])) {
     return UI_HI_LABELS[english];
   }
 
-  if (HINDI_TEXT_BY_EN[english]) {
+  if (HINDI_TEXT_BY_EN[english] && !looksCorruptHindi(HINDI_TEXT_BY_EN[english])) {
     return HINDI_TEXT_BY_EN[english];
   }
 
@@ -1166,6 +1181,11 @@ async function loadSiteSettings() {
 function setLanguage(language) {
   currentLanguage = language;
   document.documentElement.lang = language === "hi" ? "hi" : "en";
+  try {
+    localStorage.setItem("khabriJunctionLanguage", currentLanguage);
+  } catch (error) {
+    // Language still applies on this page.
+  }
 
   document.querySelectorAll("[data-en][data-hi]").forEach((node) => {
     node.textContent = getLocalizedText(node.dataset.en, node.dataset.hi, language);
@@ -1182,6 +1202,21 @@ function setLanguage(language) {
   const stickyButton = document.getElementById("stickySubscribeCta");
   if (stickyButton) {
     stickyButton.textContent = language === "hi" ? "ताजा खबरें" : "Latest News";
+  }
+}
+
+function initialLanguage() {
+  const params = new URLSearchParams(window.location.search);
+  const queryLanguage = params.get("lang");
+
+  if (queryLanguage === "en" || queryLanguage === "hi") {
+    return queryLanguage;
+  }
+
+  try {
+    return localStorage.getItem("khabriJunctionLanguage") === "en" ? "en" : "hi";
+  } catch (error) {
+    return "hi";
   }
 }
 
@@ -1231,7 +1266,8 @@ function bindNewsOpenButtons() {
       }
 
       if (article?.dataset.pageLink) {
-        window.location.href = article.dataset.pageLink;
+        const separator = article.dataset.pageLink.includes("?") ? "&" : "?";
+        window.location.href = `${article.dataset.pageLink}${separator}lang=${currentLanguage}`;
         return;
       }
 
@@ -1286,7 +1322,8 @@ function bindActions() {
         return;
       }
 
-      window.location.href = card.dataset.pageLink;
+      const separator = card.dataset.pageLink.includes("?") ? "&" : "?";
+      window.location.href = `${card.dataset.pageLink}${separator}lang=${currentLanguage}`;
     });
   });
 
@@ -1455,7 +1492,7 @@ applyAdminData();
 duplicateTicker();
 revealOnScroll();
 bindActions();
-setLanguage("hi");
+setLanguage(initialLanguage());
 renderTopStory(false);
 optimizeImagesForMobile();
 addHeroMeta();

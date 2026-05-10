@@ -305,6 +305,76 @@ body.locked .admin-main {
   background: linear-gradient(135deg, #ffffff 0%, #fff7f8 100%);
 }
 
+.dashboard-panel {
+  border-color: #ccd6e4;
+  background: linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-grid article {
+  min-height: 92px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.dashboard-grid strong {
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.dashboard-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dashboard-split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.dashboard-split h3 {
+  margin: 0 0 8px;
+  font-size: 0.95rem;
+}
+
+.mini-report-list {
+  display: grid;
+  gap: 8px;
+}
+
+.mini-report-list article {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mini-report-list strong {
+  font-size: 0.86rem;
+}
+
+.mini-report-list span,
+.mini-report-list time {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
 .automation-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content max-content max-content;
@@ -731,6 +801,8 @@ textarea:focus {
 
   .automation-grid,
   .automation-status,
+  .dashboard-grid,
+  .dashboard-split,
   .automation-log article {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -761,6 +833,8 @@ textarea:focus {
   .form-grid,
   .automation-grid,
   .automation-status,
+  .dashboard-grid,
+  .dashboard-split,
   .automation-log article,
   .thumbnail-tools {
     grid-template-columns: 1fr;

@@ -153,6 +153,10 @@ const fields = {
   statusLine: document.getElementById("statusLine"),
   adminLoading: document.getElementById("adminLoading"),
   adminLoadingText: document.getElementById("adminLoadingText"),
+  refreshDashboard: document.getElementById("refreshDashboard"),
+  dashboardStats: document.getElementById("dashboardStats"),
+  dashboardTrending: document.getElementById("dashboardTrending"),
+  dashboardLogs: document.getElementById("dashboardLogs"),
   logoutAdmin: document.getElementById("logoutAdmin"),
   automationEnabled: document.getElementById("automationEnabled"),
   automationQuery: document.getElementById("automationQuery"),
@@ -195,7 +199,9 @@ const fields = {
   manualImage: document.getElementById("manualImage"),
   manualUpload: document.getElementById("manualUpload"),
   manualSummaryHi: document.getElementById("manualSummaryHi"),
+  manualSummaryEn: document.getElementById("manualSummaryEn"),
   manualBodyHi: document.getElementById("manualBodyHi"),
+  manualBodyEn: document.getElementById("manualBodyEn"),
   manualMetaTitle: document.getElementById("manualMetaTitle"),
   manualMetaDescription: document.getElementById("manualMetaDescription"),
   manualBreaking: document.getElementById("manualBreaking"),
@@ -212,6 +218,13 @@ const fields = {
   bulkApprovePending: document.getElementById("bulkApprovePending"),
   previewModal: document.getElementById("adminPreviewModal"),
   closePreview: document.getElementById("closePreview"),
+  pushForm: document.getElementById("pushForm"),
+  pushTitle: document.getElementById("pushTitle"),
+  pushBody: document.getElementById("pushBody"),
+  pushUrl: document.getElementById("pushUrl"),
+  pushDistrict: document.getElementById("pushDistrict"),
+  loadSubscribers: document.getElementById("loadSubscribers"),
+  subscriberList: document.getElementById("subscriberList"),
   previewBadge: document.getElementById("previewBadge"),
   previewImage: document.getElementById("previewImage"),
   previewTitle: document.getElementById("previewTitle"),
@@ -586,6 +599,65 @@ function renderAutomationSettings(settings) {
   renderAutomationLogs(settings.logs || []);
 }
 
+function renderDashboard(report = {}) {
+  if (!fields.dashboardStats) return;
+
+  const stats = [
+    ["Total News", report.totalNews],
+    ["Published", report.publishedNews],
+    ["Pending", report.pendingReview],
+    ["Rejected", report.rejectedNews],
+    ["Views", report.views],
+    ["Clicks", report.clicks],
+    ["Today", report.todayNews],
+    ["Ads Active", `${Number(report.activeAds || 0)}/${Number(report.totalAds || 0)}`],
+    ["Subscribers", report.subscribers],
+    ["Failed Jobs", report.failedJobs],
+    ["AI News", report.aiNews],
+    ["Manual News", report.manualNews]
+  ];
+
+  fields.dashboardStats.innerHTML = stats.map(([label, value]) => `
+    <article>
+      <strong>${escapeHTML(value ?? 0)}</strong>
+      <span>${escapeHTML(label)}</span>
+    </article>
+  `).join("");
+
+  const trending = Array.isArray(report.trendingArticles) ? report.trendingArticles : [];
+  fields.dashboardTrending.innerHTML = trending.length
+    ? trending.slice(0, 6).map((item) => `
+      <article>
+        <strong>${escapeHTML(item.titleHi || item.title || "Untitled")}</strong>
+        <span>${escapeHTML(item.category || "News")} • ${escapeHTML(item.city || "All")}</span>
+      </article>
+    `).join("")
+    : `<article><strong>No trending report yet.</strong><span>Views/clicks ke baad yaha data aayega.</span></article>`;
+
+  const logs = Array.isArray(report.automationLogs) ? report.automationLogs : [];
+  fields.dashboardLogs.innerHTML = logs.length
+    ? logs.slice(0, 6).map((log) => `
+      <article>
+        <strong>${escapeHTML(log.type || "log")}</strong>
+        <span>${escapeHTML(log.message || "")}</span>
+        <time>${escapeHTML(formatDateTime(log.createdAt))}</time>
+      </article>
+    `).join("")
+    : `<article><strong>No logs yet.</strong><span>Automation run ke baad yaha logs dikhenge.</span></article>`;
+}
+
+async function loadDashboard() {
+  if (!fields.dashboardStats) return;
+
+  try {
+    renderDashboard(await apiRequest("/api/dashboard/analytics", {
+      loadingMessage: "Dashboard report load ho raha hai..."
+    }));
+  } catch (error) {
+    fields.dashboardStats.innerHTML = `<article><strong>Offline</strong><span>${escapeHTML(error.message)}</span></article>`;
+  }
+}
+
 function linesToItems(value, mapper) {
   return String(value || "")
     .split(/\r?\n/)
@@ -749,6 +821,7 @@ async function saveAd(event) {
     showStatus("Ad saved. Refresh website to see placement update.");
     clearAdForm();
     await loadAds();
+    await loadDashboard();
   } catch (error) {
     showStatus(`Ad save failed: ${error.message}`);
   }
@@ -761,6 +834,7 @@ async function deleteCurrentAd() {
   showStatus("Ad deleted.");
   clearAdForm();
   await loadAds();
+  await loadDashboard();
 }
 
 function clearManualForm() {
@@ -774,7 +848,9 @@ function clearManualForm() {
   fields.manualSlug.value = "";
   fields.manualImage.value = "";
   fields.manualSummaryHi.value = "";
+  if (fields.manualSummaryEn) fields.manualSummaryEn.value = "";
   fields.manualBodyHi.value = "";
+  if (fields.manualBodyEn) fields.manualBodyEn.value = "";
   fields.manualMetaTitle.value = "";
   fields.manualMetaDescription.value = "";
   fields.manualBreaking.checked = false;
@@ -795,7 +871,9 @@ function fillManualForm(item) {
   fields.manualSlug.value = item.slug || "";
   fields.manualImage.value = item.image || "";
   fields.manualSummaryHi.value = item.summaryHi || item.summary || "";
+  if (fields.manualSummaryEn) fields.manualSummaryEn.value = item.summaryEn || "";
   fields.manualBodyHi.value = item.bodyHi || item.body || "";
+  if (fields.manualBodyEn) fields.manualBodyEn.value = item.bodyEn || "";
   fields.manualMetaTitle.value = item.metaTitle || "";
   fields.manualMetaDescription.value = item.metaDescription || "";
   fields.manualBreaking.checked = Boolean(item.breaking);
@@ -812,8 +890,10 @@ function manualPayload(imageUrl = "") {
     titleEn: fields.manualTitleEn.value.trim(),
     summary: fields.manualSummaryHi.value.trim(),
     summaryHi: fields.manualSummaryHi.value.trim(),
+    summaryEn: fields.manualSummaryEn?.value.trim() || "",
     body: fields.manualBodyHi.value.trim(),
     bodyHi: fields.manualBodyHi.value.trim(),
+    bodyEn: fields.manualBodyEn?.value.trim() || "",
     category: fields.manualCategory.value,
     city: fields.manualCity.value,
     status: fields.manualStatus.value,
@@ -879,6 +959,7 @@ async function saveManualNews(event) {
     showStatus(saved.status === "published" ? "Manual news published. Homepage priority is active." : "Manual news saved.");
     clearManualForm();
     await loadManualNews();
+    await loadDashboard();
   } catch (error) {
     showStatus(`Manual news save failed: ${error.message}`);
   }
@@ -902,6 +983,66 @@ async function deleteCurrentManualNews() {
   showStatus("Manual news deleted.");
   clearManualForm();
   await loadManualNews();
+  await loadDashboard();
+}
+
+async function loadSubscribers() {
+  if (!fields.subscriberList) return;
+
+  try {
+    const result = await apiRequest("/api/push/subscribers", {
+      loadingMessage: "Subscribers load ho rahe hain..."
+    });
+    const items = Array.isArray(result.items) ? result.items : [];
+    fields.subscriberList.innerHTML = items.length ? "" : `<div class="news-item"><strong>No subscribers yet.</strong><p>Website par notification subscribe hone ke baad list yaha dikhegi.</p></div>`;
+    items.slice(0, 80).forEach((item) => {
+      const card = document.createElement("article");
+      card.className = "news-item";
+      card.innerHTML = `
+        <span>${item.active ? "ACTIVE" : "INACTIVE"}</span>
+        <strong>${escapeHTML(item.platform || "web")} subscriber</strong>
+        <div class="news-item-meta">
+          <small>${escapeHTML(item.language || "hi")}</small>
+          <small>${escapeHTML(item.district || "all districts")}</small>
+          <small>${escapeHTML(formatDateTime(item.updatedAt || item.createdAt))}</small>
+        </div>`;
+      fields.subscriberList.appendChild(card);
+    });
+    showStatus(`Subscribers loaded: ${Number(result.active || 0)} active / ${Number(result.total || 0)} total.`);
+  } catch (error) {
+    showStatus(`Subscriber load failed: ${error.message}`);
+  }
+}
+
+async function sendPushNotification(event) {
+  event.preventDefault();
+
+  const payload = {
+    title: fields.pushTitle.value.trim(),
+    body: fields.pushBody.value.trim(),
+    url: fields.pushUrl.value.trim() || "/category/breaking",
+    district: fields.pushDistrict.value
+  };
+
+  if (!payload.title || !payload.body) {
+    showStatus("Notification title aur message dono required hain.");
+    return;
+  }
+
+  try {
+    const result = await apiRequest("/api/push/send", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      loadingMessage: "Notification send ho raha hai..."
+    });
+    showStatus(result.skipped
+      ? `Notification skipped: ${result.reason || "Firebase/subscriber setup pending"}`
+      : `Notification sent: ${Number(result.sent || 0)} sent, ${Number(result.failed || 0)} failed.`);
+    await loadSubscribers();
+    await loadDashboard();
+  } catch (error) {
+    showStatus(`Notification send failed: ${error.message}`);
+  }
 }
 
 async function loadSiteSettings() {
@@ -1458,6 +1599,7 @@ async function saveNewsItem(event) {
 
   clearNewsForm();
   renderNewsList();
+  loadDashboard();
   syncTicker();
   saveLocalState();
 }
@@ -1763,6 +1905,7 @@ async function resetAll() {
 function bindEvents() {
   fields.loginForm.addEventListener("submit", handleLogin);
   fields.logoutAdmin.addEventListener("click", logoutAdmin);
+  fields.refreshDashboard?.addEventListener("click", loadDashboard);
   document.getElementById("publishAll").addEventListener("click", publishState);
   document.getElementById("resetAll").addEventListener("click", resetAll);
   document.getElementById("addNews").addEventListener("click", clearNewsForm);
@@ -1785,6 +1928,8 @@ function bindEvents() {
   fields.clearManualForm?.addEventListener("click", clearManualForm);
   fields.previewManual?.addEventListener("click", previewManualNews);
   fields.deleteManual?.addEventListener("click", deleteCurrentManualNews);
+  fields.pushForm?.addEventListener("submit", sendPushNotification);
+  fields.loadSubscribers?.addEventListener("click", loadSubscribers);
   fields.manualTitleHi?.addEventListener("input", () => {
     if (!fields.manualId.value) {
       fields.manualSlug.value = slugifyAdmin(fields.manualTitleHi.value);
@@ -1903,7 +2048,9 @@ renderNewsList();
 bindEvents();
 setAccess(hasAccess());
 loadStateFromApi();
+loadDashboard();
 loadAutomationSettings();
 loadSiteSettings();
 loadAds();
 loadManualNews();
+loadSubscribers();
