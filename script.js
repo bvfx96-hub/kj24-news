@@ -393,12 +393,31 @@ function localizedNewsField(item = {}, field, language = currentLanguage) {
   return item[`${field}En`] || item[field] || item[`${field}Hi`] || "";
 }
 
-function newsPageLink(item = {}, mode = "article") {
-  if (mode === "category") {
-    return item.categoryPage || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
+function safeSitePath(url = "") {
+  const value = String(url || "").trim();
+  if (!value) return "";
+
+  try {
+    const parsed = new URL(value, window.location.origin);
+    const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname);
+    const isSameHost = parsed.host === window.location.host;
+
+    if (isLocalhost || isSameHost) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch (error) {
+    return value;
   }
 
-  return item.articleUrl || item.categoryPage || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
+  return value;
+}
+
+function newsPageLink(item = {}, mode = "article") {
+  if (mode === "category") {
+    return safeSitePath(item.categoryPage) || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
+  }
+
+  return safeSitePath(item.articleUrl) || safeSitePath(item.categoryPage) || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
 }
 
 function articleHref(item = {}, mode = "article") {
@@ -444,7 +463,7 @@ function newsToStory(item = {}) {
     summary: textPair(item.summaryEn || item.summary || item.bodyEn || item.body, item.summaryHi || item.summary || item.bodyHi || item.body),
     body: textPair(item.bodyEn || item.body || item.summaryEn || item.summary, item.bodyHi || item.body || item.summaryHi || item.summary),
     image: item.image || FALLBACK_NEWS_IMAGE,
-    articleUrl: item.articleUrl || item.categoryPage || ""
+    articleUrl: safeSitePath(item.articleUrl) || safeSitePath(item.categoryPage) || ""
   };
 }
 
@@ -481,7 +500,7 @@ function applyNewsToCard(card, item, options = {}) {
   card.dataset.newsHiTitle = titleHi;
   card.dataset.newsBody = bodyEn;
   card.dataset.newsHiBody = bodyHi;
-  card.dataset.articleUrl = mode === "article" ? (item.articleUrl || pageLink) : "";
+  card.dataset.articleUrl = mode === "article" ? (safeSitePath(item.articleUrl) || pageLink) : "";
   card.dataset.pageLink = pageLink;
   card.dataset.city = item.city || "";
   card.dataset.category = item.category || "";

@@ -36,6 +36,25 @@ function portalCategoryPath(slug = pageSectionSlug()) {
   return `/category/${slug || "breaking"}`;
 }
 
+function safePortalPath(url = "") {
+  const value = String(url || "").trim();
+  if (!value) return "";
+
+  try {
+    const parsed = new URL(value, window.location.origin);
+    const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname);
+    const isSameHost = parsed.host === window.location.host;
+
+    if (isLocalhost || isSameHost) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch (error) {
+    return value;
+  }
+
+  return value;
+}
+
 function localizedValue(item, field) {
   if (portalLanguage === "hi") {
     return item[`${field}Hi`] || item[field] || item[`${field}En`] || "";
@@ -173,7 +192,7 @@ function renderRelatedNews(related) {
   box.innerHTML = `
     <h3>${uiText("Related News", "संबंधित खबरें")}</h3>
     ${related.slice(0, 4).map((item) => `
-      <a href="${escapeHTML(item.articleUrl || `/news/${item.slug}`)}?lang=${portalLanguage}" target="_blank" rel="noopener">
+      <a href="${escapeHTML(safePortalPath(item.articleUrl) || `/news/${item.slug}`)}?lang=${portalLanguage}" target="_blank" rel="noopener">
         <span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
         <strong>${escapeHTML(localizedValue(item, "title"))}</strong>
       </a>
@@ -201,8 +220,10 @@ async function openPortalNews(card) {
     modalImage.hidden = true;
   }
 
-  if (news.articleUrl) {
-    articleLink.href = `${news.articleUrl}?lang=${portalLanguage}`;
+  const articleUrl = safePortalPath(news.articleUrl);
+
+  if (articleUrl) {
+    articleLink.href = `${articleUrl}?lang=${portalLanguage}`;
     articleLink.hidden = false;
   } else {
     articleLink.hidden = true;
@@ -302,7 +323,7 @@ function newsDataset(item) {
     data-news-body="${escapeHTML(body)}"
     data-news-image="${escapeHTML(item.image || PORTAL_FALLBACK_IMAGE)}"
     data-news-badge="${escapeHTML(item.categoryBadge || item.category || "NEWS")}"
-    data-article-url="${escapeHTML(item.articleUrl || "")}"
+    data-article-url="${escapeHTML(safePortalPath(item.articleUrl) || "")}"
   `;
 }
 
@@ -310,7 +331,8 @@ function portalCard(item) {
   const image = item.image || PORTAL_FALLBACK_IMAGE;
   const title = localizedValue(item, "title");
   const summary = localizedValue(item, "summary");
-  const url = item.articleUrl ? `${item.articleUrl}?lang=${portalLanguage}` : "#";
+  const articleUrl = safePortalPath(item.articleUrl);
+  const url = articleUrl ? `${articleUrl}?lang=${portalLanguage}` : "#";
 
   return `<article class="portal-card" ${newsDataset(item)}>
     <img src="${escapeHTML(image)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
@@ -324,7 +346,8 @@ function portalCard(item) {
 function portalListItem(item) {
   const image = item.image || PORTAL_FALLBACK_IMAGE;
   const title = localizedValue(item, "title");
-  const url = item.articleUrl ? `${item.articleUrl}?lang=${portalLanguage}` : "#";
+  const articleUrl = safePortalPath(item.articleUrl);
+  const url = articleUrl ? `${articleUrl}?lang=${portalLanguage}` : "#";
 
   return `<article class="portal-list-item" ${newsDataset(item)}>
     <div><span>${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span><h3>${escapeHTML(title)}</h3></div>
@@ -336,7 +359,8 @@ function portalListItem(item) {
 function portalPhotoItem(item) {
   const image = item.image || PORTAL_FALLBACK_IMAGE;
   const title = localizedValue(item, "title");
-  const url = item.articleUrl ? `${item.articleUrl}?lang=${portalLanguage}` : "#";
+  const articleUrl = safePortalPath(item.articleUrl);
+  const url = articleUrl ? `${articleUrl}?lang=${portalLanguage}` : "#";
 
   return `<article class="portal-photo-card" ${newsDataset(item)}>
     <img src="${escapeHTML(image)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
@@ -349,7 +373,9 @@ function portalSideItem(item) {
   const image = item.image || PORTAL_FALLBACK_IMAGE;
   const title = localizedValue(item, "title");
 
-  return `<a class="portal-side-item" href="${escapeHTML(item.articleUrl || "#")}?lang=${portalLanguage}" ${newsDataset(item)}>
+  const articleUrl = safePortalPath(item.articleUrl);
+
+  return `<a class="portal-side-item" href="${escapeHTML(articleUrl || "#")}?lang=${portalLanguage}" ${newsDataset(item)}>
     <h3>${escapeHTML(title)}</h3>
     <img src="${escapeHTML(image)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
   </a>`;

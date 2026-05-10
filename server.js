@@ -35,7 +35,7 @@ const NEWS_FRESHNESS_HOURS = 12;
 const NEWS_FRESHNESS_WINDOW_MS = NEWS_FRESHNESS_HOURS * 60 * 60 * 1000;
 const RSS_FETCH_RETRY_COUNT = 3;
 const AUTOMATION_STUCK_MS = 20 * 60 * 1000;
-const SITE_URL = (process.env.SITE_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+const SITE_URL = (process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
 const DEFAULT_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=1200&auto=format&fit=crop";
 const THUMBNAIL_WIDTH = 1200;
 const THUMBNAIL_HEIGHT = 675;
@@ -202,6 +202,7 @@ const MAX_ITEMS_PER_SOURCE_PER_RUN = 2;
 
 const app = express();
 const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
+app.set("trust proxy", true);
 
 let newsCollection;
 let adsCollection;
@@ -1144,7 +1145,17 @@ function publicBaseUrl(req) {
     return SITE_URL;
   }
 
-  return `${req.protocol}://${req.get("host")}`.replace(/\/+$/, "");
+  const forwardedHost = normalizeText(req.get("x-forwarded-host")).split(",")[0].trim();
+  const forwardedProto = normalizeText(req.get("x-forwarded-proto")).split(",")[0].trim();
+  const host = forwardedHost || req.get("host");
+  const proto = forwardedProto || req.protocol || "https";
+  const base = `${proto}://${host}`.replace(/\/+$/, "");
+
+  if (/^https?:\/\/localhost(?::\d+)?$/i.test(base) && process.env.RENDER_EXTERNAL_URL) {
+    return process.env.RENDER_EXTERNAL_URL.replace(/\/+$/, "");
+  }
+
+  return base;
 }
 
 function routeSlugForNews(doc) {
@@ -1167,7 +1178,11 @@ function landingPageForNews(doc) {
 }
 
 function articleUrl(doc, req) {
-  return `${publicBaseUrl(req)}${categoryRoutePath(routeSlugForNews(doc))}/${doc.slug || toSlug(doc.title)}`;
+  return `${publicBaseUrl(req)}${articlePath(doc)}`;
+}
+
+function articlePath(doc) {
+  return `${categoryRoutePath(routeSlugForNews(doc))}/${doc.slug || toSlug(doc.title)}`;
 }
 
 function normalizeNews(input, existing = {}) {
@@ -1341,7 +1356,7 @@ function serializeNews(doc) {
     thumbnailHash: doc.thumbnailHash,
     thumbnailStatus: doc.thumbnailStatus,
     slug: doc.slug,
-    articleUrl: articleUrl(doc),
+    articleUrl: articlePath(doc),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     publishedAt: doc.publishedAt,
@@ -2045,7 +2060,7 @@ function buildPublishNotification(news) {
     title: normalizeText(news.titleHi || news.title || "ताज़ा खबर"),
     body: trimForMeta(news.summaryHi || news.summary || news.metaDescription || "", 110),
     image: primaryNewsImage(news),
-    url: articleUrl(news),
+    url: `${SITE_URL}${articlePath(news)}`,
     slug: news.slug,
     category: news.category,
     district: news.city
@@ -3545,7 +3560,7 @@ function articleTags(news = {}) {
 
 function renderBreadcrumbSchema(news, req, language) {
   const categoryName = articleDistrictLabel(news) || news.category || (language === "hi" ? "खबर" : "News");
-  const categoryPage = `${publicBaseUrl(req)}/${landingPageForNews(news)}`;
+  const categoryPage = `${publicBaseUrl(req)}${landingPageForNews(news)}`;
 
   return JSON.stringify({
     "@context": "https://schema.org",
@@ -3589,7 +3604,7 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const labels = articlePageLabels(language);
   const article = localizedNews(news, language);
   const url = articleUrl(news, req);
-  const categoryUrl = `/${landingPageForNews(news)}`;
+  const categoryUrl = landingPageForNews(news);
   const shareText = encodeURIComponent(article.title);
   const shareUrl = encodeURIComponent(url);
   const sourceName = news.sourceName || news.feedSourceName || "Khabri Junction";
