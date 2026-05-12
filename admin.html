@@ -292,6 +292,7 @@
           </div>
           <div class="form-actions">
             <button class="ghost-btn" id="deleteAd" type="button"><i class="fa-solid fa-trash"></i> Delete</button>
+            <button class="ghost-btn" id="previewAd" type="button"><i class="fa-solid fa-eye"></i> Preview</button>
             <button class="primary-btn" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Ad</button>
           </div>
         </form>
@@ -528,6 +529,10 @@
               Image URL
               <input id="newsImage" type="url" placeholder="https://images.unsplash.com/...">
             </label>
+            <label>
+              Upload Image
+              <input id="newsUpload" type="file" accept="image/*">
+            </label>
             <div class="thumbnail-tools">
               <button class="ghost-btn" id="useSourceImage" type="button"><i class="fa-solid fa-image"></i> Use Source Image</button>
               <button class="ghost-btn" id="generateAiThumbnail" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i> Generate AI Thumbnail</button>
@@ -574,6 +579,7 @@
           </div>
           <div class="form-actions">
             <button class="ghost-btn" id="clearNewsForm" type="button">Clear</button>
+            <button class="ghost-btn" id="previewNewsDraft" type="button"><i class="fa-solid fa-eye"></i> Preview</button>
             <button class="ghost-btn" id="autoTranslateNews" type="button"><i class="fa-solid fa-language"></i> Auto Translate</button>
             <button class="primary-btn" type="submit"><i class="fa-solid fa-check"></i> Save News Item</button>
           </div>

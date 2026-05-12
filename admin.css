@@ -782,6 +782,18 @@ textarea:focus {
   white-space: pre-line;
 }
 
+.admin-preview-card pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f4f7fb;
+  color: #162132;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.82rem;
+  overflow: auto;
+}
+
 @media (max-width: 900px) {
   .admin-sidebar {
     position: static;
@@ -850,5 +862,16 @@ textarea:focus {
 
   .news-item {
     padding: 10px;
+  }
+
+  .primary-btn,
+  .ghost-btn,
+  .danger-btn {
+    width: 100%;
+  }
+
+  .admin-preview-card {
+    max-height: calc(100vh - 28px);
+    padding: 16px;
   }
 }

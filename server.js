@@ -218,7 +218,8 @@ let automationRunning = false;
 let automationTask;
 
 app.use(cors({ origin: true, credentials: false }));
-app.use(express.json({ limit: "15mb" }));
+app.use(express.json({ limit: "30mb" }));
+app.use(express.urlencoded({ extended: false, limit: "30mb" }));
 
 function renderHomepage(req) {
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
@@ -1209,7 +1210,8 @@ function normalizeNews(input, existing = {}) {
   const freshnessScoreValue = Number(input.freshnessScore ?? existing.freshnessScore);
   const categoryBadge = normalizeText(input.categoryBadge || input.tag || categoryDefinition.badge);
   const sourceImage = preferredSourceImage(input, existing);
-  const optimizedThumbnail = normalizeText(input.optimizedThumbnail || existing.optimizedThumbnail) || buildWatermarkedSourceThumbnail({
+  const sourceImageChanged = Boolean(sourceImage) && sourceImage !== normalizeText(existing.sourceImage);
+  const optimizedThumbnail = normalizeText(input.optimizedThumbnail || (sourceImageChanged ? "" : existing.optimizedThumbnail)) || buildWatermarkedSourceThumbnail({
     ...input,
     ...existing,
     title,
@@ -1218,9 +1220,9 @@ function normalizeNews(input, existing = {}) {
     city,
     sourceImage
   });
-  const aiThumbnail = normalizeText(input.aiThumbnail || existing.aiThumbnail);
+  const aiThumbnail = normalizeText(input.aiThumbnail || (sourceImageChanged ? "" : existing.aiThumbnail));
   const fallbackThumbnail = generateNewsThumbnail({ title, categoryBadge, category: categoryDefinition.label, city });
-  const thumbnailHash = normalizeText(input.thumbnailHash || existing.thumbnailHash || thumbnailHashForNews({
+  const thumbnailHash = normalizeText(input.thumbnailHash || (sourceImageChanged ? "" : existing.thumbnailHash) || thumbnailHashForNews({
     ...input,
     title,
     category: categoryDefinition.label,
@@ -1251,7 +1253,7 @@ function normalizeNews(input, existing = {}) {
     optimizedThumbnail,
     aiThumbnail,
     thumbnailHash,
-    thumbnailStatus: normalizeText(input.thumbnailStatus || existing.thumbnailStatus || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
+    thumbnailStatus: normalizeText(input.thumbnailStatus || (sourceImageChanged ? "" : existing.thumbnailStatus) || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
     createdAt: existing.createdAt || input.createdAt || now,
     updatedAt: now,
     publishedAt: status === "published"
@@ -4365,7 +4367,7 @@ app.get("/api/uploads/:id", requireDatabase, async (req, res, next) => {
   }
 });
 
-app.post("/api/uploads", requireDatabase, async (req, res, next) => {
+app.post("/api/uploads", async (req, res, next) => {
   try {
     const dataUrl = normalizeText(req.body?.dataUrl);
     const originalName = normalizeText(req.body?.filename || "upload.png");
@@ -4383,18 +4385,25 @@ app.post("/api/uploads", requireDatabase, async (req, res, next) => {
     const filePath = path.join(uploadDir, filename);
     const imageBuffer = Buffer.from(match[2], "base64");
     fs.writeFileSync(filePath, imageBuffer);
-    const uploadResult = await uploadsCollection.insertOne({
-      filename,
-      originalName,
-      mimeType: match[1].toLowerCase(),
-      data: imageBuffer.toString("base64"),
-      size: imageBuffer.length,
-      createdAt: new Date()
-    });
-    const url = `/api/uploads/${uploadResult.insertedId}`;
+    let apiUrl = "";
+
+    if (uploadsCollection) {
+      const uploadResult = await uploadsCollection.insertOne({
+        filename,
+        originalName,
+        mimeType: match[1].toLowerCase(),
+        data: imageBuffer.toString("base64"),
+        size: imageBuffer.length,
+        createdAt: new Date()
+      });
+      apiUrl = `/api/uploads/${uploadResult.insertedId}`;
+    }
+
+    const url = `/assets/uploads/${filename}`;
     res.status(201).json({
       url,
       previewUrl: url,
+      apiUrl,
       imageAlt: normalizeText(req.body?.imageAlt),
       imageCredit: normalizeText(req.body?.imageCredit),
       imageSource: normalizeText(req.body?.imageSource),
@@ -4405,7 +4414,7 @@ app.post("/api/uploads", requireDatabase, async (req, res, next) => {
   }
 });
 
-app.get("/api/images/preview", requireDatabase, async (req, res, next) => {
+app.get("/api/images/preview", async (req, res, next) => {
   try {
     const url = normalizeText(req.query.url);
 
@@ -5048,9 +5057,27 @@ app.post("/api/news/:id/image", requireDatabase, async (req, res, next) => {
       return res.status(404).json({ error: "news not found" });
     }
 
+    const sourceImage = normalizeText(req.body?.sourceImage || req.body?.image || existing.sourceImage || existing.image);
+    const thumbnailFields = await buildThumbnailFields(
+      {
+        ...existing,
+        sourceImage,
+        categoryBadge: existing.categoryBadge || existing.category,
+        city: existing.city
+      },
+      existing,
+      {
+        action: sourceImage ? "use-source" : "backfill",
+        force: sourceImage !== normalizeText(existing.sourceImage)
+      }
+    );
     const update = {
-      image: normalizeText(req.body?.image || existing.image),
-      sourceImage: normalizeText(req.body?.sourceImage || existing.sourceImage),
+      image: thumbnailFields.image || normalizeText(req.body?.image || existing.image),
+      sourceImage: sourceImage || existing.sourceImage,
+      optimizedThumbnail: thumbnailFields.optimizedThumbnail || "",
+      aiThumbnail: thumbnailFields.aiThumbnail || "",
+      thumbnailHash: thumbnailFields.thumbnailHash || "",
+      thumbnailStatus: thumbnailFields.thumbnailStatus || "",
       imageAlt: normalizeText(req.body?.imageAlt || existing.imageAlt || existing.title),
       imageCredit: normalizeText(req.body?.imageCredit || existing.imageCredit),
       imageSource: normalizeText(req.body?.imageSource || existing.imageSource || existing.sourceUrl),

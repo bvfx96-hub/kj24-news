@@ -136,6 +136,7 @@ const fields = {
   newsCity: document.getElementById("newsCity"),
   newsStatus: document.getElementById("newsStatus"),
   newsImage: document.getElementById("newsImage"),
+  newsUpload: document.getElementById("newsUpload"),
   newsTitle: document.getElementById("newsTitle"),
   newsTitleHi: document.getElementById("newsTitleHi"),
   newsSummary: document.getElementById("newsSummary"),
@@ -143,6 +144,7 @@ const fields = {
   newsBody: document.getElementById("newsBody"),
   newsBodyHi: document.getElementById("newsBodyHi"),
   autoTranslateNews: document.getElementById("autoTranslateNews"),
+  previewNewsDraft: document.getElementById("previewNewsDraft"),
   useSourceImage: document.getElementById("useSourceImage"),
   generateAiThumbnail: document.getElementById("generateAiThumbnail"),
   regenerateThumbnail: document.getElementById("regenerateThumbnail"),
@@ -185,6 +187,7 @@ const fields = {
   adUpload: document.getElementById("adUpload"),
   adLinkUrl: document.getElementById("adLinkUrl"),
   adCode: document.getElementById("adCode"),
+  previewAd: document.getElementById("previewAd"),
   adList: document.getElementById("adList"),
   clearAdForm: document.getElementById("clearAdForm"),
   deleteAd: document.getElementById("deleteAd"),
@@ -340,6 +343,10 @@ function friendlyErrorMessage(message) {
 
   if (/openai/i.test(cleanMessage) && /(incorrect api key|invalid api key|401)/i.test(cleanMessage)) {
     return "OpenAI API key invalid hai. Render Environment me OPENAI_API_KEY update karke service redeploy karo.";
+  }
+
+  if (/(413|payload too large|request entity too large)/i.test(cleanMessage)) {
+    return "Image bahut badi thi. Chhoti/compressed image try karo, system ab auto-optimize bhi karta hai.";
   }
 
   return cleanMessage;
@@ -709,15 +716,52 @@ function fileToDataUrl(file) {
   });
 }
 
+function loadImageElement(source) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Image load failed"));
+    image.src = source;
+  });
+}
+
+async function fileToOptimizedDataUrl(file, options = {}) {
+  if (!file) return "";
+
+  if (!file.type.startsWith("image/") || /gif|svg/i.test(file.type)) {
+    return fileToDataUrl(file);
+  }
+
+  const {
+    maxWidth = 1600,
+    maxHeight = 1600,
+    quality = 0.84
+  } = options;
+  const source = await fileToDataUrl(file);
+  const image = await loadImageElement(source);
+  const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+  const width = Math.max(1, Math.round(image.width * scale));
+  const height = Math.max(1, Math.round(image.height * scale));
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  const mimeType = /png/i.test(file.type) ? "image/png" : "image/jpeg";
+  return canvas.toDataURL(mimeType, quality);
+}
+
 async function uploadImage(file) {
   if (!file) return "";
-  const dataUrl = await fileToDataUrl(file);
+  const dataUrl = await fileToOptimizedDataUrl(file);
   const result = await apiRequest("/api/uploads", {
     method: "POST",
     body: JSON.stringify({ filename: file.name, dataUrl }),
     loadingMessage: "Image upload ho raha hai..."
   });
-  return result.url;
+  return result;
 }
 
 async function uploadAndFill(input, targetField, label) {
@@ -731,8 +775,8 @@ async function uploadAndFill(input, targetField, label) {
   showStatus(`${label} upload ho raha hai...`);
 
   try {
-    const uploadedUrl = await uploadImage(file);
-    targetField.value = uploadedUrl;
+    const uploaded = await uploadImage(file);
+    targetField.value = uploaded.url;
     input.value = "";
     showStatus(`${label} uploaded. Ab Save dabayein.`);
   } catch (error) {
@@ -783,6 +827,7 @@ function renderAds() {
       </div>
       <div class="item-actions">
         <button type="button" data-ad-edit="${escapeHTML(ad._id)}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button type="button" data-ad-preview="${escapeHTML(ad._id)}"><i class="fa-solid fa-eye"></i> Preview</button>
         <button type="button" data-ad-delete="${escapeHTML(ad._id)}"><i class="fa-solid fa-trash"></i> Delete</button>
       </div>`;
     fields.adList.appendChild(card);
@@ -802,7 +847,7 @@ async function loadAds() {
 async function saveAd(event) {
   event.preventDefault();
   try {
-    const uploadedUrl = fields.adUpload?.files?.[0] ? await uploadImage(fields.adUpload.files[0]) : "";
+    const uploadedUrl = fields.adUpload?.files?.[0] ? (await uploadImage(fields.adUpload.files[0])).url : "";
     const payload = {
       title: fields.adTitle.value.trim(),
       position: fields.adPosition.value,
@@ -949,7 +994,7 @@ async function loadManualNews() {
 async function saveManualNews(event) {
   event.preventDefault();
   try {
-    const uploadedUrl = fields.manualUpload?.files?.[0] ? await uploadImage(fields.manualUpload.files[0]) : "";
+    const uploadedUrl = fields.manualUpload?.files?.[0] ? (await uploadImage(fields.manualUpload.files[0])).url : "";
     const id = fields.manualId.value;
     const saved = await apiRequest(id ? `/api/manual-news/${id}` : "/api/manual-news", {
       method: id ? "PUT" : "POST",
@@ -965,15 +1010,74 @@ async function saveManualNews(event) {
   }
 }
 
-function previewManualNews() {
-  const payload = manualPayload();
-  fields.previewBadge.textContent = payload.category || "MANUAL";
-  fields.previewImage.src = payload.image || fallbackImage;
-  fields.previewTitle.textContent = payload.titleHi || payload.title;
-  fields.previewSummary.textContent = payload.summaryHi || "";
-  fields.previewBody.textContent = payload.bodyHi || "";
+function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary = "", bodyHtml = "", bodyText = "" }) {
+  fields.previewBadge.textContent = badge;
+  fields.previewTitle.textContent = title || "Preview";
+  fields.previewSummary.textContent = summary || "";
+  fields.previewBody.innerHTML = bodyHtml || `<p>${escapeHTML(bodyText || "")}</p>`;
+
+  if (image) {
+    fields.previewImage.src = image;
+    fields.previewImage.alt = title || "Preview";
+    fields.previewImage.hidden = false;
+  } else {
+    fields.previewImage.hidden = true;
+  }
+
   fields.previewModal.classList.add("open");
   fields.previewModal.setAttribute("aria-hidden", "false");
+}
+
+function previewManualNews() {
+  const payload = manualPayload();
+  openPreviewModal({
+    badge: payload.category || "MANUAL",
+    image: payload.image || fallbackImage,
+    title: payload.titleHi || payload.title,
+    summary: payload.summaryHi || "",
+    bodyText: payload.bodyHi || ""
+  });
+}
+
+function previewNewsDraft() {
+  const title = fields.newsTitleHi.value.trim() || fields.newsTitle.value.trim();
+  const summary = fields.newsSummaryHi.value.trim() || fields.newsSummary.value.trim();
+  const body = fields.newsBodyHi.value.trim() || fields.newsBody.value.trim();
+  const badge = fields.newsTag.value.trim() || fields.newsCategory.value || "PREVIEW";
+
+  openPreviewModal({
+    badge,
+    image: fields.newsImage.value.trim() || fallbackImage,
+    title,
+    summary,
+    bodyText: body
+  });
+}
+
+function previewAdItem(ad = null) {
+  const payload = ad || {
+    title: fields.adTitle.value.trim() || "Advertisement",
+    position: fields.adPosition.value || "homepage",
+    target: fields.adTarget.value || "all",
+    image: fields.adImage.value.trim(),
+    linkUrl: fields.adLinkUrl.value.trim(),
+    adsenseCode: fields.adCode.value.trim(),
+    enabled: fields.adEnabled.checked
+  };
+  const bodyHtml = `
+    <strong>Position</strong><p>${escapeHTML(payload.position || "homepage")}</p>
+    <strong>Target</strong><p>${escapeHTML(payload.target || "all")}</p>
+    ${payload.linkUrl ? `<strong>Link</strong><p>${escapeHTML(payload.linkUrl)}</p>` : ""}
+    ${payload.adsenseCode ? `<strong>Ad Code</strong><pre>${escapeHTML(payload.adsenseCode)}</pre>` : "<p>Banner image preview</p>"}
+  `;
+
+  openPreviewModal({
+    badge: payload.enabled === false ? "DISABLED AD" : "AD PREVIEW",
+    image: payload.image || fallbackImage,
+    title: payload.title || "Advertisement",
+    summary: payload.linkUrl || "Ad banner preview",
+    bodyHtml
+  });
 }
 
 async function deleteCurrentManualNews() {
@@ -1482,6 +1586,8 @@ function clearNewsForm() {
   if (fields.newsCity) fields.newsCity.value = "";
   fields.newsStatus.value = "pending";
   fields.newsImage.value = "";
+  fields.newsImage.dataset.original = "";
+  if (fields.newsUpload) fields.newsUpload.value = "";
   fields.newsTitle.value = "";
   fields.newsTitleHi.value = "";
   fields.newsSummary.value = "";
@@ -1508,6 +1614,7 @@ function fillNewsForm(index) {
   if (fields.newsCity) fields.newsCity.value = item.city || "";
   fields.newsStatus.value = item.status || "published";
   fields.newsImage.value = item.sourceImage || item.optimizedThumbnail || item.aiThumbnail || item.image || "";
+  fields.newsImage.dataset.original = item.sourceImage || item.optimizedThumbnail || item.aiThumbnail || item.image || "";
   fields.newsTitle.value = item.title || "";
   fields.newsTitleHi.value = item.titleHi || "";
   fields.newsSummary.value = item.summary || "";
@@ -1566,12 +1673,26 @@ async function saveNewsItem(event) {
 
   const index = Number(fields.editingIndex.value);
   const existing = Number.isInteger(index) && index >= 0 ? state.news[index] : null;
+  const currentImage = fields.newsImage.value.trim();
+  const originalImage = fields.newsImage.dataset.original || "";
+  const imageChanged = Boolean(currentImage) && currentImage !== originalImage;
 
   try {
     const saved = existing?._id
       ? await apiRequest(`/api/news/${existing._id}`, {
           method: "PUT",
-          body: JSON.stringify(newsPayload({ ...existing, ...item }))
+          body: JSON.stringify(newsPayload(
+            {
+              ...existing,
+              ...item,
+              ...(imageChanged ? {
+                optimizedThumbnail: "",
+                aiThumbnail: "",
+                thumbnailHash: "",
+                thumbnailStatus: ""
+              } : {})
+            }
+          ))
         })
       : await apiRequest("/api/news", {
           method: "POST",
@@ -1587,6 +1708,7 @@ async function saveNewsItem(event) {
     }
 
     showStatus("News saved to MongoDB.");
+    fields.newsImage.dataset.original = savedItem.sourceImage || savedItem.optimizedThumbnail || savedItem.aiThumbnail || savedItem.image || "";
   } catch (error) {
     if (existing) {
       state.news[index] = { ...existing, ...item };
@@ -1684,27 +1806,19 @@ function previewNewsItem(index) {
     return;
   }
 
-  fields.previewBadge.textContent = item.categoryBadge || item.tag || item.category || "PREVIEW";
-  fields.previewTitle.textContent = item.title || "Untitled news";
-  fields.previewSummary.textContent = item.summary || "";
-  fields.previewBody.innerHTML = `
+  openPreviewModal({
+    badge: item.categoryBadge || item.tag || item.category || "PREVIEW",
+    image: item.image || "",
+    title: item.title || "Untitled news",
+    summary: item.summary || "",
+    bodyHtml: `
     ${item.sourceName ? `<strong>Source</strong><p>${escapeHTML(item.sourceName)}${item.sourcePublishedAt ? ` - ${escapeHTML(formatDateTime(item.sourcePublishedAt))}` : ""}</p>` : ""}
     <strong>English</strong>
     <p>${escapeHTML(item.body || item.summary || "")}</p>
     <strong>Hindi</strong>
     <p>${escapeHTML(item.bodyHi || item.summaryHi || item.titleHi || "Hindi copy will auto-fill after save when OpenAI quota is available.")}</p>
-  `;
-
-  if (item.image) {
-    fields.previewImage.src = item.image;
-    fields.previewImage.alt = item.title || "News preview";
-    fields.previewImage.hidden = false;
-  } else {
-    fields.previewImage.hidden = true;
-  }
-
-  fields.previewModal.classList.add("open");
-  fields.previewModal.setAttribute("aria-hidden", "false");
+  `
+  });
 }
 
 function closePreview() {
@@ -1911,6 +2025,8 @@ function bindEvents() {
   document.getElementById("addNews").addEventListener("click", clearNewsForm);
   document.getElementById("clearNewsForm").addEventListener("click", clearNewsForm);
   document.getElementById("newsForm").addEventListener("submit", saveNewsItem);
+  fields.newsUpload?.addEventListener("change", () => uploadAndFill(fields.newsUpload, fields.newsImage, "News image"));
+  fields.previewNewsDraft?.addEventListener("click", previewNewsDraft);
   fields.autoTranslateNews.addEventListener("click", autoTranslateCurrentNews);
   fields.useSourceImage?.addEventListener("click", () => runThumbnailAction("use-source"));
   fields.generateAiThumbnail?.addEventListener("click", () => runThumbnailAction("generate-ai"));
@@ -1921,6 +2037,7 @@ function bindEvents() {
   fields.saveSiteSettings?.addEventListener("click", saveSiteSettings);
   fields.adForm?.addEventListener("submit", saveAd);
   fields.adUpload?.addEventListener("change", () => uploadAndFill(fields.adUpload, fields.adImage, "Ad banner"));
+  fields.previewAd?.addEventListener("click", () => previewAdItem());
   fields.clearAdForm?.addEventListener("click", clearAdForm);
   fields.deleteAd?.addEventListener("click", deleteCurrentAd);
   fields.manualNewsForm?.addEventListener("submit", saveManualNews);
@@ -2000,11 +2117,17 @@ function bindEvents() {
 
   fields.adList?.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-ad-edit]");
+    const previewButton = event.target.closest("[data-ad-preview]");
     const deleteButton = event.target.closest("[data-ad-delete]");
 
     if (editButton) {
       const ad = state.ads.find((item) => item._id === editButton.dataset.adEdit);
       if (ad) fillAdForm(ad);
+    }
+
+    if (previewButton) {
+      const ad = state.ads.find((item) => item._id === previewButton.dataset.adPreview);
+      if (ad) previewAdItem(ad);
     }
 
     if (deleteButton) {
