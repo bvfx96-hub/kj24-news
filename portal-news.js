@@ -430,8 +430,177 @@ async function loadPortalMongoNews() {
   }
 }
 
+function repairPortalMojibake(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[àÂÃï¿½â]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const percentEncoded = Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? `%${code.toString(16).padStart(2, "0")}` : encodeURIComponent(char);
+    }).join("");
+
+    return decodeURIComponent(percentEncoded);
+  } catch (error) {
+    return text;
+  }
+}
+
+function normalizePortalText(value) {
+  const text = String(value || "").trim();
+  return /Ã |Ã‚|Ãƒ|ï¿½|à¤|â€™|Â°|Â©/.test(text) ? repairPortalMojibake(text) : text;
+}
+
+portalLanguage = requestedPortalLanguage === "en" || requestedPortalLanguage === "hi"
+  ? requestedPortalLanguage
+  : (localStorage.getItem(PORTAL_LANGUAGE_KEY) === "en" ? "en" : "hi");
+
+function uiText(en, hi) {
+  if (portalLanguage !== "hi") {
+    return normalizePortalText(en);
+  }
+
+  if (PORTAL_HINDI_TEXT[en]) {
+    return normalizePortalText(PORTAL_HINDI_TEXT[en]);
+  }
+
+  const repaired = normalizePortalText(hi);
+  return repaired || normalizePortalText(en);
+}
+
+function portalStaticLabel(value) {
+  const text = normalizePortalText(value);
+  const labels = {
+    "Fast local news for Chhattisgarh": "छत्तीसगढ़ की तेज़ लोकल खबरें",
+    "Home": "होम",
+    "Durg": "दुर्ग",
+    "Bhilai": "भिलाई",
+    "Raipur": "रायपुर",
+    "Bilaspur": "बिलासपुर",
+    "Politics": "राजनीति",
+    "Crime": "क्राइम",
+    "Sports": "स्पोर्ट्स",
+    "Entertainment": "मनोरंजन",
+    "Health": "हेल्थ",
+    "Jobs": "जॉब्स",
+    "ADVERTISEMENT SPACE": "विज्ञापन स्थान",
+    "Latest News": "ताज़ा खबरें",
+    "Top News": "टॉप खबरें",
+    "Photos": "फोटो",
+    "Cricket": "क्रिकेट",
+    "Football": "फुटबॉल",
+    "Tennis": "टेनिस",
+    "Photo": "फोटो",
+    "Video": "वीडियो",
+    "SPONSOR SLOT": "स्पॉन्सर स्लॉट",
+    "All Rights Reserved": "सर्वाधिकार सुरक्षित"
+  };
+
+  return labels[text] || text;
+}
+
+function localizePortalTitle(text) {
+  const raw = normalizePortalText(text);
+  if (portalLanguage !== "hi") {
+    return raw;
+  }
+
+  return raw
+    .replace(/^Home \/\s*/i, "होम / ")
+    .replace(/\bNews\b/g, "समाचार")
+    .replace(/\bDurg\b/g, "दुर्ग")
+    .replace(/\bBhilai\b/g, "भिलाई")
+    .replace(/\bRaipur\b/g, "रायपुर")
+    .replace(/\bBilaspur\b/g, "बिलासपुर")
+    .replace(/\bRajnandgaon\b/g, "राजनांदगांव")
+    .replace(/\bKhairagarh\b/g, "खैरागढ़")
+    .replace(/\bKawardha\b/g, "कवर्धा")
+    .replace(/\bAstrology\b/g, "राशिफल")
+    .replace(/\bBreaking\b/g, "ब्रेकिंग")
+    .replace(/\bPolitics\b/g, "राजनीति")
+    .replace(/\bCrime\b/g, "क्राइम")
+    .replace(/\bSports\b/g, "स्पोर्ट्स")
+    .replace(/\bEntertainment\b/g, "मनोरंजन")
+    .replace(/\bHealth\b/g, "हेल्थ")
+    .replace(/\bJobs\b/g, "जॉब्स");
+}
+
+function translatePortalStatic() {
+  document.documentElement.lang = portalLanguage === "hi" ? "hi" : "en";
+  document.querySelectorAll(".portal-brand span, .portal-main-nav a, .portal-top-ad, .portal-tabs a, .portal-section-title, .portal-ad, .portal-side-ad, .portal-side-block h2, .portal-read-more").forEach((node) => {
+    const english = normalizePortalText(node.dataset.portalEn || node.textContent);
+    if (!node.dataset.portalEn) {
+      node.dataset.portalEn = english;
+    }
+    node.textContent = portalLanguage === "hi" ? portalStaticLabel(english) : english;
+  });
+
+  const backLink = document.querySelector(".portal-back");
+  if (backLink) {
+    const english = normalizePortalText(backLink.dataset.portalEn || backLink.textContent);
+    if (!backLink.dataset.portalEn) {
+      backLink.dataset.portalEn = english;
+    }
+    backLink.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const title = document.querySelector(".portal-title");
+  if (title) {
+    const english = normalizePortalText(title.dataset.portalEn || title.textContent);
+    if (!title.dataset.portalEn) {
+      title.dataset.portalEn = english;
+    }
+    title.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const footer = document.querySelector(".portal-footer");
+  if (footer) {
+    const english = normalizePortalText(footer.dataset.portalEn || footer.textContent).replace("? 2026", "© 2026");
+    if (!footer.dataset.portalEn) {
+      footer.dataset.portalEn = english;
+    }
+    footer.textContent = portalLanguage === "hi"
+      ? `© 2026 KHABRI JUNCTION - ${portalStaticLabel("All Rights Reserved")}`
+      : english;
+  }
+}
+
+function addPortalLanguageSwitch() {
+  const header = document.querySelector(".portal-site-header");
+
+  if (!header || document.getElementById("portalLanguageSwitch")) {
+    return;
+  }
+
+  const switcher = document.createElement("div");
+  switcher.className = "portal-language-switch";
+  switcher.id = "portalLanguageSwitch";
+  switcher.innerHTML = `
+    <button class="${portalLanguage === "hi" ? "active" : ""}" type="button" data-portal-lang="hi">हिंदी</button>
+    <button class="${portalLanguage === "en" ? "active" : ""}" type="button" data-portal-lang="en">English</button>
+  `;
+  header.appendChild(switcher);
+  switcher.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-portal-lang]");
+
+    if (!button) {
+      return;
+    }
+
+    portalLanguage = button.dataset.portalLang;
+    localStorage.setItem(PORTAL_LANGUAGE_KEY, portalLanguage);
+    switcher.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item.dataset.portalLang === portalLanguage));
+    translatePortalStatic();
+    loadPortalMongoNews();
+  });
+}
+
 createPortalModal();
 addPortalLanguageSwitch();
+translatePortalStatic();
 highlightPortalNav();
 bindPortalNewsCards();
 bindPortalModal();

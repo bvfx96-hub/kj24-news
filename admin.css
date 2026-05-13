@@ -782,6 +782,31 @@ textarea:focus {
   white-space: pre-line;
 }
 
+.preview-language-switch {
+  display: inline-flex;
+  gap: 8px;
+  margin: 4px 0 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f4f7fb;
+}
+
+.preview-language-switch button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+  padding: 8px 14px;
+}
+
+.preview-language-switch button.active {
+  background: var(--red);
+  color: #fff;
+}
+
 .admin-preview-card pre {
   margin: 0;
   padding: 10px 12px;

@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 
 const crypto = require("crypto");
 const cors = require("cors");
@@ -49,16 +49,16 @@ const CATEGORY_DEFINITIONS = [
   { label: "Local News", slug: "local-news", page: "local-news", badge: "LOCAL", keywords: ["local", "district", "city", "ward", "nagar", "local news"] },
   { label: "MP Shahdol", slug: "mp-shahdol", page: "mp-shahdol-news", badge: "SHAHDOL", keywords: ["shahdol", "mp shahdol", "madhya pradesh shahdol"] },
   { label: "World", slug: "world", page: "desh-duniya-news", badge: "WORLD", keywords: ["world", "global", "international", "desh duniya", "foreign"] },
-  { label: "Education", slug: "education", page: "local-news", badge: "EDUCATION", keywords: ["education", "school", "college", "exam", "admission", "शिक्षा", "स्कूल"] },
-  { label: "Business", slug: "business", page: "market-news", badge: "BUSINESS", keywords: ["business", "startup", "industry", "trade", "व्यापार", "कारोबार"] },
-  { label: "Agriculture", slug: "agriculture", page: "local-news", badge: "AGRI", keywords: ["agriculture", "farmer", "crop", "mandi", "farming", "किसान", "खेती"] },
-  { label: "Technology", slug: "technology", page: "local-news", badge: "TECH", keywords: ["technology", "digital", "ai", "app", "tech", "टेक"] },
-  { label: "Lifestyle", slug: "lifestyle", page: "entertainment.html", badge: "LIFESTYLE", keywords: ["lifestyle", "fashion", "food", "travel", "लाइफस्टाइल"] },
-  { label: "Travel", slug: "travel", page: "local-news", badge: "TRAVEL", keywords: ["travel", "tourism", "tourist", "यात्रा", "पर्यटन"] },
-  { label: "Fashion", slug: "fashion", page: "entertainment.html", badge: "FASHION", keywords: ["fashion", "style", "फैशन"] },
-  { label: "Movie", slug: "movie", page: "entertainment.html", badge: "MOVIE", keywords: ["movie", "film", "cinema", "फिल्म"] },
-  { label: "Music", slug: "music", page: "entertainment.html", badge: "MUSIC", keywords: ["music", "song", "singer", "गीत", "संगीत"] },
-  { label: "Events", slug: "events", page: "local-news", badge: "EVENTS", keywords: ["event", "programme", "festival", "कार्यक्रम", "महोत्सव"] },
+  { label: "Education", slug: "education", page: "local-news", badge: "EDUCATION", keywords: ["education", "school", "college", "exam", "admission", "à¤¶à¤¿à¤•à¥à¤·à¤¾", "à¤¸à¥à¤•à¥‚à¤²"] },
+  { label: "Business", slug: "business", page: "market-news", badge: "BUSINESS", keywords: ["business", "startup", "industry", "trade", "à¤µà¥à¤¯à¤¾à¤ªà¤¾à¤°", "à¤•à¤¾à¤°à¥‹à¤¬à¤¾à¤°"] },
+  { label: "Agriculture", slug: "agriculture", page: "local-news", badge: "AGRI", keywords: ["agriculture", "farmer", "crop", "mandi", "farming", "à¤•à¤¿à¤¸à¤¾à¤¨", "à¤–à¥‡à¤¤à¥€"] },
+  { label: "Technology", slug: "technology", page: "local-news", badge: "TECH", keywords: ["technology", "digital", "ai", "app", "tech", "à¤Ÿà¥‡à¤•"] },
+  { label: "Lifestyle", slug: "lifestyle", page: "entertainment.html", badge: "LIFESTYLE", keywords: ["lifestyle", "fashion", "food", "travel", "à¤²à¤¾à¤‡à¤«à¤¸à¥à¤Ÿà¤¾à¤‡à¤²"] },
+  { label: "Travel", slug: "travel", page: "local-news", badge: "TRAVEL", keywords: ["travel", "tourism", "tourist", "à¤¯à¤¾à¤¤à¥à¤°à¤¾", "à¤ªà¤°à¥à¤¯à¤Ÿà¤¨"] },
+  { label: "Fashion", slug: "fashion", page: "entertainment.html", badge: "FASHION", keywords: ["fashion", "style", "à¤«à¥ˆà¤¶à¤¨"] },
+  { label: "Movie", slug: "movie", page: "entertainment.html", badge: "MOVIE", keywords: ["movie", "film", "cinema", "à¤«à¤¿à¤²à¥à¤®"] },
+  { label: "Music", slug: "music", page: "entertainment.html", badge: "MUSIC", keywords: ["music", "song", "singer", "à¤—à¥€à¤¤", "à¤¸à¤‚à¤—à¥€à¤¤"] },
+  { label: "Events", slug: "events", page: "local-news", badge: "EVENTS", keywords: ["event", "programme", "festival", "à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤®", "à¤®à¤¹à¥‹à¤¤à¥à¤¸à¤µ"] },
   { label: "Sports", slug: "sports", page: "sports.html", badge: "SPORTS", keywords: ["ipl", "cricket", "football", "match", "tournament", "sports", "score", "team", "league"] },
   { label: "Astrology", slug: "astrology", page: "astrology.html", badge: "ASTROLOGY", keywords: ["rashifal", "astrology", "horoscope", "zodiac", "panchang"] },
   { label: "Crime", slug: "crime", page: "crime.html", badge: "CRIME", keywords: ["murder", "police", "theft", "crime", "arrest", "fraud", "case", "fir"] },
@@ -99,14 +99,14 @@ const CATEGORY_DEFINITIONS = [
   { label: "Breaking", slug: "breaking", page: "breaking.html", badge: "BREAKING", keywords: ["breaking", "latest", "alert", "big news", "urgent"] }
 ];
 const CLEAN_CATEGORY_ROUTES = [
-  { path: "/raipur-news", title: "Raipur News", category: "Raipur", description: "रायपुर की ताजा खबरें, अपडेट और लोकल रिपोर्ट।" },
-  { path: "/raipur-promotion-news", title: "Raipur Promotion News", category: "Raipur Promotion", description: "रायपुर प्रमोशन, ब्रांड अपडेट और स्पॉन्सर्ड लोकल खबरें।" },
-  { path: "/market-news", title: "Market News", category: "Market", description: "शेयर मार्केट, बिजनेस और बाजार अपडेट।" },
-  { path: "/weather-update", title: "Weather Update", category: "Weather", description: "दुर्ग, भिलाई और रायपुर का मौसम अपडेट।" },
-  { path: "/viral-videos", title: "Viral Reels / Viral Videos", category: "Viral Videos", description: "वायरल वीडियो, यूट्यूब रील और ट्रेंडिंग लोकल क्लिप।" },
-  { path: "/local-news", title: "Local News", category: "Local News", description: "छत्तीसगढ़ की लोकल और जिला खबरें।" },
-  { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "मध्य प्रदेश शहडोल की ताजा खबरें।" },
-  { path: "/desh-duniya-news", title: "देश-दुनिया की खबर", category: "World", description: "देश-दुनिया, अंतरराष्ट्रीय अपडेट और ग्लोबल खबरें।" }
+  { path: "/raipur-news", title: "Raipur News", category: "Raipur", description: "à¤°à¤¾à¤¯à¤ªà¥à¤° à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤²à¥‹à¤•à¤² à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿà¥¤" },
+  { path: "/raipur-promotion-news", title: "Raipur Promotion News", category: "Raipur Promotion", description: "à¤°à¤¾à¤¯à¤ªà¥à¤° à¤ªà¥à¤°à¤®à¥‹à¤¶à¤¨, à¤¬à¥à¤°à¤¾à¤‚à¤¡ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤¸à¥à¤ªà¥‰à¤¨à¥à¤¸à¤°à¥à¤¡ à¤²à¥‹à¤•à¤² à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
+  { path: "/market-news", title: "Market News", category: "Market", description: "à¤¶à¥‡à¤¯à¤° à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ, à¤¬à¤¿à¤œà¤¨à¥‡à¤¸ à¤”à¤° à¤¬à¤¾à¤œà¤¾à¤° à¤…à¤ªà¤¡à¥‡à¤Ÿà¥¤" },
+  { path: "/weather-update", title: "Weather Update", category: "Weather", description: "à¤¦à¥à¤°à¥à¤—, à¤­à¤¿à¤²à¤¾à¤ˆ à¤”à¤° à¤°à¤¾à¤¯à¤ªà¥à¤° à¤•à¤¾ à¤®à¥Œà¤¸à¤® à¤…à¤ªà¤¡à¥‡à¤Ÿà¥¤" },
+  { path: "/viral-videos", title: "Viral Reels / Viral Videos", category: "Viral Videos", description: "à¤µà¤¾à¤¯à¤°à¤² à¤µà¥€à¤¡à¤¿à¤¯à¥‹, à¤¯à¥‚à¤Ÿà¥à¤¯à¥‚à¤¬ à¤°à¥€à¤² à¤”à¤° à¤Ÿà¥à¤°à¥‡à¤‚à¤¡à¤¿à¤‚à¤— à¤²à¥‹à¤•à¤² à¤•à¥à¤²à¤¿à¤ªà¥¤" },
+  { path: "/local-news", title: "Local News", category: "Local News", description: "à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤²à¥‹à¤•à¤² à¤”à¤° à¤œà¤¿à¤²à¤¾ à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
+  { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "à¤®à¤§à¥à¤¯ à¤ªà¥à¤°à¤¦à¥‡à¤¶ à¤¶à¤¹à¤¡à¥‹à¤² à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
+  { path: "/desh-duniya-news", title: "à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾ à¤•à¥€ à¤–à¤¬à¤°", category: "World", description: "à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾, à¤…à¤‚à¤¤à¤°à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¥€à¤¯ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤—à¥à¤²à¥‹à¤¬à¤² à¤–à¤¬à¤°à¥‡à¤‚à¥¤" }
 ];
 const CATEGORY_ROUTE_ALIASES = new Map([
   ["home", "breaking"],
@@ -920,19 +920,19 @@ function inferCategory(text) {
   return "Breaking";
 
   const categoryRules = [
-    ["Astrology", ["astrology", "rashifal", "horoscope", "panchang", "zodiac", "राशिफल", "ज्योतिष"]],
-    ["Sports", ["sports", "cricket", "ipl", "football", "match", "खेल", "क्रिकेट"]],
-    ["Durg", ["durg", "दुर्ग"]],
-    ["Bhilai", ["bhilai", "भिलाई"]],
-    ["Raipur", ["raipur", "रायपुर"]],
-    ["Bilaspur", ["bilaspur", "बिलासपुर"]],
-    ["Kawardha", ["kawardha", "कवर्धा"]],
-    ["Khairagarh", ["khairagarh", "खैरागढ़", "खैरागढ़"]],
-    ["Rajnandgaon", ["rajnandgaon", "राजनांदगांव"]],
-    ["Politics", ["politics", "election", "minister", "bjp", "congress", "राजनीति", "चुनाव"]],
-    ["Crime", ["crime", "police", "arrest", "murder", "fraud", "अपराध", "पुलिस"]],
-    ["Health", ["health", "hospital", "doctor", "medical", "स्वास्थ्य", "अस्पताल"]],
-    ["Jobs", ["job", "jobs", "recruitment", "vacancy", "रोजगार", "नौकरी"]]
+    ["Astrology", ["astrology", "rashifal", "horoscope", "panchang", "zodiac", "à¤°à¤¾à¤¶à¤¿à¤«à¤²", "à¤œà¥à¤¯à¥‹à¤¤à¤¿à¤·"]],
+    ["Sports", ["sports", "cricket", "ipl", "football", "match", "à¤–à¥‡à¤²", "à¤•à¥à¤°à¤¿à¤•à¥‡à¤Ÿ"]],
+    ["Durg", ["durg", "à¤¦à¥à¤°à¥à¤—"]],
+    ["Bhilai", ["bhilai", "à¤­à¤¿à¤²à¤¾à¤ˆ"]],
+    ["Raipur", ["raipur", "à¤°à¤¾à¤¯à¤ªà¥à¤°"]],
+    ["Bilaspur", ["bilaspur", "à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°"]],
+    ["Kawardha", ["kawardha", "à¤•à¤µà¤°à¥à¤§à¤¾"]],
+    ["Khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—à¤¢à¤¼", "à¤–à¥ˆà¤°à¤¾à¤—à¥"]],
+    ["Rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚à¤µ"]],
+    ["Politics", ["politics", "election", "minister", "bjp", "congress", "à¤°à¤¾à¤œà¤¨à¥€à¤¤à¤¿", "à¤šà¥à¤¨à¤¾à¤µ"]],
+    ["Crime", ["crime", "police", "arrest", "murder", "fraud", "à¤…à¤ªà¤°à¤¾à¤§", "à¤ªà¥à¤²à¤¿à¤¸"]],
+    ["Health", ["health", "hospital", "doctor", "medical", "à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯", "à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²"]],
+    ["Jobs", ["job", "jobs", "recruitment", "vacancy", "à¤°à¥‹à¤œà¤—à¤¾à¤°", "à¤¨à¥Œà¤•à¤°à¥€"]]
   ];
 
   const match = categoryRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
@@ -950,13 +950,13 @@ function inferCity(text) {
   return "";
 
   const cityRules = [
-    ["durg", ["durg", "दुर्ग"]],
-    ["bhilai", ["bhilai", "भिलाई"]],
-    ["raipur", ["raipur", "रायपुर"]],
-    ["bilaspur", ["bilaspur", "बिलासपुर"]],
-    ["kawardha", ["kawardha", "कवर्धा"]],
-    ["khairagarh", ["khairagarh", "खैरागढ़", "खैरागढ़"]],
-    ["rajnandgaon", ["rajnandgaon", "राजनांदगांव"]]
+    ["durg", ["durg", "à¤¦à¥à¤°à¥à¤—"]],
+    ["bhilai", ["bhilai", "à¤­à¤¿à¤²à¤¾à¤ˆ"]],
+    ["raipur", ["raipur", "à¤°à¤¾à¤¯à¤ªà¥à¤°"]],
+    ["bilaspur", ["bilaspur", "à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°"]],
+    ["kawardha", ["kawardha", "à¤•à¤µà¤°à¥à¤§à¤¾"]],
+    ["khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—à¤¢à¤¼", "à¤–à¥ˆà¤°à¤¾à¤—à¥"]],
+    ["rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚à¤µ"]]
   ];
 
   const match = cityRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
@@ -1421,9 +1421,9 @@ async function requireDatabase(req, res, next) {
 <body class="article-page">
   <main class="portal-shell">
     <section class="market-card category-focus-card">
-      <div class="section-title"><span></span><strong>न्यूज सर्वर कनेक्ट हो रहा है</strong></div>
-      <p class="article-summary">कृपया कुछ सेकंड बाद पेज refresh करें. MongoDB connection अभी तैयार नहीं है.</p>
-      <a class="read-btn" href="/index.html">होम पर जाएं</a>
+      <div class="section-title"><span></span><strong>à¤¨à¥à¤¯à¥‚à¤œ à¤¸à¤°à¥à¤µà¤° à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ</strong></div>
+      <p class="article-summary">à¤•à¥ƒà¤ªà¤¯à¤¾ à¤•à¥à¤› à¤¸à¥‡à¤•à¤‚à¤¡ à¤¬à¤¾à¤¦ à¤ªà¥‡à¤œ refresh à¤•à¤°à¥‡à¤‚. MongoDB connection à¤…à¤­à¥€ à¤¤à¥ˆà¤¯à¤¾à¤° à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ.</p>
+      <a class="read-btn" href="/index.html">à¤¹à¥‹à¤® à¤ªà¤° à¤œà¤¾à¤à¤‚</a>
     </section>
   </main>
 </body>
@@ -1737,9 +1737,9 @@ function defaultSiteSettings() {
   return {
     _id: "site",
     weather: [
-      { city: "Durg", temp: "34°C", condition: "साफ मौसम", updatedAt: now },
-      { city: "Bhilai", temp: "33°C", condition: "हल्की गर्मी", updatedAt: now },
-      { city: "Raipur", temp: "35°C", condition: "धूप", updatedAt: now }
+      { city: "Durg", temp: "34Â°C", condition: "à¤¸à¤¾à¤« à¤®à¥Œà¤¸à¤®", updatedAt: now },
+      { city: "Bhilai", temp: "33Â°C", condition: "à¤¹à¤²à¥à¤•à¥€ à¤—à¤°à¥à¤®à¥€", updatedAt: now },
+      { city: "Raipur", temp: "35Â°C", condition: "à¤§à¥‚à¤ª", updatedAt: now }
     ],
     market: [
       { name: "SENSEX", value: "77,958.52", change: "+1.22%" },
@@ -1752,8 +1752,8 @@ function defaultSiteSettings() {
       { match: "Local League", score: "Durg XI 126/3", status: "Live" }
     ],
     videos: [
-      { title: "लोकल मार्केट रील वायरल", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
-      { title: "शहर ट्रैफिक अपडेट वीडियो", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
+      { title: "à¤²à¥‹à¤•à¤² à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤°à¥€à¤² à¤µà¤¾à¤¯à¤°à¤²", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
+      { title: "à¤¶à¤¹à¤° à¤Ÿà¥à¤°à¥ˆà¤«à¤¿à¤• à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤µà¥€à¤¡à¤¿à¤¯à¥‹", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
     ],
     ads: {
       header: "",
@@ -1763,8 +1763,8 @@ function defaultSiteSettings() {
     },
     notification: {
       enabled: true,
-      title: "ताजा खबरों की सूचना पाएं",
-      description: "Khabri Junction से लोकल न्यूज अपडेट पाने के लिए नोटिफिकेशन सब्सक्राइब करें।"
+      title: "à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥€ à¤¸à¥‚à¤šà¤¨à¤¾ à¤ªà¤¾à¤à¤‚",
+      description: "Khabri Junction à¤¸à¥‡ à¤²à¥‹à¤•à¤² à¤¨à¥à¤¯à¥‚à¤œ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤ªà¤¾à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤¨à¥‹à¤Ÿà¤¿à¤«à¤¿à¤•à¥‡à¤¶à¤¨ à¤¸à¤¬à¥à¤¸à¤•à¥à¤°à¤¾à¤‡à¤¬ à¤•à¤°à¥‡à¤‚à¥¤"
     },
     integrations: {
       weather: {
@@ -2061,7 +2061,7 @@ async function sendFirebaseNotification(payload, filter = {}) {
 
 function buildPublishNotification(news) {
   return {
-    title: normalizeText(news.titleHi || news.title || "ताज़ा खबर"),
+    title: normalizeText(news.titleHi || news.title || "à¤¤à¤¾à¤œà¤¼à¤¾ à¤–à¤¬à¤°"),
     body: trimForMeta(news.summaryHi || news.summary || news.metaDescription || "", 110),
     image: primaryNewsImage(news),
     url: `${SITE_URL}${articlePath(news)}`,
@@ -3533,17 +3533,17 @@ function articlePageLabels(language) {
   }
 
   return {
-    home: "होम",
-    news: "खबर",
-    published: "प्रकाशित",
-    updated: "अपडेट",
-    source: "स्रोत",
-    author: "लेखक",
-    category: "श्रेणी",
-    district: "जिला",
-    tags: "टैग",
-    related: "संबंधित खबरें",
-    noRelated: "अभी संबंधित खबरें उपलब्ध नहीं हैं।"
+    home: "\u0939\u094b\u092e",
+    news: "\u0916\u092c\u0930",
+    published: "\u092a\u094d\u0930\u0915\u093e\u0936\u093f\u0924",
+    updated: "\u0905\u092a\u0921\u0947\u091f",
+    source: "\u0938\u094d\u0930\u094b\u0924",
+    author: "\u0932\u0947\u0916\u0915",
+    category: "\u0936\u094d\u0930\u0947\u0923\u0940",
+    district: "\u091c\u093f\u0932\u093e",
+    tags: "\u091f\u0948\u0917",
+    related: "\u0938\u0902\u092c\u0902\u0927\u093f\u0924 \u0916\u092c\u0930\u0947\u0902",
+    noRelated: "\u0905\u092d\u0940 \u0938\u0902\u092c\u0902\u0927\u093f\u0924 \u0916\u092c\u0930\u0947\u0902 \u0909\u092a\u0932\u092c\u094d\u0927 \u0928\u0939\u0940\u0902 \u0939\u0948\u0902\u0964"
   };
 }
 
@@ -3563,7 +3563,7 @@ function articleTags(news = {}) {
 }
 
 function renderBreadcrumbSchema(news, req, language) {
-  const categoryName = articleDistrictLabel(news) || news.category || (language === "hi" ? "खबर" : "News");
+  const categoryName = articleDistrictLabel(news) || news.category || (language === "hi" ? "\u0916\u092c\u0930" : "News");
   const categoryPage = `${publicBaseUrl(req)}${landingPageForNews(news)}`;
 
   return JSON.stringify({
@@ -3573,7 +3573,7 @@ function renderBreadcrumbSchema(news, req, language) {
       {
         "@type": "ListItem",
         position: 1,
-        name: language === "hi" ? "होम" : "Home",
+        name: language === "hi" ? "\u0939\u094b\u092e" : "Home",
         item: `${publicBaseUrl(req)}/index.html`
       },
       {
@@ -3629,10 +3629,10 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
     </a>
   `).join("");
   const prevLink = adjacent.previous
-    ? `<a href="${escapeHTML(articleUrl(adjacent.previous, req))}?lang=${language}"><span>पिछली खबर</span><strong>${escapeHTML(localizedValue(adjacent.previous, "title", language))}</strong></a>`
+    ? `<a href="${escapeHTML(articleUrl(adjacent.previous, req))}?lang=${language}"><span>${language === "hi" ? "\u092a\u093f\u091b\u0932\u0940 \u0916\u092c\u0930" : "Previous story"}</span><strong>${escapeHTML(localizedValue(adjacent.previous, "title", language))}</strong></a>`
     : "";
   const nextLink = adjacent.next
-    ? `<a href="${escapeHTML(articleUrl(adjacent.next, req))}?lang=${language}"><span>अगली खबर</span><strong>${escapeHTML(localizedValue(adjacent.next, "title", language))}</strong></a>`
+    ? `<a href="${escapeHTML(articleUrl(adjacent.next, req))}?lang=${language}"><span>${language === "hi" ? "\u0905\u0917\u0932\u0940 \u0916\u092c\u0930" : "Next story"}</span><strong>${escapeHTML(localizedValue(adjacent.next, "title", language))}</strong></a>`
     : "";
   const paragraphs = escapeHTML(article.body || article.summary)
     .split(/\n{2,}/)
@@ -3680,21 +3680,21 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html" aria-label="Khabri Junction home">
       <img src="/assets/logo-kj.png" alt="Khabri Junction logo">
-      <div><strong>KHABRI JUNCTION</strong><span>छत्तीसगढ़ की ताजा खबरें</span></div>
+      <div><strong>KHABRI JUNCTION</strong><span>à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚</span></div>
     </a>
     <nav class="portal-main-nav" aria-label="News pages">
-      <a href="/index.html">होम</a>
-      <a href="/durg.html">दुर्ग</a>
-      <a href="/bhilai.html">भिलाई</a>
-      <a href="/raipur.html">रायपुर</a>
-      <a href="/bilaspur.html">बिलासपुर</a>
-      <a href="/politics.html">राजनीति</a>
-      <a href="/crime.html">क्राइम</a>
-      <a href="/sports.html">खेल</a>
-      <a href="/astrology.html">राशिफल</a>
+      <a href="/index.html">à¤¹à¥‹à¤®</a>
+      <a href="/durg.html">à¤¦à¥à¤°à¥à¤—</a>
+      <a href="/bhilai.html">à¤­à¤¿à¤²à¤¾à¤ˆ</a>
+      <a href="/raipur.html">à¤°à¤¾à¤¯à¤ªà¥à¤°</a>
+      <a href="/bilaspur.html">à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°</a>
+      <a href="/politics.html">à¤°à¤¾à¤œà¤¨à¥€à¤¤à¤¿</a>
+      <a href="/crime.html">à¤•à¥à¤°à¤¾à¤‡à¤®</a>
+      <a href="/sports.html">à¤–à¥‡à¤²</a>
+      <a href="/astrology.html">à¤°à¤¾à¤¶à¤¿à¤«à¤²</a>
     </nav>
     <div class="portal-language-switch" aria-label="Article language">
-      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">हिंदी</a>
+      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">à¤¹à¤¿à¤‚à¤¦à¥€</a>
       <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(url)}?lang=en">English</a>
     </div>
   </header>
@@ -3819,7 +3819,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
           <span class="tag">${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
           <h3>${escapeHTML(item.title)}</h3>
           <p>${escapeHTML(item.summary || "")}</p>
-          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">पूरी खबर पढ़ें</a>
+          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">à¤ªà¥‚à¤°à¥€ à¤–à¤¬à¤° à¤ªà¤¢à¤¼à¥‡à¤‚</a>
         </div>
       </article>`;
   }).join("");
@@ -3837,7 +3837,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   `).join("");
   const mainWidget = route.path === "/weather-update"
     ? `<section class="market-card category-focus-card">
-        <div class="section-title small"><span></span><strong>दुर्ग, भिलाई और रायपुर मौसम</strong></div>
+        <div class="section-title small"><span></span><strong>à¤¦à¥à¤°à¥à¤—, à¤­à¤¿à¤²à¤¾à¤ˆ à¤”à¤° à¤°à¤¾à¤¯à¤ªà¥à¤° à¤®à¥Œà¤¸à¤®</strong></div>
         <div class="weather-mini-grid">${(settings.weather || []).map((item) => `
           <div class="weather-mini-card">
             <strong>${escapeHTML(item.city || "City")}</strong>
@@ -3848,9 +3848,9 @@ function renderCategoryLandingPage(route, articles, settings, req) {
       </section>`
     : route.path === "/market-news"
       ? `<section class="market-card category-focus-card">
-          <div class="section-title small"><span></span><strong>रीयल-टाइम मार्केट ट्रैकर</strong></div>
+          <div class="section-title small"><span></span><strong>à¤°à¥€à¤¯à¤²-à¤Ÿà¤¾à¤‡à¤® à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤Ÿà¥à¤°à¥ˆà¤•à¤°</strong></div>
           <div class="market-list">${market}</div>
-          <p class="market-note">Admin panel से values manually update कर सकते हैं।</p>
+          <p class="market-note">Admin panel à¤¸à¥‡ values manually update à¤•à¤° à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤</p>
         </section>`
       : "";
 
@@ -3875,17 +3875,17 @@ function renderCategoryLandingPage(route, articles, settings, req) {
 <body class="article-page">
   <div class="ad-slot article-top-ad">${settings.ads?.header || "ADVERTISEMENT"}</div>
   <header class="portal-site-header">
-    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>छत्तीसगढ़ की ताजा खबरें</span></div></a>
+    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚</span></div></a>
     <nav class="portal-main-nav">
-      <a href="/index.html">होम</a>
-      <a href="/durg.html">दुर्ग</a>
-      <a href="/bhilai.html">भिलाई</a>
-      <a href="/raipur-news">रायपुर</a>
-      <a href="/market-news">आज का बाजार</a>
-      <a href="/weather-update">मौसम</a>
-      <a href="/viral-videos">ट्रेंडिंग रील</a>
-      <a href="/desh-duniya-news">देश-दुनिया</a>
-      <a href="/mp-shahdol-news">शहडोल</a>
+      <a href="/index.html">à¤¹à¥‹à¤®</a>
+      <a href="/durg.html">à¤¦à¥à¤°à¥à¤—</a>
+      <a href="/bhilai.html">à¤­à¤¿à¤²à¤¾à¤ˆ</a>
+      <a href="/raipur-news">à¤°à¤¾à¤¯à¤ªà¥à¤°</a>
+      <a href="/market-news">à¤†à¤œ à¤•à¤¾ à¤¬à¤¾à¤œà¤¾à¤°</a>
+      <a href="/weather-update">à¤®à¥Œà¤¸à¤®</a>
+      <a href="/viral-videos">à¤Ÿà¥à¤°à¥‡à¤‚à¤¡à¤¿à¤‚à¤— à¤°à¥€à¤²</a>
+      <a href="/desh-duniya-news">à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾</a>
+      <a href="/mp-shahdol-news">à¤¶à¤¹à¤¡à¥‹à¤²</a>
     </nav>
   </header>
   <main class="portal-shell">
@@ -3894,13 +3894,13 @@ function renderCategoryLandingPage(route, articles, settings, req) {
         <div class="section-title"><span></span><strong>${escapeHTML(route.title)}</strong></div>
         <p class="article-summary">${escapeHTML(route.description)}</p>
         ${mainWidget}
-        <div class="news-grid latest-grid">${cards || `<div class="ad-slot">इस सेक्शन में जल्द नई खबरें आएंगी।</div>`}</div>
+        <div class="news-grid latest-grid">${cards || `<div class="ad-slot">à¤‡à¤¸ à¤¸à¥‡à¤•à¥à¤¶à¤¨ à¤®à¥‡à¤‚ à¤œà¤²à¥à¤¦ à¤¨à¤ˆ à¤–à¤¬à¤°à¥‡à¤‚ à¤†à¤à¤‚à¤—à¥€à¥¤</div>`}</div>
       </div>
       <aside class="portal-sidebar">
         <div class="portal-side-ad">${settings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
-        <section class="market-card"><div class="section-title small"><span></span><strong>मौसम अपडेट</strong></div><div class="market-list">${weather}</div></section>
-        <section class="market-card"><div class="section-title small"><span></span><strong>मार्केट ट्रैकर</strong></div><div class="market-list">${market}</div></section>
-        <section class="market-card"><div class="section-title small"><span></span><strong>वायरल वीडियो</strong></div>${videos || "<p>No videos yet.</p>"}</section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>à¤®à¥Œà¤¸à¤® à¤…à¤ªà¤¡à¥‡à¤Ÿ</strong></div><div class="market-list">${weather}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤Ÿà¥à¤°à¥ˆà¤•à¤°</strong></div><div class="market-list">${market}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>à¤µà¤¾à¤¯à¤°à¤² à¤µà¥€à¤¡à¤¿à¤¯à¥‹</strong></div>${videos || "<p>No videos yet.</p>"}</section>
       </aside>
     </section>
   </main>
@@ -4613,7 +4613,7 @@ async function sendCategoryPage(req, res, next, rawSlug) {
         path: req.path,
         title: "Category Not Found",
         category: "Breaking",
-        description: "यह कैटेगरी अभी उपलब्ध नहीं है. ताजा खबरों के लिए होम या ब्रेकिंग न्यूज देखें."
+        description: "à¤¯à¤¹ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤…à¤­à¥€ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥‡ à¤²à¤¿à¤ à¤¹à¥‹à¤® à¤¯à¤¾ à¤¬à¥à¤°à¥‡à¤•à¤¿à¤‚à¤— à¤¨à¥à¤¯à¥‚à¤œ à¤¦à¥‡à¤–à¥‡à¤‚."
       }, [], settings, req));
     }
 
@@ -4622,7 +4622,7 @@ async function sendCategoryPage(req, res, next, rawSlug) {
       path: categoryRoutePath(category),
       title: `${category.label} News`,
       category: category.label,
-      description: `${category.label} की ताजा खबरें, अपडेट और लोकल रिपोर्ट Khabri Junction पर पढ़ें.`
+      description: `${category.label} à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤²à¥‹à¤•à¤² à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿ Khabri Junction à¤ªà¤° à¤ªà¤¢à¤¼à¥‡à¤‚.`
     };
     route.path = categoryRoutePath(category);
     const articles = await getCombinedPublishedNews({ status: "published", section: category.slug }, 24);
@@ -5271,12 +5271,12 @@ app.use((req, res) => {
 <body class="article-page">
   <main class="portal-shell">
     <section class="market-card category-focus-card">
-      <div class="section-title"><span></span><strong>पेज नहीं मिला</strong></div>
-      <p class="article-summary">यह लिंक उपलब्ध नहीं है. नीचे से सही कैटेगरी खोलें.</p>
+      <div class="section-title"><span></span><strong>à¤ªà¥‡à¤œ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾</strong></div>
+      <p class="article-summary">à¤¯à¤¹ à¤²à¤¿à¤‚à¤• à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¨à¥€à¤šà¥‡ à¤¸à¥‡ à¤¸à¤¹à¥€ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤–à¥‹à¤²à¥‡à¤‚.</p>
       <div class="quick-links">
         ${CATEGORY_DEFINITIONS.slice(0, 24).map((category) => `<a href="${categoryRoutePath(category)}">${escapeHTML(category.label)}</a>`).join("")}
       </div>
-      <a class="read-btn" href="/index.html">होम पर जाएं</a>
+      <a class="read-btn" href="/index.html">à¤¹à¥‹à¤® à¤ªà¤° à¤œà¤¾à¤à¤‚</a>
     </section>
   </main>
 </body>
@@ -5391,3 +5391,4 @@ if (require.main === module) {
 }
 
 module.exports = app;
+

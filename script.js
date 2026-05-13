@@ -221,7 +221,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong";
+  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = node.dataset.autoEn || node.dataset.en || node.textContent.trim();
@@ -231,6 +231,79 @@ function applyUiLanguage(language) {
     }
 
     node.textContent = language === "hi" ? (UI_HI_LABELS[original] || getHindiText(original, node.dataset.hi)) : original;
+  });
+}
+
+function repairMojibakeText(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[àÂÃï¿½â]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const percentEncoded = Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? `%${code.toString(16).padStart(2, "0")}` : encodeURIComponent(char);
+    }).join("");
+
+    return decodeURIComponent(percentEncoded);
+  } catch (error) {
+    return text;
+  }
+}
+
+function looksCorruptHindi(value) {
+  return /Ã |Ã‚|Ãƒ|ï¿½|Ã°|Ã˜|à¤|â€™|Â°|Â©/.test(String(value || ""));
+}
+
+function normalizeDisplayText(value) {
+  const text = String(value || "").trim();
+  return looksCorruptHindi(text) ? repairMojibakeText(text) : text;
+}
+
+function getHindiText(en, hi) {
+  const english = normalizeDisplayText(en);
+  const hindi = normalizeDisplayText(hi);
+
+  if (CLEAN_HI_LABELS[english]) {
+    return normalizeDisplayText(CLEAN_HI_LABELS[english]);
+  }
+
+  if (UI_HI_LABELS[english]) {
+    return normalizeDisplayText(UI_HI_LABELS[english]);
+  }
+
+  if (HINDI_TEXT_BY_EN[english]) {
+    return normalizeDisplayText(HINDI_TEXT_BY_EN[english]);
+  }
+
+  if (hindi) {
+    return hindi;
+  }
+
+  return english;
+}
+
+function getLocalizedText(en, hi, language) {
+  return language === "hi" ? getHindiText(en, hi) : normalizeDisplayText(en);
+}
+
+function applyUiLanguage(language) {
+  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong";
+
+  document.querySelectorAll(selector).forEach((node) => {
+    const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());
+
+    if (!node.dataset.autoEn) {
+      node.dataset.autoEn = original;
+    }
+
+    node.textContent = language === "hi" ? getHindiText(original, node.dataset.hi) : original;
+  });
+
+  document.querySelectorAll("[data-en]").forEach((node) => {
+    node.dataset.en = normalizeDisplayText(node.dataset.en);
   });
 }
 
@@ -508,7 +581,9 @@ function applyNewsToCard(card, item, options = {}) {
   const bodyEn = localizedNewsField(item, "body", "en") || summaryEn;
   const bodyHi = localizedNewsField(item, "body", "hi") || summaryHi;
   const image = item.image || FALLBACK_NEWS_IMAGE;
-  const tagText = String(item.categoryBadge || item.category || item.city || "NEWS").toUpperCase();
+  const tagBase = String(item.categoryBadge || item.category || item.city || "NEWS").trim();
+  const tagTextEn = normalizeDisplayText(tagBase).toUpperCase();
+  const tagTextHi = getHindiText(tagBase, tagBase);
   const pageLink = newsPageLink(item, mode);
 
   card.dataset.newsTitle = titleEn;
@@ -532,16 +607,17 @@ function applyNewsToCard(card, item, options = {}) {
 
   const tagNode = card.querySelector(".tag");
   if (tagNode) {
-    tagNode.dataset.en = tagText;
-    tagNode.dataset.hi = tagText;
-    tagNode.textContent = tagText;
+    tagNode.dataset.en = tagTextEn;
+    tagNode.dataset.hi = tagTextHi;
+    tagNode.textContent = getLocalizedText(tagTextEn, tagTextHi, currentLanguage);
   }
 
   const titleNode = card.querySelector("h1, h2, h3");
-  const districtName = item.category || (item.city ? `${item.city}`.replace(/(^\w)/, (char) => char.toUpperCase()) : "");
+  const districtNameEn = item.category || (item.city ? `${item.city}`.replace(/(^\w)/, (char) => char.toUpperCase()) : "");
+  const districtNameHi = getHindiText(districtNameEn, districtNameEn);
   if (titleNode) {
-    const cardTitleEn = card.classList.contains("district-card") && districtName ? districtName : titleEn;
-    const cardTitleHi = card.classList.contains("district-card") && districtName ? districtName : titleHi;
+    const cardTitleEn = card.classList.contains("district-card") && districtNameEn ? districtNameEn : titleEn;
+    const cardTitleHi = card.classList.contains("district-card") && districtNameHi ? districtNameHi : titleHi;
     titleNode.dataset.en = cardTitleEn;
     titleNode.dataset.hi = cardTitleHi;
     titleNode.textContent = getLocalizedText(cardTitleEn, cardTitleHi, currentLanguage);

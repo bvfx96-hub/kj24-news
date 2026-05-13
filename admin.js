@@ -232,10 +232,14 @@ const fields = {
   previewImage: document.getElementById("previewImage"),
   previewTitle: document.getElementById("previewTitle"),
   previewSummary: document.getElementById("previewSummary"),
-  previewBody: document.getElementById("previewBody")
+  previewBody: document.getElementById("previewBody"),
+  previewLanguageSwitch: document.getElementById("previewLanguageSwitch"),
+  previewLanguageButtons: document.querySelectorAll("[data-preview-lang]")
 };
 let automationCountdownTimer = null;
 let activeAdminRequests = 0;
+let previewModalState = null;
+let previewLanguage = "hi";
 
 function hasAccess() {
   return sessionStorage.getItem(AUTH_SESSION_KEY) === "granted";
@@ -1010,11 +1014,46 @@ async function saveManualNews(event) {
   }
 }
 
-function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary = "", bodyHtml = "", bodyText = "" }) {
+function previewMarkupFromText(text = "") {
+  return `<p>${escapeHTML(text || "")}</p>`;
+}
+
+function renderPreviewModalLanguage() {
+  if (!previewModalState) {
+    return;
+  }
+
+  const copy = previewModalState.localized?.[previewLanguage]
+    || previewModalState.localized?.hi
+    || previewModalState.localized?.en
+    || {};
+
+  fields.previewTitle.textContent = copy.title || previewModalState.title || "Preview";
+  fields.previewSummary.textContent = copy.summary || previewModalState.summary || "";
+  fields.previewBody.innerHTML = copy.bodyHtml || previewModalState.bodyHtml || previewMarkupFromText(previewModalState.bodyText || "");
+  fields.previewLanguageButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.previewLang === previewLanguage);
+  });
+}
+
+function setPreviewLanguage(language = "hi") {
+  previewLanguage = language === "en" ? "en" : "hi";
+  renderPreviewModalLanguage();
+}
+
+function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary = "", bodyHtml = "", bodyText = "", localized = null, defaultLanguage = "hi" }) {
+  previewModalState = {
+    badge,
+    image,
+    title,
+    summary,
+    bodyHtml,
+    bodyText,
+    localized
+  };
+
   fields.previewBadge.textContent = badge;
-  fields.previewTitle.textContent = title || "Preview";
-  fields.previewSummary.textContent = summary || "";
-  fields.previewBody.innerHTML = bodyHtml || `<p>${escapeHTML(bodyText || "")}</p>`;
+  fields.previewLanguageSwitch.hidden = !localized;
 
   if (image) {
     fields.previewImage.src = image;
@@ -1024,6 +1063,7 @@ function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary =
     fields.previewImage.hidden = true;
   }
 
+  setPreviewLanguage(localized ? defaultLanguage : "hi");
   fields.previewModal.classList.add("open");
   fields.previewModal.setAttribute("aria-hidden", "false");
 }
@@ -1033,24 +1073,39 @@ function previewManualNews() {
   openPreviewModal({
     badge: payload.category || "MANUAL",
     image: payload.image || fallbackImage,
-    title: payload.titleHi || payload.title,
-    summary: payload.summaryHi || "",
-    bodyText: payload.bodyHi || ""
+    localized: {
+      hi: {
+        title: payload.titleHi || payload.title,
+        summary: payload.summaryHi || "",
+        bodyHtml: previewMarkupFromText(payload.bodyHi || "")
+      },
+      en: {
+        title: payload.titleEn || payload.title,
+        summary: payload.summaryEn || "",
+        bodyHtml: previewMarkupFromText(payload.bodyEn || payload.bodyHi || "")
+      }
+    }
   });
 }
 
 function previewNewsDraft() {
-  const title = fields.newsTitleHi.value.trim() || fields.newsTitle.value.trim();
-  const summary = fields.newsSummaryHi.value.trim() || fields.newsSummary.value.trim();
-  const body = fields.newsBodyHi.value.trim() || fields.newsBody.value.trim();
   const badge = fields.newsTag.value.trim() || fields.newsCategory.value || "PREVIEW";
 
   openPreviewModal({
     badge,
     image: fields.newsImage.value.trim() || fallbackImage,
-    title,
-    summary,
-    bodyText: body
+    localized: {
+      hi: {
+        title: fields.newsTitleHi.value.trim() || fields.newsTitle.value.trim(),
+        summary: fields.newsSummaryHi.value.trim() || fields.newsSummary.value.trim(),
+        bodyHtml: previewMarkupFromText(fields.newsBodyHi.value.trim() || fields.newsBody.value.trim())
+      },
+      en: {
+        title: fields.newsTitle.value.trim() || fields.newsTitleHi.value.trim(),
+        summary: fields.newsSummary.value.trim() || fields.newsSummaryHi.value.trim(),
+        bodyHtml: previewMarkupFromText(fields.newsBody.value.trim() || fields.newsBodyHi.value.trim())
+      }
+    }
   });
 }
 
@@ -1806,24 +1861,40 @@ function previewNewsItem(index) {
     return;
   }
 
+  const sourceLine = item.sourceName
+    ? `${escapeHTML(item.sourceName)}${item.sourcePublishedAt ? ` - ${escapeHTML(formatDateTime(item.sourcePublishedAt))}` : ""}`
+    : "";
+
   openPreviewModal({
     badge: item.categoryBadge || item.tag || item.category || "PREVIEW",
     image: item.image || "",
-    title: item.title || "Untitled news",
-    summary: item.summary || "",
-    bodyHtml: `
-    ${item.sourceName ? `<strong>Source</strong><p>${escapeHTML(item.sourceName)}${item.sourcePublishedAt ? ` - ${escapeHTML(formatDateTime(item.sourcePublishedAt))}` : ""}</p>` : ""}
-    <strong>English</strong>
-    <p>${escapeHTML(item.body || item.summary || "")}</p>
-    <strong>Hindi</strong>
-    <p>${escapeHTML(item.bodyHi || item.summaryHi || item.titleHi || "Hindi copy will auto-fill after save when OpenAI quota is available.")}</p>
-  `
+    localized: {
+      hi: {
+        title: item.titleHi || item.title || "Untitled news",
+        summary: item.summaryHi || item.summary || "",
+        bodyHtml: `
+          ${sourceLine ? `<strong>स्रोत</strong><p>${sourceLine}</p>` : ""}
+          <strong>हिंदी कॉपी</strong>
+          <p>${escapeHTML(item.bodyHi || item.summaryHi || item.titleHi || "Hindi copy will auto-fill after save when OpenAI quota is available.")}</p>
+        `
+      },
+      en: {
+        title: item.titleEn || item.title || item.titleHi || "Untitled news",
+        summary: item.summaryEn || item.summary || item.summaryHi || "",
+        bodyHtml: `
+          ${sourceLine ? `<strong>Source</strong><p>${sourceLine}</p>` : ""}
+          <strong>English Copy</strong>
+          <p>${escapeHTML(item.bodyEn || item.summaryEn || item.titleEn || "English copy is not available yet.")}</p>
+        `
+      }
+    }
   });
 }
 
 function closePreview() {
   fields.previewModal.classList.remove("open");
   fields.previewModal.setAttribute("aria-hidden", "true");
+  previewModalState = null;
 }
 
 async function autoTranslateCurrentNews() {
@@ -2054,6 +2125,9 @@ function bindEvents() {
   });
   fields.bulkApprovePending.addEventListener("click", bulkApprovePending);
   fields.closePreview.addEventListener("click", closePreview);
+  fields.previewLanguageButtons.forEach((button) => {
+    button.addEventListener("click", () => setPreviewLanguage(button.dataset.previewLang));
+  });
   fields.previewModal.addEventListener("click", (event) => {
     if (event.target === fields.previewModal) {
       closePreview();
