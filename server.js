@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const { XMLParser } = require("fast-xml-parser");
 const { MongoClient, ObjectId } = require("mongodb");
+const { text } = require("stream/consumers");
 
 const PORT = Number(process.env.PORT || 3000);
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
@@ -2629,7 +2630,7 @@ If exact details are unavailable, use careful wording and keep the article neutr
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI API failed: ${response.status} ${errorText.slice(0, 160)}`);
+    throw new Error (error Text);
   }
 
   const payload = await response.json();
