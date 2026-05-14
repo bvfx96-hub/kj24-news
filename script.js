@@ -412,6 +412,17 @@ function textPair(en, hi) {
   };
 }
 
+function sourceLanguageForItem(item = {}) {
+  return item.language || (/[\u0900-\u097F]/.test(`${item.titleHi || item.title || ""} ${item.summaryHi || item.summary || ""} ${item.bodyHi || item.body || ""}`) ? "hi" : "en");
+}
+
+function localizedTextPair(item = {}, field, fallback = "") {
+  const sourceLanguage = sourceLanguageForItem(item);
+  const english = item[`${field}En`] || (sourceLanguage === "en" ? item[field] || "" : "");
+  const hindi = item[`${field}Hi`] || (sourceLanguage === "hi" ? item[field] || fallback : fallback);
+  return textPair(english, hindi);
+}
+
 function escapeHTML(value) {
   return String(value || "")
     .replaceAll("&", "&amp;")
@@ -443,13 +454,17 @@ function mongoNewsToAdminData(news) {
           enabled: true,
           kicker: featured.category || featured.tag || "FEATURED",
           title: featured.title,
+          titleEn: featured.titleEn || "",
           titleHi: featured.titleHi || featured.title,
           summary: featured.summary,
+          summaryEn: featured.summaryEn || "",
           summaryHi: featured.summaryHi || featured.summary,
           body: featured.body,
+          bodyEn: featured.bodyEn || "",
           bodyHi: featured.bodyHi || featured.body,
           image: featured.image,
-          articleUrl: featured.articleUrl
+          articleUrl: featured.articleUrl,
+          language: featured.language || sourceLanguageForItem(featured)
         }
       : null,
     news: publishedNews
@@ -459,15 +474,19 @@ function mongoNewsToAdminData(news) {
         category: item.category,
         city: item.city,
         title: item.title,
+        titleEn: item.titleEn || "",
         titleHi: item.titleHi || item.title,
         summary: item.summary,
+        summaryEn: item.summaryEn || "",
         summaryHi: item.summaryHi || item.summary,
         body: item.body,
+        bodyEn: item.bodyEn || "",
         bodyHi: item.bodyHi || item.body,
         image: item.image,
         articleUrl: item.articleUrl,
         categoryPage: item.categoryPage,
-        categorySlug: item.categorySlug
+        categorySlug: item.categorySlug,
+        language: item.language || sourceLanguageForItem(item)
       })),
     ticker: []
   };
@@ -579,9 +598,9 @@ function takeNews(items = [], limit = 1, used = new Set(), predicate = () => tru
 function newsToStory(item = {}) {
   return {
     kicker: textPair(item.category || item.tag || "BREAKING NEWS", item.categoryBadge || item.category || "ब्रेकिंग न्यूज़"),
-    title: textPair(item.titleEn || item.title || item.titleHi, item.titleHi || item.title || item.titleEn),
-    summary: textPair(item.summaryEn || item.summary || item.bodyEn || item.body, item.summaryHi || item.summary || item.bodyHi || item.body),
-    body: textPair(item.bodyEn || item.body || item.summaryEn || item.summary, item.bodyHi || item.body || item.summaryHi || item.summary),
+    title: localizedTextPair(item, "title"),
+    summary: localizedTextPair(item, "summary", item.bodyHi || item.body || ""),
+    body: localizedTextPair(item, "body", item.summaryHi || item.summary || ""),
     image: item.image || FALLBACK_NEWS_IMAGE,
     articleUrl: safeSitePath(item.articleUrl) || safeSitePath(item.categoryPage) || ""
   };
@@ -872,9 +891,9 @@ function applyAdminTopStory(data) {
 
   topStories.unshift({
     kicker: textPair(data.topStory.kicker || "ADMIN UPDATE", data.topStory.kickerHi),
-    title: textPair(data.topStory.title, data.topStory.titleHi),
-    summary: textPair(data.topStory.summary, data.topStory.summaryHi),
-    body: textPair(data.topStory.body || data.topStory.summary, data.topStory.bodyHi || data.topStory.summaryHi),
+    title: localizedTextPair(data.topStory, "title"),
+    summary: localizedTextPair(data.topStory, "summary"),
+    body: localizedTextPair(data.topStory, "body", data.topStory.summaryHi || data.topStory.summary || ""),
     image: data.topStory.image || "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=1400&auto=format&fit=crop",
     articleUrl: data.topStory.articleUrl || ""
   });
@@ -934,9 +953,9 @@ function renderAdminUpdates(data) {
       return;
     }
 
-    const title = textPair(item.title, item.titleHi);
-    const body = textPair(item.body || item.summary, item.bodyHi || item.summaryHi);
-    const summary = textPair(item.summary || item.body, item.summaryHi || item.bodyHi);
+    const title = localizedTextPair(item, "title");
+    const body = localizedTextPair(item, "body", item.summaryHi || item.summary || "");
+    const summary = localizedTextPair(item, "summary", item.bodyHi || item.body || "");
     const tag = escapeHTML(item.tag || item.category || "UPDATE");
     const image = escapeHTML(item.image || "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop");
     const titleEn = escapeHTML(title.en);

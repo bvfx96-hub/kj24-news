@@ -266,6 +266,17 @@ const CP1252_REVERSE = {
   0x017E: 0x9E,
   0x0178: 0x9F
 };
+const HTML_ENTITY_MAP = {
+  nbsp: " ",
+  amp: "&",
+  quot: "\"",
+  apos: "'",
+  lt: "<",
+  gt: ">",
+  ndash: "-",
+  mdash: "—",
+  hellip: "…"
+};
 
 function decodeMojibake(value) {
   const text = String(value || "").trim();
@@ -290,12 +301,30 @@ function decodeMojibake(value) {
   }
 }
 
+function decodeHtmlEntities(value) {
+  return String(value || "")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const parsed = Number.parseInt(code, 10);
+      return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const parsed = Number.parseInt(code, 16);
+      return Number.isFinite(parsed) ? String.fromCodePoint(parsed) : " ";
+    })
+    .replace(/&([a-z]+);/gi, (match, name) => HTML_ENTITY_MAP[name.toLowerCase()] ?? match);
+}
+
 function normalizeText(value) {
-  const text = String(value || "").trim();
+  const text = decodeHtmlEntities(String(value || ""))
+    .replace(/\u00a0/g, " ")
+    .trim();
   const normalized = /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(text) ? decodeMojibake(text) : text;
   return normalized
     .replace(/Â°/g, "°")
     .replace(/â€™/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
     .trim();
 }
 
@@ -325,6 +354,82 @@ function hashValue(value) {
 
 function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function languageCharStats(value) {
+  const text = normalizeText(value);
+  return {
+    hindi: (text.match(/[\u0900-\u097F]/g) || []).length,
+    latin: (text.match(/[A-Za-z]/g) || []).length
+  };
+}
+
+function looksLikeLanguageCopy(value, targetLanguage) {
+  const text = normalizeText(value);
+
+  if (!text) {
+    return false;
+  }
+
+  const stats = languageCharStats(text);
+  if (targetLanguage === "hi") {
+    return stats.hindi >= Math.max(4, Math.ceil(stats.latin * 0.35));
+  }
+
+  return stats.latin >= Math.max(8, stats.hindi * 3);
+}
+
+function comparableCopy(value) {
+  return normalizeText(value)
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksCopiedFromSource(candidate, source) {
+  const left = comparableCopy(candidate);
+  const right = comparableCopy(source);
+
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  const sample = right.split(" ").filter(Boolean).slice(0, 12).join(" ");
+  return sample.length >= 32 && left.includes(sample);
+}
+
+function cleanNewsCopyText(value, options = {}) {
+  const targetLanguage = normalizeText(options.targetLanguage || "");
+  let cleaned = normalizeText(value)
+    .replace(/\|\s*google news\s*$/iu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  [options.sourceName, options.feedSourceName].map((item) => normalizeText(item)).filter(Boolean).forEach((name) => {
+    const safeName = escapeRegExp(name);
+    cleaned = cleaned
+      .replace(new RegExp(`(?:\\s*[|:-]\\s*)${safeName}\\s*$`, "iu"), "")
+      .replace(new RegExp(`(?:^|\\n)\\s*${safeName}\\s*(?=\\n|$)`, "giu"), "\n");
+  });
+
+  if (targetLanguage === "hi" && hasHindiText(cleaned)) {
+    cleaned = cleaned.replace(/^[A-Za-z][A-Za-z0-9\s'’&(),.-]{6,}:\s*(?=[\u0900-\u097F])/u, "");
+  }
+
+  return cleaned
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function localizedCopySeed(copy = {}) {
+  return [copy.title, copy.summary, copy.body].map((item) => normalizeText(item)).filter(Boolean).join(" ");
 }
 
 function looksLikeHttpUrl(value) {
@@ -1141,6 +1246,36 @@ function detectContentLanguage(value) {
   return hasHindiText(value) ? "hi" : "en";
 }
 
+function sourceLanguageForNews(news = {}) {
+  return normalizeText(news.language || detectContentLanguage(localizedCopySeed({
+    title: news.titleHi || news.title || news.titleEn,
+    summary: news.summaryHi || news.summary || news.summaryEn,
+    body: news.bodyHi || news.body || news.bodyEn
+  })));
+}
+
+function needsLocalizationRepair(news = {}) {
+  const sourceLanguage = sourceLanguageForNews(news);
+  const englishSeed = localizedCopySeed({ title: news.titleEn, summary: news.summaryEn, body: news.bodyEn });
+  const hindiSeed = localizedCopySeed({ title: news.titleHi, summary: news.summaryHi, body: news.bodyHi });
+  const hasEntityNoise = /&(?:nbsp|amp|quot|apos|lt|gt|#\d+);/i.test(`${news.titleEn || ""} ${news.titleHi || ""} ${news.bodyEn || ""} ${news.bodyHi || ""}`);
+  const copiedHindi = looksCopiedFromSource(`${news.titleHi || ""} ${news.summaryHi || ""}`, `${news.sourceTitle || ""} ${news.summary || ""}`);
+
+  if (hasEntityNoise || copiedHindi) {
+    return true;
+  }
+
+  if (!looksLikeLanguageCopy(hindiSeed, "hi")) {
+    return true;
+  }
+
+  if (!looksLikeLanguageCopy(englishSeed, "en")) {
+    return true;
+  }
+
+  return Boolean(sourceLanguage === "hi" && comparableCopy(englishSeed) === comparableCopy(hindiSeed));
+}
+
 function parseJsonObject(text) {
   const raw = normalizeText(text);
 
@@ -1153,26 +1288,37 @@ function parseJsonObject(text) {
 }
 
 async function translateNewsCopy(source, targetLanguage) {
+  const cleanedSource = {
+    title: cleanNewsCopyText(source.title, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName }),
+    summary: cleanNewsCopyText(source.summary, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName }),
+    body: cleanNewsCopyText(source.body, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName })
+  };
+  const sourceLanguage = detectContentLanguage(localizedCopySeed(cleanedSource));
+
   if (!OPENAI_API_KEY) {
-    return {
-      title: normalizeText(source.title),
-      summary: normalizeText(source.summary),
-      body: normalizeText(source.body)
-    };
+    return sourceLanguage === targetLanguage ? cleanedSource : { title: "", summary: "", body: "" };
   }
 
   const targetName = targetLanguage === "hi" ? "Hindi" : "English";
-  const prompt = `
+  let lastCleaned = { title: "", summary: "", body: "" };
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const prompt = `
 Translate this news copy into ${targetName} for Khabri Junction.
 
 Rules:
 - Keep facts, numbers, names, places and allegations exactly as given.
 - Do not add new facts.
 - Keep the language natural for a news website.
+- Output ONLY in ${targetName}.
+- ${targetLanguage === "en"
+    ? "Do not leave Hindi sentences or mixed Hindi-English paragraphs in the result."
+    : "Do not leave English headline prefixes or English-only body paragraphs in the result except names and official terms."}
+- Remove source labels, publisher names, and HTML entities like &nbsp; from the final copy.
 - Return ONLY valid JSON.
 
 Input:
-${JSON.stringify(source, null, 2)}
+${JSON.stringify(cleanedSource, null, 2)}
 
 Return JSON:
 {
@@ -1182,60 +1328,109 @@ Return JSON:
 }
 `;
 
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      input: prompt,
-      max_output_tokens: 1600
-    })
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    await addAutomationLog("translation-fallback", "OpenAI translation unavailable, original copy preserved", {
-      status: response.status,
-      targetLanguage
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        input: prompt,
+        max_output_tokens: 1600
+      })
     });
-    return {
-      title: normalizeText(source.title),
-      summary: normalizeText(source.summary),
-      body: normalizeText(source.body)
+
+    if (!response.ok) {
+      await addAutomationLog("translation-fallback", "OpenAI translation unavailable, original copy preserved", {
+        status: response.status,
+        targetLanguage,
+        attempt
+      });
+      if (attempt === 2) {
+        return sourceLanguage === targetLanguage ? cleanedSource : { title: "", summary: "", body: "" };
+      }
+      continue;
+    }
+
+    const payload = await response.json();
+    const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
+    const parsed = parseJsonObject(outputText);
+    lastCleaned = {
+      title: cleanNewsCopyText(parsed.title, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName }),
+      summary: cleanNewsCopyText(parsed.summary, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName }),
+      body: cleanNewsCopyText(parsed.body, { targetLanguage, sourceName: source.sourceName, feedSourceName: source.feedSourceName })
     };
+
+    if (looksLikeLanguageCopy(localizedCopySeed(lastCleaned), targetLanguage)) {
+      return lastCleaned;
+    }
   }
 
-  const payload = await response.json();
-  const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
-  const parsed = parseJsonObject(outputText);
-
-  return {
-    title: normalizeText(parsed.title),
-    summary: normalizeText(parsed.summary),
-    body: normalizeText(parsed.body)
-  };
+  return sourceLanguage === targetLanguage ? cleanedSource : lastCleaned;
 }
 
 async function prepareBilingualNews(input, existing = {}) {
-  const sourceTitle = normalizeText(input.title || input.titleEn || input.titleHi || existing.title || existing.titleEn || existing.titleHi);
-  const sourceSummary = normalizeText(input.summary || input.summaryEn || input.summaryHi || existing.summary || existing.summaryEn || existing.summaryHi);
-  const sourceBody = normalizeText(input.body || input.bodyEn || input.bodyHi || existing.body || existing.bodyEn || existing.bodyHi);
+  const sourceTitle = cleanNewsCopyText(input.title || input.titleEn || input.titleHi || existing.title || existing.titleEn || existing.titleHi, {
+    targetLanguage: normalizeText(input.language || existing.language),
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  const sourceSummary = cleanNewsCopyText(input.summary || input.summaryEn || input.summaryHi || existing.summary || existing.summaryEn || existing.summaryHi, {
+    targetLanguage: normalizeText(input.language || existing.language),
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  const sourceBody = cleanNewsCopyText(input.body || input.bodyEn || input.bodyHi || existing.body || existing.bodyEn || existing.bodyHi, {
+    targetLanguage: normalizeText(input.language || existing.language),
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
   const sourceLanguage = normalizeText(input.language || existing.language || detectContentLanguage(`${sourceTitle} ${sourceSummary} ${sourceBody}`));
   const sourceIsHindi = sourceLanguage === "hi" || detectContentLanguage(`${sourceTitle} ${sourceSummary} ${sourceBody}`) === "hi";
-  let titleEn = normalizeText(input.titleEn || existing.titleEn || (!sourceIsHindi ? sourceTitle : ""));
-  let summaryEn = normalizeText(input.summaryEn || existing.summaryEn || (!sourceIsHindi ? sourceSummary : ""));
-  let bodyEn = normalizeText(input.bodyEn || existing.bodyEn || (!sourceIsHindi ? sourceBody : ""));
-  let titleHi = normalizeText(input.titleHi || existing.titleHi || (sourceIsHindi ? sourceTitle : ""));
-  let summaryHi = normalizeText(input.summaryHi || existing.summaryHi || (sourceIsHindi ? sourceSummary : ""));
-  let bodyHi = normalizeText(input.bodyHi || existing.bodyHi || (sourceIsHindi ? sourceBody : ""));
+  let titleEn = cleanNewsCopyText(input.titleEn || existing.titleEn || (!sourceIsHindi ? sourceTitle : ""), {
+    targetLanguage: "en",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  let summaryEn = cleanNewsCopyText(input.summaryEn || existing.summaryEn || (!sourceIsHindi ? sourceSummary : ""), {
+    targetLanguage: "en",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  let bodyEn = cleanNewsCopyText(input.bodyEn || existing.bodyEn || (!sourceIsHindi ? sourceBody : ""), {
+    targetLanguage: "en",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  let titleHi = cleanNewsCopyText(input.titleHi || existing.titleHi || (sourceIsHindi ? sourceTitle : ""), {
+    targetLanguage: "hi",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  let summaryHi = cleanNewsCopyText(input.summaryHi || existing.summaryHi || (sourceIsHindi ? sourceSummary : ""), {
+    targetLanguage: "hi",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
+  let bodyHi = cleanNewsCopyText(input.bodyHi || existing.bodyHi || (sourceIsHindi ? sourceBody : ""), {
+    targetLanguage: "hi",
+    sourceName: input.sourceName || existing.sourceName,
+    feedSourceName: input.feedSourceName || existing.feedSourceName
+  });
   const errors = [];
+  const englishSeed = () => localizedCopySeed({ title: titleEn, summary: summaryEn, body: bodyEn });
+  const hindiSeed = () => localizedCopySeed({ title: titleHi, summary: summaryHi, body: bodyHi });
 
-  if ((!titleEn || !summaryEn || !bodyEn) && (titleHi || summaryHi || bodyHi)) {
+  if ((!titleEn || !summaryEn || !bodyEn || !looksLikeLanguageCopy(englishSeed(), "en")) && (titleHi || summaryHi || bodyHi)) {
     try {
-      const translated = await translateNewsCopy({ title: titleHi, summary: summaryHi, body: bodyHi }, "en");
+      const translated = await translateNewsCopy({
+        title: titleHi,
+        summary: summaryHi,
+        body: bodyHi,
+        sourceName: input.sourceName || existing.sourceName,
+        feedSourceName: input.feedSourceName || existing.feedSourceName
+      }, "en");
       titleEn = titleEn || translated.title;
       summaryEn = summaryEn || translated.summary;
       bodyEn = bodyEn || translated.body;
@@ -1244,9 +1439,15 @@ async function prepareBilingualNews(input, existing = {}) {
     }
   }
 
-  if ((!titleHi || !summaryHi || !bodyHi) && (titleEn || summaryEn || bodyEn)) {
+  if ((!titleHi || !summaryHi || !bodyHi || !looksLikeLanguageCopy(hindiSeed(), "hi")) && (titleEn || summaryEn || bodyEn)) {
     try {
-      const translated = await translateNewsCopy({ title: titleEn, summary: summaryEn, body: bodyEn }, "hi");
+      const translated = await translateNewsCopy({
+        title: titleEn,
+        summary: summaryEn,
+        body: bodyEn,
+        sourceName: input.sourceName || existing.sourceName,
+        feedSourceName: input.feedSourceName || existing.feedSourceName
+      }, "hi");
       titleHi = titleHi || translated.title;
       summaryHi = summaryHi || translated.summary;
       bodyHi = bodyHi || translated.body;
@@ -1255,12 +1456,19 @@ async function prepareBilingualNews(input, existing = {}) {
     }
   }
 
-  titleEn = titleEn || sourceTitle || titleHi;
-  summaryEn = summaryEn || sourceSummary || summaryHi;
-  bodyEn = bodyEn || sourceBody || bodyHi || summaryEn;
-  titleHi = titleHi || sourceTitle || titleEn;
-  summaryHi = summaryHi || sourceSummary || summaryEn;
-  bodyHi = bodyHi || sourceBody || bodyEn || summaryHi;
+  if (!looksLikeLanguageCopy(englishSeed(), "en")) {
+    titleEn = sourceIsHindi ? "" : sourceTitle;
+    summaryEn = sourceIsHindi ? "" : sourceSummary;
+    bodyEn = sourceIsHindi ? "" : sourceBody;
+    errors.push("english copy pending");
+  }
+
+  if (!looksLikeLanguageCopy(hindiSeed(), "hi")) {
+    titleHi = sourceIsHindi ? sourceTitle : "";
+    summaryHi = sourceIsHindi ? sourceSummary : "";
+    bodyHi = sourceIsHindi ? sourceBody : "";
+    errors.push("hindi copy pending");
+  }
 
   return {
     ...input,
@@ -1491,12 +1699,12 @@ function serializeNews(doc) {
     title: doc.title,
     summary: doc.summary,
     body: doc.body,
-    titleEn: doc.titleEn || doc.title,
-    summaryEn: doc.summaryEn || doc.summary,
-    bodyEn: doc.bodyEn || doc.body,
-    titleHi: doc.titleHi || doc.title,
-    summaryHi: doc.summaryHi || doc.summary,
-    bodyHi: doc.bodyHi || doc.body,
+    titleEn: normalizeText(doc.titleEn),
+    summaryEn: normalizeText(doc.summaryEn),
+    bodyEn: normalizeText(doc.bodyEn),
+    titleHi: normalizeText(doc.titleHi),
+    summaryHi: normalizeText(doc.summaryHi),
+    bodyHi: normalizeText(doc.bodyHi),
     category: doc.category,
     categorySlug: doc.categorySlug,
     categoryPage: landingPageForNews(doc),
@@ -2716,18 +2924,18 @@ function parseGeneratedArticle(outputText, fallback) {
   try {
     const parsed = JSON.parse(jsonText);
     return {
-      title: normalizeText(parsed.title) || fallback.title,
-      summary: normalizeText(parsed.summary) || fallback.summary,
-      body: normalizeText(parsed.body) || fallback.summary,
+      title: cleanNewsCopyText(parsed.title, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }) || fallback.title,
+      summary: cleanNewsCopyText(parsed.summary, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }) || fallback.summary,
+      body: cleanNewsCopyText(parsed.body, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }) || fallback.summary,
       category: normalizeText(parsed.category) || fallback.category,
       city: normalizeText(parsed.city) || fallback.city,
       breaking: normalizeBoolean(parsed.breaking)
     };
   } catch (error) {
     return {
-      title: fallback.title,
-      summary: fallback.summary,
-      body: text || fallback.summary,
+      title: cleanNewsCopyText(fallback.title, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }),
+      summary: cleanNewsCopyText(fallback.summary, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }),
+      body: cleanNewsCopyText(text || fallback.summary, { targetLanguage: "hi", sourceName: fallback.sourceName, feedSourceName: fallback.feedSourceName }),
       category: fallback.category,
       city: fallback.city,
       breaking: false
@@ -2738,14 +2946,26 @@ function parseGeneratedArticle(outputText, fallback) {
 function buildFallbackHindiArticle(item) {
   const category = inferCategory(`${item.title} ${item.summary}`);
   const city = inferCity(`${item.title} ${item.summary}`);
-  const sourceTitle = normalizeText(item.title || "ताजा खबर");
-  const sourceSummary = normalizeText(item.summary || item.title || "स्थानीय अपडेट");
-  const title = hasHindiText(sourceTitle) ? sourceTitle : `${category || "Breaking"} अपडेट`;
-  const summary = hasHindiText(sourceSummary) ? sourceSummary : `${title} को लेकर नई जानकारी सामने आई है।`;
+  const sourceTitle = cleanNewsCopyText(item.title || "ताजा खबर", {
+    targetLanguage: "hi",
+    sourceName: item.sourceName,
+    feedSourceName: item.feedSourceName
+  });
+  const sourceSummary = cleanNewsCopyText(item.summary || item.title || "स्थानीय अपडेट", {
+    targetLanguage: "hi",
+    sourceName: item.sourceName,
+    feedSourceName: item.feedSourceName
+  });
+  const titlePrefix = city
+    ? `${city.charAt(0).toUpperCase()}${city.slice(1)} अपडेट`
+    : `${category || "Breaking"} अपडेट`;
+  const summaryLine = hasHindiText(sourceSummary)
+    ? sourceSummary
+    : `${titlePrefix} को लेकर नई जानकारी सामने आई है।`;
+  const title = `${titlePrefix}: ${summaryLine.replace(/[।!?].*$/u, "").trim()}`.slice(0, 95);
+  const summary = summaryLine.replace(/\s+/g, " ").trim();
   const paragraphOne = summary;
-  const paragraphTwo = hasHindiText(sourceTitle)
-    ? `${sourceTitle} से जुड़ी जानकारी को Khabri Junction desk ने उपलब्ध इनपुट के आधार पर संक्षेप में तैयार किया है।`
-    : `${title} पर उपलब्ध शुरुआती इनपुट को Khabri Junction desk ने संकलित किया है।`;
+  const paragraphTwo = `${titlePrefix} से जुड़ी उपलब्ध शुरुआती जानकारी को Khabri Junction desk ने साफ और तटस्थ रूप में संकलित किया है।`;
   const paragraphThree = city
     ? `${city.charAt(0).toUpperCase()}${city.slice(1)} से जुड़े इस अपडेट में आधिकारिक जानकारी आने पर कॉपी को और विस्तार दिया जाएगा।`
     : "जैसे-जैसे आधिकारिक जानकारी और पुष्टि सामने आएगी, इस खबर को अपडेट किया जाएगा।";
@@ -2783,6 +3003,8 @@ Rewrite rules:
 - Do not reuse more than 7 consecutive words from the source text.
 - Do not translate word-for-word; paraphrase naturally for local Hindi readers.
 - Do not add fake quotes, fake names, fake numbers, or unverified allegations.
+- Do not include publisher/source names like ${item.sourceName || "source name"} inside the final headline or body.
+- Do not leave HTML entities like &nbsp; in the output.
 
 Return ONLY valid JSON with:
 {
@@ -2831,7 +3053,9 @@ If exact details are unavailable, use careful wording and keep the article neutr
     title: item.title,
     summary: item.summary,
     category,
-    city
+    city,
+    sourceName: item.sourceName,
+    feedSourceName: item.feedSourceName
   });
 }
 
@@ -3546,6 +3770,85 @@ async function backfillNewsMetadata() {
   }
 }
 
+async function repairNewsLocalization(limit = 40) {
+  const docs = await newsCollection
+    .find({ automated: true })
+    .sort({ updatedAt: -1, createdAt: -1 })
+    .limit(limit)
+    .toArray();
+  let updated = 0;
+
+  for (const doc of docs) {
+    if (!needsLocalizationRepair(doc)) {
+      continue;
+    }
+
+    let nextInput = { ...doc };
+
+    if (looksCopiedFromSource(`${doc.titleHi || ""} ${doc.summaryHi || ""}`, `${doc.sourceTitle || ""} ${doc.summary || ""}`)) {
+      const regenerated = await generateHindiArticle({
+        title: doc.sourceTitle || doc.title || doc.titleHi,
+        summary: doc.summaryHi || doc.summary || doc.sourceTitle,
+        sourceUrl: doc.sourceUrl,
+        sourceName: doc.sourceName,
+        feedSourceName: doc.feedSourceName,
+        districtHint: doc.districtHint,
+        sourceImage: doc.sourceImage,
+        sourcePublishedAt: doc.sourcePublishedAt
+      });
+
+      nextInput = {
+        ...nextInput,
+        title: regenerated.title,
+        titleHi: regenerated.title,
+        summary: regenerated.summary,
+        summaryHi: regenerated.summary,
+        body: regenerated.body,
+        bodyHi: regenerated.body,
+        category: regenerated.category || doc.category,
+        city: regenerated.city || doc.city,
+        breaking: regenerated.breaking ?? doc.breaking,
+        language: "hi"
+      };
+    }
+
+    const prepared = normalizeNews(await prepareBilingualNews(nextInput, doc), doc);
+    await newsCollection.updateOne(
+      { _id: doc._id },
+      {
+        $set: {
+          title: prepared.title,
+          summary: prepared.summary,
+          body: prepared.body,
+          titleEn: prepared.titleEn,
+          summaryEn: prepared.summaryEn,
+          bodyEn: prepared.bodyEn,
+          titleHi: prepared.titleHi,
+          summaryHi: prepared.summaryHi,
+          bodyHi: prepared.bodyHi,
+          translationStatus: prepared.translationStatus,
+          translationError: prepared.translationError,
+          category: prepared.category,
+          categorySlug: prepared.categorySlug,
+          categoryPage: prepared.categoryPage,
+          categoryBadge: prepared.categoryBadge,
+          city: prepared.city,
+          tag: prepared.tag,
+          metaTitle: prepared.metaTitle,
+          metaDescription: prepared.metaDescription,
+          ogTitle: prepared.ogTitle,
+          ogDescription: prepared.ogDescription,
+          keywords: prepared.keywords,
+          updatedAt: new Date()
+        }
+      }
+    );
+    updated += 1;
+  }
+
+  return updated;
+}
+
 async function backfillNewsThumbnails() {
   const docs = await newsCollection
     .find({
@@ -3620,11 +3923,13 @@ function requestedLanguage(req) {
 }
 
 function localizedValue(news, field, language) {
+  const sourceLanguage = sourceLanguageForNews(news);
+
   if (language === "hi") {
-    return normalizeText(news[`${field}Hi`] || news[field] || news[`${field}En`]);
+    return normalizeText(news[`${field}Hi`] || (sourceLanguage === "hi" ? news[field] : ""));
   }
 
-  return normalizeText(news[`${field}En`] || news[field] || news[`${field}Hi`]);
+  return normalizeText(news[`${field}En`] || (sourceLanguage === "en" ? news[field] : ""));
 }
 
 function localizedNews(news, language) {
@@ -3864,7 +4169,7 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
       <a href="/astrology.html">à¤°à¤¾à¤¶à¤¿à¤«à¤²</a>
     </nav>
     <div class="portal-language-switch" aria-label="Article language">
-      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">à¤¹à¤¿à¤‚à¤¦à¥€</a>
+      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">हिंदी</a>
       <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(url)}?lang=en">English</a>
     </div>
   </header>
@@ -5589,6 +5894,11 @@ async function connectToMongo() {
     startAutomationCron();
     mongoReady = true;
     mongoError = null;
+    repairNewsLocalization().then((count) => {
+      if (count) {
+        console.log(`Localization repair updated ${count} automated articles.`);
+      }
+    }).catch((error) => console.warn(`Localization repair failed: ${error.message}`));
     if (thumbnailBackfillCount) {
       console.log(`Thumbnail backfill updated ${thumbnailBackfillCount} articles.`);
     }

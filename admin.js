@@ -1448,6 +1448,17 @@ function hasHindiText(value) {
   return /[\u0900-\u097F]/.test(String(value || ""));
 }
 
+function isLikelyEnglishCopy(value) {
+  const text = String(value || "").trim();
+  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  const hindi = (text.match(/[\u0900-\u097F]/g) || []).length;
+  return latin >= Math.max(6, hindi * 3);
+}
+
+function sourceLanguageOfNews(item = {}) {
+  return item.language || (hasHindiText(`${item.titleHi || item.title || ""} ${item.summaryHi || item.summary || ""} ${item.bodyHi || item.body || ""}`) ? "hi" : "en");
+}
+
 function detectCategory(value) {
   const text = String(value || "").toLowerCase();
   const rules = [
@@ -1485,6 +1496,7 @@ function detectCategory(value) {
 }
 
 function apiToAdminItem(news) {
+  const sourceLanguage = sourceLanguageOfNews(news);
   return {
     _id: news._id,
     tag: news.categoryBadge || news.tag || news.category || "UPDATE",
@@ -1500,14 +1512,14 @@ function apiToAdminItem(news) {
     thumbnailHash: news.thumbnailHash || "",
     thumbnailStatus: news.thumbnailStatus || "",
     title: news.title || "",
-    titleEn: news.titleEn || news.title || "",
-    titleHi: news.titleHi || "",
+    titleEn: news.titleEn || (sourceLanguage === "en" ? news.title || "" : ""),
+    titleHi: news.titleHi || (sourceLanguage === "hi" ? news.title || "" : ""),
     summary: news.summary || "",
-    summaryEn: news.summaryEn || news.summary || "",
-    summaryHi: news.summaryHi || "",
+    summaryEn: news.summaryEn || (sourceLanguage === "en" ? news.summary || "" : ""),
+    summaryHi: news.summaryHi || (sourceLanguage === "hi" ? news.summary || "" : ""),
     body: news.body || "",
-    bodyEn: news.bodyEn || news.body || "",
-    bodyHi: news.bodyHi || "",
+    bodyEn: news.bodyEn || (sourceLanguage === "en" ? news.body || "" : ""),
+    bodyHi: news.bodyHi || (sourceLanguage === "hi" ? news.body || "" : ""),
     status: news.status || "pending",
     breaking: Boolean(news.breaking),
     featured: Boolean(news.featured),
@@ -1527,20 +1539,21 @@ function apiToAdminItem(news) {
 }
 
 function apiToTopStory(news) {
+  const sourceLanguage = sourceLanguageOfNews(news);
   return {
     _id: news._id,
     enabled: true,
     kicker: news.category || news.tag || "FEATURED",
     kickerHi: "",
     title: news.title || "",
-    titleEn: news.titleEn || news.title || "",
-    titleHi: news.titleHi || "",
+    titleEn: news.titleEn || (sourceLanguage === "en" ? news.title || "" : ""),
+    titleHi: news.titleHi || (sourceLanguage === "hi" ? news.title || "" : ""),
     summary: news.summary || "",
-    summaryEn: news.summaryEn || news.summary || "",
-    summaryHi: news.summaryHi || "",
+    summaryEn: news.summaryEn || (sourceLanguage === "en" ? news.summary || "" : ""),
+    summaryHi: news.summaryHi || (sourceLanguage === "hi" ? news.summary || "" : ""),
     body: news.body || "",
-    bodyEn: news.bodyEn || news.body || "",
-    bodyHi: news.bodyHi || "",
+    bodyEn: news.bodyEn || (sourceLanguage === "en" ? news.body || "" : ""),
+    bodyHi: news.bodyHi || (sourceLanguage === "hi" ? news.body || "" : ""),
     image: absolutizeBackendUrl(news.image || ""),
     status: news.status || "published",
     breaking: Boolean(news.breaking),
@@ -1552,7 +1565,7 @@ function apiToTopStory(news) {
 
 function newsPayload(item, overrides = {}) {
   const category = overrides.category || item.category || item.tag || "Breaking";
-  const language = item.language || (hasHindiText(`${item.title} ${item.summary} ${item.body}`) ? "hi" : "en");
+  const language = sourceLanguageOfNews(item);
 
   return {
     title: item.title || item.titleEn || item.titleHi || "",
@@ -1952,12 +1965,12 @@ function previewNewsItem(index) {
         `
       },
       en: {
-        title: item.titleEn || item.title || item.titleHi || "Untitled news",
-        summary: item.summaryEn || item.summary || item.summaryHi || "",
+        title: item.titleEn || "Untitled news",
+        summary: item.summaryEn || "",
         bodyHtml: `
           ${sourceLine ? `<strong>Source</strong><p>${sourceLine}</p>` : ""}
           <strong>English Copy</strong>
-          <p>${escapeHTML(item.bodyEn || item.summaryEn || item.titleEn || "English copy is not available yet.")}</p>
+          <p>${escapeHTML(item.bodyEn || item.summaryEn || item.titleEn || "English translation is being prepared.")}</p>
         `
       }
     }

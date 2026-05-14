@@ -89,12 +89,18 @@ function normalizePortalNewsItem(item = {}) {
   };
 }
 
+function sourceLanguageForPortalItem(item = {}) {
+  return item.language || (/[\u0900-\u097F]/.test(`${item.titleHi || item.title || ""} ${item.summaryHi || item.summary || ""} ${item.bodyHi || item.body || ""}`) ? "hi" : "en");
+}
+
 function localizedValue(item, field) {
+  const sourceLanguage = sourceLanguageForPortalItem(item);
+
   if (portalLanguage === "hi") {
-    return item[`${field}Hi`] || item[field] || item[`${field}En`] || "";
+    return item[`${field}Hi`] || (sourceLanguage === "hi" ? item[field] || "" : "");
   }
 
-  return item[`${field}En`] || item[field] || item[`${field}Hi`] || "";
+  return item[`${field}En`] || (sourceLanguage === "en" ? item[field] || "" : "");
 }
 
 function uiText(en, hi) {
