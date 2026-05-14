@@ -237,8 +237,66 @@ app.get("/favicon.ico", (req, res) => {
   res.type("png").sendFile(`${__dirname}/assets/logo-kj.png`);
 });
 
+const CP1252_REVERSE = {
+  0x20AC: 0x80,
+  0x201A: 0x82,
+  0x0192: 0x83,
+  0x201E: 0x84,
+  0x2026: 0x85,
+  0x2020: 0x86,
+  0x2021: 0x87,
+  0x02C6: 0x88,
+  0x2030: 0x89,
+  0x0160: 0x8A,
+  0x2039: 0x8B,
+  0x0152: 0x8C,
+  0x017D: 0x8E,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201C: 0x93,
+  0x201D: 0x94,
+  0x2022: 0x95,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x02DC: 0x98,
+  0x2122: 0x99,
+  0x0161: 0x9A,
+  0x203A: 0x9B,
+  0x0153: 0x9C,
+  0x017E: 0x9E,
+  0x0178: 0x9F
+};
+
+function decodeMojibake(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[à-ÿŒœŠšŽžŸ€‚ƒ„…†‡ˆ‰‹›‘’“”•–—˜™]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? code : (CP1252_REVERSE[code] ?? 0x3f);
+    }));
+
+    return new TextDecoder("utf-8").decode(bytes)
+      .replace(/\uFFFD/g, "")
+      .replace(/Â°/g, "°")
+      .replace(/â€™/g, "'")
+      .trim();
+  } catch (error) {
+    return text;
+  }
+}
+
 function normalizeText(value) {
-  return String(value || "").trim();
+  const text = String(value || "").trim();
+  const normalized = /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(text) ? decodeMojibake(text) : text;
+  return normalized
+    .replace(/Â°/g, "°")
+    .replace(/â€™/g, "'")
+    .trim();
 }
 
 function normalizeBoolean(value) {
@@ -267,6 +325,85 @@ function hashValue(value) {
 
 function escapeRegExp(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function looksLikeHttpUrl(value) {
+  return /^(https?:)?\/\//i.test(normalizeText(value));
+}
+
+function looksLikeImageUrl(value) {
+  const text = normalizeText(value);
+  return Boolean(text) && (
+    /^data:image\//i.test(text) ||
+    /\.(png|jpe?g|webp|gif|svg)(\?.*)?$/i.test(text) ||
+    /images\.unsplash\.com|img\.youtube\.com|cloudinary|cdn|upload/i.test(text)
+  );
+}
+
+function normalizeVideoSetting(item = {}) {
+  const values = [item.title, item.url, item.type, item.thumbnail]
+    .map((value) => normalizeText(value))
+    .filter(Boolean);
+  const uniqueValues = [...new Set(values)];
+  const thumbnail = uniqueValues.find((value) => looksLikeImageUrl(value)) || normalizeText(item.thumbnail);
+  const url = uniqueValues.find((value) => looksLikeHttpUrl(value) && !looksLikeImageUrl(value)) || normalizeText(item.url);
+  const textValues = uniqueValues.filter((value) => !looksLikeHttpUrl(value) && !looksLikeImageUrl(value));
+  let title = normalizeText(item.title);
+
+  if (!title || looksLikeHttpUrl(title) || looksLikeImageUrl(title)) {
+    title = textValues.find((value) => value.length > 8) || textValues[0] || "Viral Video";
+  }
+
+  let type = normalizeText(item.type);
+  if (!type || looksLikeHttpUrl(type) || looksLikeImageUrl(type) || type.length > 24) {
+    type = textValues.find((value) => value !== title && value.length <= 18) || "VIDEO";
+  }
+
+  return {
+    ...item,
+    title,
+    url,
+    type,
+    thumbnail
+  };
+}
+
+function normalizeSiteSettings(settings = {}) {
+  return {
+    ...settings,
+    weather: Array.isArray(settings.weather)
+      ? settings.weather.map((item) => ({
+          ...item,
+          city: normalizeText(item.city),
+          temp: normalizeText(item.temp).replace(/Â°/g, "°"),
+          condition: normalizeText(item.condition)
+        }))
+      : [],
+    market: Array.isArray(settings.market)
+      ? settings.market.map((item) => ({
+          ...item,
+          name: normalizeText(item.name),
+          value: normalizeText(item.value),
+          change: normalizeText(item.change)
+        }))
+      : [],
+    cricket: Array.isArray(settings.cricket)
+      ? settings.cricket.map((item) => ({
+          ...item,
+          match: normalizeText(item.match),
+          score: normalizeText(item.score),
+          status: normalizeText(item.status)
+        }))
+      : [],
+    videos: Array.isArray(settings.videos)
+      ? settings.videos.map((item) => normalizeVideoSetting(item))
+      : [],
+    notification: {
+      ...(settings.notification || {}),
+      title: normalizeText(settings.notification?.title),
+      description: normalizeText(settings.notification?.description)
+    }
+  };
 }
 
 function parseDateCandidate(value) {
@@ -1017,7 +1154,11 @@ function parseJsonObject(text) {
 
 async function translateNewsCopy(source, targetLanguage) {
   if (!OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is missing");
+    return {
+      title: normalizeText(source.title),
+      summary: normalizeText(source.summary),
+      body: normalizeText(source.body)
+    };
   }
 
   const targetName = targetLanguage === "hi" ? "Hindi" : "English";
@@ -1056,7 +1197,15 @@ Return JSON:
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OpenAI translation failed: ${response.status} ${errorText.slice(0, 160)}`);
+    await addAutomationLog("translation-fallback", "OpenAI translation unavailable, original copy preserved", {
+      status: response.status,
+      targetLanguage
+    });
+    return {
+      title: normalizeText(source.title),
+      summary: normalizeText(source.summary),
+      body: normalizeText(source.body)
+    };
   }
 
   const payload = await response.json();
@@ -1805,7 +1954,7 @@ async function getSiteSettings() {
 
   if (existing) {
     const defaults = defaultSiteSettings();
-    return {
+    return normalizeSiteSettings({
       ...defaults,
       ...existing,
       ads: { ...defaults.ads, ...(existing.ads || {}), ...dynamicAds },
@@ -1818,12 +1967,12 @@ async function getSiteSettings() {
         cricket: { ...defaults.integrations.cricket, ...(existing.integrations?.cricket || {}) },
         firebase: { ...defaults.integrations.firebase, ...(existing.integrations?.firebase || {}) }
       }
-    };
+    });
   }
 
   const defaults = defaultSiteSettings();
   await settingsCollection.insertOne(defaults);
-  return { ...defaults, ads: { ...defaults.ads, ...dynamicAds } };
+  return normalizeSiteSettings({ ...defaults, ads: { ...defaults.ads, ...dynamicAds } });
 }
 
 function sanitizeIntegrationConfig(type, config = {}) {
@@ -2580,9 +2729,36 @@ function parseGeneratedArticle(outputText, fallback) {
   }
 }
 
+function buildFallbackHindiArticle(item) {
+  const category = inferCategory(`${item.title} ${item.summary}`);
+  const city = inferCity(`${item.title} ${item.summary}`);
+  const sourceTitle = normalizeText(item.title || "ताजा खबर");
+  const sourceSummary = normalizeText(item.summary || item.title || "स्थानीय अपडेट");
+  const title = hasHindiText(sourceTitle) ? sourceTitle : `${category || "Breaking"} अपडेट`;
+  const summary = hasHindiText(sourceSummary) ? sourceSummary : `${title} को लेकर नई जानकारी सामने आई है।`;
+  const paragraphOne = summary;
+  const paragraphTwo = hasHindiText(sourceTitle)
+    ? `${sourceTitle} से जुड़ी जानकारी को Khabri Junction desk ने उपलब्ध इनपुट के आधार पर संक्षेप में तैयार किया है।`
+    : `${title} पर उपलब्ध शुरुआती इनपुट को Khabri Junction desk ने संकलित किया है।`;
+  const paragraphThree = city
+    ? `${city.charAt(0).toUpperCase()}${city.slice(1)} से जुड़े इस अपडेट में आधिकारिक जानकारी आने पर कॉपी को और विस्तार दिया जाएगा।`
+    : "जैसे-जैसे आधिकारिक जानकारी और पुष्टि सामने आएगी, इस खबर को अपडेट किया जाएगा।";
+  const paragraphFour = "फिलहाल पाठकों को सलाह है कि इस विषय में केवल आधिकारिक अपडेट और विश्वसनीय स्रोतों पर भरोसा करें।";
+  const body = [paragraphOne, paragraphTwo, paragraphThree, paragraphFour].filter(Boolean).join("\n\n");
+
+  return {
+    title,
+    summary,
+    body,
+    category,
+    city,
+    breaking: /ब्रेकिंग|ताजा|urgent|breaking/i.test(`${sourceTitle} ${sourceSummary}`)
+  };
+}
+
 async function generateHindiArticle(item) {
   if (!OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is missing");
+    return buildFallbackHindiArticle(item);
   }
 
   const category = inferCategory(`${item.title} ${item.summary}`);
@@ -2627,21 +2803,20 @@ If exact details are unavailable, use careful wording and keep the article neutr
     })
   });
 
- if (!response.ok) {
-  const errorText = await response.text();
+  if (!response.ok) {
+    const errorText = await response.text();
 
-  console.error("OpenAI API failed:", {
-    status: response.status,
-    body: errorText.slice(0, 500),
-  });
-
-  throw new Error(
-    `OpenAI API failed: ${response.status} ${errorText.slice(0, 160)}`
-  );
-}
-console.log("Automation title:", title);
-console.log("API URL:", apiUrl);
-console.log("Payload:", JSON.stringify(payload).slice(0, 1000));
+    console.error("OpenAI API failed:", {
+      status: response.status,
+      body: errorText.slice(0, 500)
+    });
+    await addAutomationLog("openai-fallback", "OpenAI unavailable, fallback article created", {
+      status: response.status,
+      sourceUrl: item.sourceUrl,
+      title: item.title
+    });
+    return buildFallbackHindiArticle(item);
+  }
 
   const payload = await response.json();
   const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
@@ -2897,31 +3072,9 @@ async function runNewsAutomation({ force = false, limit = 8, retryFailed = false
   }
 
   if (!OPENAI_API_KEY) {
-    const result = {
-      ...emptyAutomationResult("missing-openai-key"),
-      staleRemoved,
-      errors: ["OPENAI_API_KEY is missing. Add it in .env and restart the server."]
-    };
-    const nextRunAt = nextScheduledRunDate(Number(settings.intervalMinutes || AUTOMATION_INTERVAL_MINUTES), now);
-
-    await settingsCollection.updateOne(
-      { _id: "automation" },
-      {
-        $set: {
-          lastRunAt: now,
-          lastRunStatus: result.status,
-          lastRunMessage: automationMessage(result),
-          staleRemoved,
-          nextRunAt,
-          "cronHealth.enabled": Boolean(settings.enabled),
-          "cronHealth.running": false,
-          "cronHealth.lastCompletedAt": now,
-          "cronHealth.nextRunAt": nextRunAt
-        }
-      }
-    );
-
-    return result;
+    await addAutomationLog("openai-fallback", "OPENAI_API_KEY missing. Automation will save fallback Hindi copies to pending review.", {
+      ranAt: now
+    });
   }
 
   automationRunning = true;
@@ -3819,7 +3972,30 @@ async function findAdjacentNews(news) {
 }
 
 function renderCategoryLandingPage(route, articles, settings, req) {
-  const title = `${route.title} | Khabri Junction`;
+  const routeTitle = normalizeText(route.title);
+  const routeDescription = normalizeText(route.description);
+  const cleanSettings = normalizeSiteSettings(settings || {});
+  const ui = {
+    readMore: "\u092a\u0942\u0930\u0940 \u0916\u092c\u0930 \u092a\u0922\u093c\u0947\u0902",
+    brandTagline: "\u091b\u0924\u094d\u0924\u0940\u0938\u0917\u0922\u093c \u0915\u0940 \u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902",
+    home: "\u0939\u094b\u092e",
+    durg: "\u0926\u0941\u0930\u094d\u0917",
+    bhilai: "\u092d\u093f\u0932\u093e\u0908",
+    raipur: "\u0930\u093e\u092f\u092a\u0941\u0930",
+    market: "\u0906\u091c \u0915\u093e \u092c\u093e\u091c\u093e\u0930",
+    weather: "\u092e\u094c\u0938\u092e",
+    reels: "\u091f\u094d\u0930\u0947\u0902\u0921\u093f\u0902\u0917 \u0930\u0940\u0932",
+    world: "\u0926\u0947\u0936-\u0926\u0941\u0928\u093f\u092f\u093e",
+    shahdol: "\u0936\u0939\u0921\u094b\u0932",
+    empty: "\u0907\u0938 \u0938\u0947\u0915\u094d\u0936\u0928 \u092e\u0947\u0902 \u091c\u0932\u094d\u0926 \u0928\u0908 \u0916\u092c\u0930\u0947\u0902 \u0906\u090f\u0902\u0917\u0940\u0964",
+    weatherTitle: "\u092e\u094c\u0938\u092e \u0905\u092a\u0921\u0947\u091f",
+    marketTitle: "\u092e\u093e\u0930\u094d\u0915\u0947\u091f \u091f\u094d\u0930\u0948\u0915\u0930",
+    videoTitle: "\u0935\u093e\u092f\u0930\u0932 \u0935\u0940\u0921\u093f\u092f\u094b",
+    weatherFocus: "\u0926\u0941\u0930\u094d\u0917, \u092d\u093f\u0932\u093e\u0908 \u0914\u0930 \u0930\u093e\u092f\u092a\u0941\u0930 \u092e\u094c\u0938\u092e",
+    marketFocus: "\u0930\u093f\u092f\u0932-\u091f\u093e\u0907\u092e \u092e\u093e\u0930\u094d\u0915\u0947\u091f \u091f\u094d\u0930\u0948\u0915\u0930",
+    marketNote: "Admin panel \u0938\u0947 values manually update \u0915\u0930 \u0938\u0915\u0924\u0947 \u0939\u0948\u0902\u0964"
+  };
+  const title = `${routeTitle} | Khabri Junction`;
   const canonical = `${publicBaseUrl(req)}${route.path}`;
   const cards = articles.map((rawItem) => {
     const item = localizedNews(rawItem, "hi");
@@ -3830,26 +4006,26 @@ function renderCategoryLandingPage(route, articles, settings, req) {
           <span class="tag">${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
           <h3>${escapeHTML(item.title)}</h3>
           <p>${escapeHTML(item.summary || "")}</p>
-          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">à¤ªà¥‚à¤°à¥€ à¤–à¤¬à¤° à¤ªà¤¢à¤¼à¥‡à¤‚</a>
+          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">${ui.readMore}</a>
         </div>
       </article>`;
   }).join("");
-  const videos = (settings.videos || []).slice(0, 3).map((video) => `
+  const videos = (cleanSettings.videos || []).slice(0, 3).map((video) => `
     <a class="portal-side-item" href="${escapeHTML(video.url || "/viral-videos")}" target="${video.url ? "_blank" : "_self"}" rel="noopener">
       <div><strong>${escapeHTML(video.title || "Viral Video")}</strong><span>${escapeHTML(video.type || "Video")}</span></div>
       <img src="${escapeHTML(video.thumbnail || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(video.title || "Viral Video")}" loading="lazy" decoding="async">
     </a>
   `).join("");
-  const weather = (settings.weather || []).map((item) => `
+  const weather = (cleanSettings.weather || []).map((item) => `
     <div class="market-row"><div><strong>${escapeHTML(item.city)}</strong><small>${escapeHTML(item.condition || "Weather")}</small></div><span>${escapeHTML(item.temp || "--")}</span></div>
   `).join("");
-  const market = (settings.market || []).map((item) => `
+  const market = (cleanSettings.market || []).map((item) => `
     <div class="market-row"><div><strong>${escapeHTML(item.name)}</strong><small>Live tracker</small></div><span class="up">${escapeHTML(item.value || "--")} ${escapeHTML(item.change || "")}</span></div>
   `).join("");
   const mainWidget = route.path === "/weather-update"
     ? `<section class="market-card category-focus-card">
-        <div class="section-title small"><span></span><strong>à¤¦à¥à¤°à¥à¤—, à¤­à¤¿à¤²à¤¾à¤ˆ à¤”à¤° à¤°à¤¾à¤¯à¤ªà¥à¤° à¤®à¥Œà¤¸à¤®</strong></div>
-        <div class="weather-mini-grid">${(settings.weather || []).map((item) => `
+        <div class="section-title small"><span></span><strong>${ui.weatherFocus}</strong></div>
+        <div class="weather-mini-grid">${(cleanSettings.weather || []).map((item) => `
           <div class="weather-mini-card">
             <strong>${escapeHTML(item.city || "City")}</strong>
             <span>${escapeHTML(item.temp || "--")}</span>
@@ -3857,11 +4033,11 @@ function renderCategoryLandingPage(route, articles, settings, req) {
           </div>
         `).join("")}</div>
       </section>`
-    : route.path === "/market-news"
+      : route.path === "/market-news"
       ? `<section class="market-card category-focus-card">
-          <div class="section-title small"><span></span><strong>à¤°à¥€à¤¯à¤²-à¤Ÿà¤¾à¤‡à¤® à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤Ÿà¥à¤°à¥ˆà¤•à¤°</strong></div>
+          <div class="section-title small"><span></span><strong>${ui.marketFocus}</strong></div>
           <div class="market-list">${market}</div>
-          <p class="market-note">Admin panel à¤¸à¥‡ values manually update à¤•à¤° à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤</p>
+          <p class="market-note">${ui.marketNote}</p>
         </section>`
       : "";
 
@@ -3872,46 +4048,46 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
   <title>${escapeHTML(title)}</title>
-  <meta name="description" content="${escapeHTML(route.description)}">
+  <meta name="description" content="${escapeHTML(routeDescription)}">
   <link rel="canonical" href="${escapeHTML(canonical)}">
   <meta property="og:type" content="website">
   <meta property="og:title" content="${escapeHTML(title)}">
-  <meta property="og:description" content="${escapeHTML(route.description)}">
+  <meta property="og:description" content="${escapeHTML(routeDescription)}">
   <meta property="og:url" content="${escapeHTML(canonical)}">
   <meta property="og:image" content="${escapeHTML(publicBaseUrl(req))}/assets/logo-kj.png">
   <link rel="icon" href="/assets/logo-kj.png" type="image/png">
   <link rel="stylesheet" href="/style.css">
-  <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(title)},"description":${JSON.stringify(route.description)},"url":${JSON.stringify(canonical)}}</script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(title)},"description":${JSON.stringify(routeDescription)},"url":${JSON.stringify(canonical)}}</script>
 </head>
 <body class="article-page">
-  <div class="ad-slot article-top-ad">${settings.ads?.header || "ADVERTISEMENT"}</div>
+  <div class="ad-slot article-top-ad">${cleanSettings.ads?.header || "ADVERTISEMENT"}</div>
   <header class="portal-site-header">
-    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚</span></div></a>
+    <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>${ui.brandTagline}</span></div></a>
     <nav class="portal-main-nav">
-      <a href="/index.html">à¤¹à¥‹à¤®</a>
-      <a href="/durg.html">à¤¦à¥à¤°à¥à¤—</a>
-      <a href="/bhilai.html">à¤­à¤¿à¤²à¤¾à¤ˆ</a>
-      <a href="/raipur-news">à¤°à¤¾à¤¯à¤ªà¥à¤°</a>
-      <a href="/market-news">à¤†à¤œ à¤•à¤¾ à¤¬à¤¾à¤œà¤¾à¤°</a>
-      <a href="/weather-update">à¤®à¥Œà¤¸à¤®</a>
-      <a href="/viral-videos">à¤Ÿà¥à¤°à¥‡à¤‚à¤¡à¤¿à¤‚à¤— à¤°à¥€à¤²</a>
-      <a href="/desh-duniya-news">à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾</a>
-      <a href="/mp-shahdol-news">à¤¶à¤¹à¤¡à¥‹à¤²</a>
+      <a href="/index.html">${ui.home}</a>
+      <a href="/durg.html">${ui.durg}</a>
+      <a href="/bhilai.html">${ui.bhilai}</a>
+      <a href="/raipur-news">${ui.raipur}</a>
+      <a href="/market-news">${ui.market}</a>
+      <a href="/weather-update">${ui.weather}</a>
+      <a href="/viral-videos">${ui.reels}</a>
+      <a href="/desh-duniya-news">${ui.world}</a>
+      <a href="/mp-shahdol-news">${ui.shahdol}</a>
     </nav>
   </header>
   <main class="portal-shell">
     <section class="portal-layout">
       <div>
-        <div class="section-title"><span></span><strong>${escapeHTML(route.title)}</strong></div>
-        <p class="article-summary">${escapeHTML(route.description)}</p>
+        <div class="section-title"><span></span><strong>${escapeHTML(routeTitle)}</strong></div>
+        <p class="article-summary">${escapeHTML(routeDescription)}</p>
         ${mainWidget}
-        <div class="news-grid latest-grid">${cards || `<div class="ad-slot">à¤‡à¤¸ à¤¸à¥‡à¤•à¥à¤¶à¤¨ à¤®à¥‡à¤‚ à¤œà¤²à¥à¤¦ à¤¨à¤ˆ à¤–à¤¬à¤°à¥‡à¤‚ à¤†à¤à¤‚à¤—à¥€à¥¤</div>`}</div>
+        <div class="news-grid latest-grid">${cards || `<div class="ad-slot">${ui.empty}</div>`}</div>
       </div>
       <aside class="portal-sidebar">
-        <div class="portal-side-ad">${settings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
-        <section class="market-card"><div class="section-title small"><span></span><strong>à¤®à¥Œà¤¸à¤® à¤…à¤ªà¤¡à¥‡à¤Ÿ</strong></div><div class="market-list">${weather}</div></section>
-        <section class="market-card"><div class="section-title small"><span></span><strong>à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤Ÿà¥à¤°à¥ˆà¤•à¤°</strong></div><div class="market-list">${market}</div></section>
-        <section class="market-card"><div class="section-title small"><span></span><strong>à¤µà¤¾à¤¯à¤°à¤² à¤µà¥€à¤¡à¤¿à¤¯à¥‹</strong></div>${videos || "<p>No videos yet.</p>"}</section>
+        <div class="portal-side-ad">${cleanSettings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
+        <section class="market-card"><div class="section-title small"><span></span><strong>${ui.weatherTitle}</strong></div><div class="market-list">${weather}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>${ui.marketTitle}</strong></div><div class="market-list">${market}</div></section>
+        <section class="market-card"><div class="section-title small"><span></span><strong>${ui.videoTitle}</strong></div>${videos || "<p>No videos yet.</p>"}</section>
       </aside>
     </section>
   </main>
@@ -4119,14 +4295,14 @@ app.get("/api/automation/logs", requireDatabase, async (req, res, next) => {
 app.get("/api/site-settings", async (req, res, next) => {
   try {
     if (!mongoReady || !settingsCollection) {
-      return res.json(defaultSiteSettings());
+      return res.json(normalizeSiteSettings(defaultSiteSettings()));
     }
 
     const settings = await getSiteSettings();
     res.json(settings);
   } catch (error) {
     if (!mongoReady) {
-      return res.json(defaultSiteSettings());
+      return res.json(normalizeSiteSettings(defaultSiteSettings()));
     }
 
     next(error);

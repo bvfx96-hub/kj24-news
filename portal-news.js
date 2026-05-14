@@ -1,4 +1,28 @@
-const PORTAL_API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "http://localhost:3000" : "");
+function resolvePortalApiBaseUrl(remoteOrigin = "https://kj24-news.onrender.com") {
+  const override = String(window.KJ_API_BASE_URL || "").trim();
+
+  if (override) {
+    return override.replace(/\/$/, "");
+  }
+
+  const { protocol, hostname } = window.location;
+
+  if (/^(localhost|127\.0\.0\.1)$/i.test(hostname)) {
+    return "";
+  }
+
+  if (protocol === "file:") {
+    return "http://localhost:3000";
+  }
+
+  if (/github\.io$/i.test(hostname) || /githubusercontent\.com$/i.test(hostname)) {
+    return remoteOrigin;
+  }
+
+  return "";
+}
+
+const PORTAL_API_BASE_URL = resolvePortalApiBaseUrl();
 const PORTAL_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const PORTAL_LANGUAGE_KEY = "khabriJunctionPortalLanguage";
 const requestedPortalLanguage = new URLSearchParams(window.location.search).get("lang");

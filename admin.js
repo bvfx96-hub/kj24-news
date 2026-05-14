@@ -2,7 +2,31 @@ const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
 const AUTH_SESSION_KEY = "khabriJunctionAdminAccess";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "kjadmin123";
-const API_BASE_URL = window.KJ_API_BASE_URL || (window.location.protocol === "file:" ? "https://kj24-news.onrender.com" : "");
+function resolveAdminApiBaseUrl(remoteOrigin = "https://kj24-news.onrender.com") {
+  const override = String(window.KJ_API_BASE_URL || "").trim();
+
+  if (override) {
+    return override.replace(/\/$/, "");
+  }
+
+  const { protocol, hostname } = window.location;
+
+  if (/^(localhost|127\.0\.0\.1)$/i.test(hostname)) {
+    return "";
+  }
+
+  if (protocol === "file:") {
+    return "http://localhost:3000";
+  }
+
+  if (/github\.io$/i.test(hostname) || /githubusercontent\.com$/i.test(hostname)) {
+    return remoteOrigin;
+  }
+
+  return "";
+}
+
+const API_BASE_URL = resolveAdminApiBaseUrl();
 const fallbackImage = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CMS_CATEGORIES = [
   "Breaking",

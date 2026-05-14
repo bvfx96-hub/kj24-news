@@ -1175,6 +1175,16 @@ section {
   pointer-events: auto;
 }
 
+.footer,
+.footer-grid,
+.footer-grid > div,
+.visit-strip,
+.visit-strip a {
+  position: relative;
+  z-index: 8;
+  pointer-events: auto;
+}
+
 .footer-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) minmax(360px, 1.35fr) minmax(190px, 0.8fr) minmax(210px, 0.85fr);
