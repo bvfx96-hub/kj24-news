@@ -1753,18 +1753,24 @@ function adHtml(ad) {
     return "";
   }
 
-  if (ad.adsenseCode) {
-    return ad.adsenseCode;
+  const title = normalizeText(ad.title || "Advertisement");
+  const image = normalizeText(ad.image);
+  const linkUrl = normalizeText(ad.linkUrl);
+  const caption = title ? `<span class="managed-ad-caption">${escapeHTML(title)}</span>` : "";
+  const imageMarkup = image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(title || "Advertisement")}" loading="lazy">` : "";
+  const mediaInner = `${caption}${imageMarkup}`;
+  const mediaMarkup = mediaInner
+    ? (linkUrl
+      ? `<a class="managed-ad-media" href="${escapeHTML(linkUrl)}" target="_blank" rel="noopener">${mediaInner}</a>`
+      : `<div class="managed-ad-media">${mediaInner}</div>`)
+    : "";
+  const codeMarkup = ad.adsenseCode ? `<div class="managed-ad-code">${ad.adsenseCode}</div>` : "";
+
+  if (mediaMarkup || codeMarkup) {
+    return `<div class="managed-ad-stack">${mediaMarkup}${codeMarkup}</div>`;
   }
 
-  if (ad.image) {
-    const image = escapeHTML(ad.image);
-    const title = escapeHTML(ad.title || "Advertisement");
-    const img = `<img src="${image}" alt="${title}" loading="lazy">`;
-    return ad.linkUrl ? `<a href="${escapeHTML(ad.linkUrl)}" target="_blank" rel="noopener">${img}</a>` : img;
-  }
-
-  return escapeHTML(ad.title || "Advertisement");
+  return escapeHTML(title || "Advertisement");
 }
 
 async function activeAdsByPosition() {
@@ -4587,10 +4593,14 @@ app.post("/api/uploads", async (req, res, next) => {
     }
 
     const url = `/assets/uploads/${filename}`;
+    const absoluteUrl = new URL(url, publicBaseUrl(req)).toString();
     res.status(201).json({
       url,
       previewUrl: url,
       apiUrl,
+      absoluteUrl,
+      absolutePreviewUrl: absoluteUrl,
+      absoluteApiUrl: apiUrl ? new URL(apiUrl, publicBaseUrl(req)).toString() : "",
       imageAlt: normalizeText(req.body?.imageAlt),
       imageCredit: normalizeText(req.body?.imageCredit),
       imageSource: normalizeText(req.body?.imageSource),
@@ -4613,9 +4623,12 @@ app.get("/api/images/preview", async (req, res, next) => {
       ? path.join(__dirname, url.replace(/^\/+/, "").replaceAll("/", path.sep))
       : "";
 
+    const absolutePreviewUrl = new URL(url, publicBaseUrl(req)).toString();
     res.json({
       url,
       previewUrl: url,
+      absoluteUrl: absolutePreviewUrl,
+      absolutePreviewUrl,
       local: Boolean(localPath && fs.existsSync(localPath)),
       exists: Boolean(localPath && fs.existsSync(localPath)),
       imageAlt: normalizeText(req.query.imageAlt),
@@ -5423,6 +5436,39 @@ app.delete("/api/news/:id", requireDatabase, async (req, res, next) => {
     }
 
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/admin/clear-posts", requireDatabase, async (req, res, next) => {
+  try {
+    if (!normalizeBoolean(req.body?.confirm)) {
+      return res.status(400).json({ error: "confirmation required" });
+    }
+
+    const [aiResult, manualResult, analyticsResult] = await Promise.all([
+      newsCollection.deleteMany({}),
+      manualNewsCollection.deleteMany({}),
+      newsAnalyticsCollection.deleteMany({})
+    ]);
+
+    await addAutomationLog(
+      "admin-clear",
+      `All posts removed by admin. AI ${aiResult.deletedCount || 0}, manual ${manualResult.deletedCount || 0}`,
+      {
+        deletedAi: aiResult.deletedCount || 0,
+        deletedManual: manualResult.deletedCount || 0,
+        deletedAnalytics: analyticsResult.deletedCount || 0
+      }
+    );
+
+    res.json({
+      ok: true,
+      deletedAi: aiResult.deletedCount || 0,
+      deletedManual: manualResult.deletedCount || 0,
+      deletedAnalytics: analyticsResult.deletedCount || 0
+    });
   } catch (error) {
     next(error);
   }

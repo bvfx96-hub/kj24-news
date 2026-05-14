@@ -1098,6 +1098,7 @@ section {
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   background: #171c24;
+  pointer-events: none;
 }
 
 .footer-notify-box h3,
@@ -1124,6 +1125,11 @@ section {
   align-items: center;
   justify-content: flex-end;
   gap: 9px;
+}
+
+.footer-notify-box .read-btn,
+.footer-notify-box .share-now-icons a {
+  pointer-events: auto;
 }
 
 .share-now-icons {
@@ -1156,6 +1162,36 @@ section {
   overflow: hidden;
   align-content: center;
   contain: layout;
+}
+
+.managed-ad-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.managed-ad-media {
+  display: grid;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.managed-ad-caption {
+  display: block;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.managed-ad-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.news-empty-card button[disabled] {
+  opacity: 0.85;
+  cursor: default;
 }
 
 .footer {

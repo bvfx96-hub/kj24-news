@@ -1,28 +1,8 @@
-function resolvePortalApiBaseUrl(remoteOrigin = "https://kj24-news.onrender.com") {
-  const override = String(window.KJ_API_BASE_URL || "").trim();
-
-  if (override) {
-    return override.replace(/\/$/, "");
-  }
-
-  const { protocol, hostname } = window.location;
-
-  if (/^(localhost|127\.0\.0\.1)$/i.test(hostname)) {
-    return "";
-  }
-
-  if (protocol === "file:") {
-    return "http://localhost:3000";
-  }
-
-  if (/github\.io$/i.test(hostname) || /githubusercontent\.com$/i.test(hostname)) {
-    return remoteOrigin;
-  }
-
-  return "";
-}
-
-const PORTAL_API_BASE_URL = resolvePortalApiBaseUrl();
+const DEFAULT_REMOTE_API_BASE = "https://kj24-news.onrender.com";
+const PORTAL_API_BASE_URL = window.KJ_API_BASE_URL
+  || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
+    ? DEFAULT_REMOTE_API_BASE
+    : "");
 const PORTAL_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const PORTAL_LANGUAGE_KEY = "khabriJunctionPortalLanguage";
 const requestedPortalLanguage = new URLSearchParams(window.location.search).get("lang");
@@ -65,18 +45,48 @@ function safePortalPath(url = "") {
   if (!value) return "";
 
   try {
-    const parsed = new URL(value, window.location.origin);
+    const contentOrigin = PORTAL_API_BASE_URL ? new URL(PORTAL_API_BASE_URL, window.location.href).origin : window.location.origin;
+    const parsed = new URL(value, contentOrigin);
     const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname);
     const isSameHost = parsed.host === window.location.host;
 
     if (isLocalhost || isSameHost) {
       return `${parsed.pathname}${parsed.search}${parsed.hash}`;
     }
+
+    if (PORTAL_API_BASE_URL && /github\.io$|githubusercontent\.com$/i.test(window.location.hostname)) {
+      return parsed.toString();
+    }
   } catch (error) {
     return value;
   }
 
   return value;
+}
+
+function absolutePortalContentUrl(url = "") {
+  const value = String(url || "").trim();
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return new URL(value, PORTAL_API_BASE_URL || window.location.origin).toString();
+  } catch (error) {
+    return value;
+  }
+}
+
+function normalizePortalNewsItem(item = {}) {
+  return {
+    ...item,
+    image: absolutePortalContentUrl(item.image || item.optimizedThumbnail || item.aiThumbnail || ""),
+    sourceImage: absolutePortalContentUrl(item.sourceImage || ""),
+    optimizedThumbnail: absolutePortalContentUrl(item.optimizedThumbnail || ""),
+    aiThumbnail: absolutePortalContentUrl(item.aiThumbnail || ""),
+    articleUrl: safePortalPath(item.articleUrl || ""),
+    categoryPage: safePortalPath(item.categoryPage || "")
+  };
 }
 
 function localizedValue(item, field) {
@@ -405,8 +415,52 @@ function portalSideItem(item) {
   </a>`;
 }
 
+function portalEmptyMarkup() {
+  const title = portalLanguage === "hi" ? "नई पोस्ट जल्द आएंगी" : "Fresh posts will appear soon";
+  const summary = portalLanguage === "hi"
+    ? "अभी इस पेज पर कोई published खबर नहीं है। नई खबर approve होते ही यहां दिखेगी।"
+    : "There are no published stories on this page yet. Approved stories will appear here.";
+
+  return `
+    <article class="portal-card news-empty-card">
+      <img src="${escapeHTML(PORTAL_FALLBACK_IMAGE)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
+      <span class="portal-badge">${portalLanguage === "hi" ? "लाइव" : "LIVE"}</span>
+      <h3>${escapeHTML(title)}</h3>
+      <p>${escapeHTML(summary)}</p>
+      <a class="read-btn" href="/admin.html">${portalLanguage === "hi" ? "एडमिन खोलें" : "Open Admin"}</a>
+    </article>
+  `;
+}
+
+function renderPortalEmptyState() {
+  const leadGrid = document.querySelector(".portal-lead-grid");
+  const listGrid = document.querySelector(".portal-list-grid");
+  const photoStrip = document.querySelector(".portal-photo-strip");
+  const sideBlocks = document.querySelectorAll(".portal-side-block");
+
+  if (leadGrid) {
+    leadGrid.innerHTML = portalEmptyMarkup();
+  }
+
+  if (listGrid) {
+    listGrid.innerHTML = portalEmptyMarkup();
+  }
+
+  if (photoStrip) {
+    photoStrip.innerHTML = "";
+  }
+
+  sideBlocks.forEach((block) => {
+    const title = block.querySelector("h2")?.outerHTML || `<h2>${portalLanguage === "hi" ? "ताज़ा खबरें" : "Latest News"}</h2>`;
+    block.innerHTML = `${title}${portalEmptyMarkup()}`;
+  });
+
+  bindPortalNewsCards();
+}
+
 function renderPortalMongoNews(news) {
   if (!news.length) {
+    renderPortalEmptyState();
     return;
   }
 
@@ -447,7 +501,7 @@ async function loadPortalMongoNews() {
       return;
     }
 
-    const news = await response.json();
+    const news = (await response.json()).map(normalizePortalNewsItem);
     renderPortalMongoNews(news);
   } catch (error) {
     // Static previews keep their dummy content when the API is unavailable.

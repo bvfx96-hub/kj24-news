@@ -1,3 +1,4 @@
+const DEFAULT_REMOTE_API_BASE = "https://kj24-news.onrender.com";
 const markets = [
   { name: "SENSEX", value: "77,958.52", change: "+1.22%", points: "+940.19" },
   { name: "NIFTY 50", value: "24,330.95", change: "+1.24%", points: "+298.15" },
@@ -5,31 +6,10 @@ const markets = [
 ];
 
 const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
-function resolveApiBaseUrl(remoteOrigin = "https://kj24-news.onrender.com") {
-  const override = String(window.KJ_API_BASE_URL || "").trim();
-
-  if (override) {
-    return override.replace(/\/$/, "");
-  }
-
-  const { protocol, hostname } = window.location;
-
-  if (/^(localhost|127\.0\.0\.1)$/i.test(hostname)) {
-    return "";
-  }
-
-  if (protocol === "file:") {
-    return "http://localhost:3000";
-  }
-
-  if (/github\.io$/i.test(hostname) || /githubusercontent\.com$/i.test(hostname)) {
-    return remoteOrigin;
-  }
-
-  return "";
-}
-
-const API_BASE_URL = resolveApiBaseUrl();
+const API_BASE_URL = window.KJ_API_BASE_URL
+  || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
+    ? DEFAULT_REMOTE_API_BASE
+    : "");
 const FALLBACK_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CATEGORY_LINKS = {
   "breaking.html": "/category/breaking",
@@ -510,18 +490,46 @@ function safeSitePath(url = "") {
   if (!value) return "";
 
   try {
-    const parsed = new URL(value, window.location.origin);
+    const contentOrigin = API_BASE_URL ? new URL(API_BASE_URL, window.location.href).origin : window.location.origin;
+    const parsed = new URL(value, contentOrigin);
     const isLocalhost = /^(localhost|127\.0\.0\.1)$/i.test(parsed.hostname);
     const isSameHost = parsed.host === window.location.host;
 
     if (isLocalhost || isSameHost) {
       return `${parsed.pathname}${parsed.search}${parsed.hash}`;
     }
+
+    if (API_BASE_URL && /github\.io$|githubusercontent\.com$/i.test(window.location.hostname)) {
+      return parsed.toString();
+    }
   } catch (error) {
     return value;
   }
 
   return value;
+}
+
+function absoluteContentUrl(url = "") {
+  const value = String(url || "").trim();
+  if (!value) return "";
+
+  try {
+    return new URL(value, API_BASE_URL || window.location.origin).toString();
+  } catch (error) {
+    return value;
+  }
+}
+
+function normalizeApiNewsItem(item = {}) {
+  return {
+    ...item,
+    image: absoluteContentUrl(item.image || item.optimizedThumbnail || item.aiThumbnail || ""),
+    sourceImage: absoluteContentUrl(item.sourceImage || ""),
+    optimizedThumbnail: absoluteContentUrl(item.optimizedThumbnail || ""),
+    aiThumbnail: absoluteContentUrl(item.aiThumbnail || ""),
+    articleUrl: safeSitePath(item.articleUrl || ""),
+    categoryPage: safeSitePath(item.categoryPage || "")
+  };
 }
 
 function newsPageLink(item = {}, mode = "article") {
@@ -590,6 +598,79 @@ function setSectionTitleForGrid(gridSelector, en, hi) {
   title.dataset.en = en;
   title.dataset.hi = hi;
   title.textContent = getLocalizedText(en, hi, currentLanguage);
+}
+
+function emptyNewsMarkup(type = "card") {
+  const badge = currentLanguage === "hi" ? "लाइव" : "LIVE";
+  const title = currentLanguage === "hi" ? "नई पोस्ट जल्द आएंगी" : "Fresh posts will appear soon";
+  const summary = currentLanguage === "hi"
+    ? "पुराने पोस्ट हटा दिए गए हैं। नई खबर publish होते ही यहां दिखाई देगी।"
+    : "Older posts have been cleared. Newly published stories will appear here.";
+
+  if (type === "district") {
+    return `
+      <article class="district-card news-empty-card" style="background: linear-gradient(135deg, rgba(20, 22, 26, 0.92), rgba(167, 12, 21, 0.92)), url('${FALLBACK_NEWS_IMAGE}') center/cover;">
+        <h3>${badge}</h3>
+        <p>${summary}</p>
+        <button class="visit-btn" type="button" disabled>${title}</button>
+      </article>
+    `;
+  }
+
+  if (type === "mini") {
+    return `
+      <article class="news-empty-card">
+        <p>${summary}</p>
+        <button type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </article>
+    `;
+  }
+
+  if (type === "video") {
+    return `
+      <article class="video-card linked-news-card news-empty-card">
+        <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+        <span class="play-btn"><i class="fa-solid fa-play"></i></span>
+        <div>
+          <span class="tag">${badge}</span>
+          <h3>${title}</h3>
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="news-card news-empty-card">
+      <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+      <div class="card-body">
+        <span class="tag">${badge}</span>
+        <h3>${title}</h3>
+        <p>${summary}</p>
+        <button class="read-btn" type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderHomepageEmptyState() {
+  homepageLiveNews = [];
+  setSectionTitleForGrid(".latest-grid", "Trending News", "ट्रेंडिंग न्यूज़");
+  const replacements = [
+    [".city-grid", emptyNewsMarkup("card").repeat(3)],
+    [".district-news-grid", emptyNewsMarkup("district").repeat(4)],
+    [".latest-grid", emptyNewsMarkup("card").repeat(3)],
+    [".entertainment-grid", emptyNewsMarkup("card").repeat(3)],
+    [".world-grid", emptyNewsMarkup("card").repeat(3)],
+    [".mini-news-grid", emptyNewsMarkup("mini").repeat(4)],
+    [".video-grid", emptyNewsMarkup("video").repeat(2)]
+  ];
+
+  replacements.forEach(([selector, html]) => {
+    const node = document.querySelector(selector);
+    if (node) {
+      node.innerHTML = html;
+    }
+  });
 }
 
 function applyNewsToCard(card, item, options = {}) {
@@ -900,7 +981,15 @@ function applyAdminData() {
 
 async function loadMongoNews() {
   try {
-    const news = await apiRequest("/api/news?status=published&limit=60");
+    const news = (await apiRequest("/api/news?status=published&limit=60")).map(normalizeApiNewsItem);
+    if (!news.length) {
+      renderHomepageEmptyState();
+      bindNewsOpenButtons();
+      applyUiLanguage(currentLanguage);
+      addCardMeta();
+      reorderHomepageSections();
+      return;
+    }
     hydrateHomepageSections(news);
     bindNewsOpenButtons();
     applyUiLanguage(currentLanguage);
@@ -1174,6 +1263,14 @@ function normalizeHomepageVideoItem(video = {}) {
   let type = normalizeDisplayText(video.type);
   if (!type || looksLikeMediaUrl(type) || looksLikeImageAsset(type) || type.length > 22) {
     type = textValues.find((value) => value !== title && value.length <= 18) || "VIDEO";
+  }
+
+  if (looksLikeMediaUrl(title) || looksLikeImageAsset(title)) {
+    title = currentLanguage === "hi" ? "ट्रेंडिंग वीडियो अपडेट" : "Trending video update";
+  }
+
+  if (looksLikeMediaUrl(type) || looksLikeImageAsset(type)) {
+    type = "VIDEO";
   }
 
   return {
@@ -1575,7 +1672,9 @@ function createStickySubscribeCta() {
   const toggle = () => {
     const scrollable = document.documentElement.scrollHeight - window.innerHeight;
     const progress = scrollable > 0 ? window.scrollY / scrollable : 0;
-    cta.classList.toggle("visible", progress > 0.4);
+    const footerTop = document.querySelector(".footer")?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+    const nearFooter = footerTop < window.innerHeight - 96;
+    cta.classList.toggle("visible", progress > 0.4 && !nearFooter);
   };
 
   cta.addEventListener("click", () => {
@@ -1597,20 +1696,9 @@ function bindFooterLinks() {
 }
 
 function setupMobileFooterAccordion() {
-  document.querySelectorAll(".footer-grid > div").forEach((section, index) => {
-    if (section.dataset.footerAccordion === "true") {
-      return;
-    }
-
-    const heading = section.querySelector("h3") || section.querySelector("p");
-
-    if (!heading) {
-      return;
-    }
-
+  document.querySelectorAll(".footer-grid > div").forEach((section) => {
     section.dataset.footerAccordion = "true";
-    section.classList.remove("open");
-    heading.addEventListener("click", () => section.classList.toggle("open"));
+    section.classList.add("open");
   });
 }
 
@@ -1900,7 +1988,9 @@ function createStickySubscribeCta() {
   const toggle = () => {
     const scrollable = document.documentElement.scrollHeight - window.innerHeight;
     const progress = scrollable > 0 ? window.scrollY / scrollable : 0;
-    cta.classList.toggle("visible", progress > 0.4);
+    const footerTop = document.querySelector(".footer")?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+    const nearFooter = footerTop < window.innerHeight - 96;
+    cta.classList.toggle("visible", progress > 0.4 && !nearFooter);
   };
 
   cta.addEventListener("click", () => {

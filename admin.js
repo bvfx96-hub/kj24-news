@@ -1,32 +1,12 @@
+const DEFAULT_REMOTE_API_BASE = "https://kj24-news.onrender.com";
 const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
 const AUTH_SESSION_KEY = "khabriJunctionAdminAccess";
 const ADMIN_USERNAME = "admin";
 const ADMIN_PASSWORD = "kjadmin123";
-function resolveAdminApiBaseUrl(remoteOrigin = "https://kj24-news.onrender.com") {
-  const override = String(window.KJ_API_BASE_URL || "").trim();
-
-  if (override) {
-    return override.replace(/\/$/, "");
-  }
-
-  const { protocol, hostname } = window.location;
-
-  if (/^(localhost|127\.0\.0\.1)$/i.test(hostname)) {
-    return "";
-  }
-
-  if (protocol === "file:") {
-    return "http://localhost:3000";
-  }
-
-  if (/github\.io$/i.test(hostname) || /githubusercontent\.com$/i.test(hostname)) {
-    return remoteOrigin;
-  }
-
-  return "";
-}
-
-const API_BASE_URL = resolveAdminApiBaseUrl();
+const API_BASE_URL = window.KJ_API_BASE_URL
+  || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
+    ? DEFAULT_REMOTE_API_BASE
+    : "");
 const fallbackImage = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CMS_CATEGORIES = [
   "Breaking",
@@ -177,6 +157,7 @@ const fields = {
   newsTrending: document.getElementById("newsTrending"),
   newsList: document.getElementById("newsList"),
   statusLine: document.getElementById("statusLine"),
+  statusLineText: document.getElementById("statusLineText"),
   adminLoading: document.getElementById("adminLoading"),
   adminLoadingText: document.getElementById("adminLoadingText"),
   refreshDashboard: document.getElementById("refreshDashboard"),
@@ -184,6 +165,7 @@ const fields = {
   dashboardTrending: document.getElementById("dashboardTrending"),
   dashboardLogs: document.getElementById("dashboardLogs"),
   logoutAdmin: document.getElementById("logoutAdmin"),
+  clearAllPosts: document.getElementById("clearAllPosts"),
   automationEnabled: document.getElementById("automationEnabled"),
   automationQuery: document.getElementById("automationQuery"),
   automationStatus: document.getElementById("automationStatus"),
@@ -380,8 +362,38 @@ function friendlyErrorMessage(message) {
   return cleanMessage;
 }
 
-function showStatus(message) {
-  fields.statusLine.textContent = friendlyErrorMessage(message);
+function statusToneFromMessage(message) {
+  const text = friendlyErrorMessage(message).toLowerCase();
+
+  if (/(failed|error|wrong|invalid|denied|missing|could not)/i.test(text)) {
+    return "error";
+  }
+
+  if (/(loading|upload ho raha|save ho raha|publishing|retrying|run ho raha|refresh ho raha|delete ho rahe|clear ho rahe)/i.test(text)) {
+    return "working";
+  }
+
+  return "success";
+}
+
+function showStatus(message, tone = "") {
+  const text = friendlyErrorMessage(message);
+  const nextTone = tone || statusToneFromMessage(text);
+
+  if (fields.statusLine) {
+    fields.statusLine.dataset.tone = nextTone;
+  }
+
+  if (fields.statusLineText) {
+    fields.statusLineText.textContent = text;
+  } else if (fields.statusLine) {
+    fields.statusLine.textContent = text;
+  }
+
+  const icon = fields.statusLine?.querySelector(".status-line-icon");
+  if (icon) {
+    icon.textContent = nextTone === "success" ? "✓" : nextTone === "working" ? "…" : "!";
+  }
 }
 
 function setAdminLoading(isLoading, message = "Backend se data load ho raha hai...") {
@@ -443,6 +455,32 @@ function compactLocalImage(value) {
   }
 
   return text;
+}
+
+function backendOrigin() {
+  if (!API_BASE_URL) {
+    return window.location.origin;
+  }
+
+  try {
+    return new URL(API_BASE_URL, window.location.href).origin;
+  } catch (error) {
+    return window.location.origin;
+  }
+}
+
+function absolutizeBackendUrl(value = "") {
+  const text = String(value || "").trim();
+
+  if (!text || text.startsWith("data:")) {
+    return text;
+  }
+
+  try {
+    return new URL(text, backendOrigin()).toString();
+  } catch (error) {
+    return text;
+  }
 }
 
 function compactLocalNewsItem(item) {
@@ -789,7 +827,12 @@ async function uploadImage(file) {
     body: JSON.stringify({ filename: file.name, dataUrl }),
     loadingMessage: "Image upload ho raha hai..."
   });
-  return result;
+  return {
+    ...result,
+    url: absolutizeBackendUrl(result.absoluteUrl || result.url || result.previewUrl),
+    previewUrl: absolutizeBackendUrl(result.absolutePreviewUrl || result.previewUrl || result.url),
+    apiUrl: absolutizeBackendUrl(result.absoluteApiUrl || result.apiUrl)
+  };
 }
 
 async function uploadAndFill(input, targetField, label) {
@@ -850,6 +893,7 @@ function renderAds() {
       <div class="news-item-meta">
         <small class="${ad.enabled ? "status-published" : "status-rejected"}">${ad.enabled ? "ENABLED" : "DISABLED"}</small>
         <small>${escapeHTML(ad.target || "all")}</small>
+        ${ad.title ? "<small>TEXT</small>" : ""}
         ${ad.adsenseCode ? "<small>ADSENSE CODE</small>" : ""}
         ${ad.image ? "<small>BANNER IMAGE</small>" : ""}
       </div>
@@ -865,7 +909,10 @@ function renderAds() {
 async function loadAds() {
   if (!fields.adList) return;
   try {
-    state.ads = await apiRequest("/api/ads");
+    state.ads = (await apiRequest("/api/ads")).map((ad) => ({
+      ...ad,
+      image: absolutizeBackendUrl(ad.image || "")
+    }));
     renderAds();
   } catch (error) {
     showStatus(`Ad Manager load failed: ${error.message}`);
@@ -1138,7 +1185,7 @@ function previewAdItem(ad = null) {
     title: fields.adTitle.value.trim() || "Advertisement",
     position: fields.adPosition.value || "homepage",
     target: fields.adTarget.value || "all",
-    image: fields.adImage.value.trim(),
+    image: absolutizeBackendUrl(fields.adImage.value.trim()),
     linkUrl: fields.adLinkUrl.value.trim(),
     adsenseCode: fields.adCode.value.trim(),
     enabled: fields.adEnabled.checked
@@ -1147,7 +1194,9 @@ function previewAdItem(ad = null) {
     <strong>Position</strong><p>${escapeHTML(payload.position || "homepage")}</p>
     <strong>Target</strong><p>${escapeHTML(payload.target || "all")}</p>
     ${payload.linkUrl ? `<strong>Link</strong><p>${escapeHTML(payload.linkUrl)}</p>` : ""}
-    ${payload.adsenseCode ? `<strong>Ad Code</strong><pre>${escapeHTML(payload.adsenseCode)}</pre>` : "<p>Banner image preview</p>"}
+    ${payload.title ? `<strong>Text</strong><p>${escapeHTML(payload.title)}</p>` : ""}
+    ${payload.image ? "<p>Banner image preview with text active.</p>" : "<p>Text-only ad preview</p>"}
+    ${payload.adsenseCode ? `<strong>Ad Code</strong><pre>${escapeHTML(payload.adsenseCode)}</pre>` : ""}
   `;
 
   openPreviewModal({
@@ -1441,13 +1490,13 @@ function apiToAdminItem(news) {
     tag: news.categoryBadge || news.tag || news.category || "UPDATE",
     category: news.category || news.tag || "UPDATE",
     categorySlug: news.categorySlug || "",
-    categoryPage: news.categoryPage || "",
+    categoryPage: absolutizeBackendUrl(news.categoryPage || ""),
     categoryBadge: news.categoryBadge || news.tag || news.category || "UPDATE",
     city: news.city || "",
-    image: news.image || fallbackImage,
-    sourceImage: news.sourceImage || "",
-    optimizedThumbnail: news.optimizedThumbnail || "",
-    aiThumbnail: news.aiThumbnail || "",
+    image: absolutizeBackendUrl(news.image || "") || fallbackImage,
+    sourceImage: absolutizeBackendUrl(news.sourceImage || ""),
+    optimizedThumbnail: absolutizeBackendUrl(news.optimizedThumbnail || ""),
+    aiThumbnail: absolutizeBackendUrl(news.aiThumbnail || ""),
     thumbnailHash: news.thumbnailHash || "",
     thumbnailStatus: news.thumbnailStatus || "",
     title: news.title || "",
@@ -1471,7 +1520,7 @@ function apiToAdminItem(news) {
     sourcePublishedAt: news.sourcePublishedAt,
     freshnessScore: news.freshnessScore,
     slug: news.slug || "",
-    articleUrl: news.articleUrl || "",
+    articleUrl: absolutizeBackendUrl(news.articleUrl || ""),
     translationStatus: news.translationStatus || "",
     translationError: news.translationError || ""
   };
@@ -1492,7 +1541,7 @@ function apiToTopStory(news) {
     body: news.body || "",
     bodyEn: news.bodyEn || news.body || "",
     bodyHi: news.bodyHi || "",
-    image: news.image || "",
+    image: absolutizeBackendUrl(news.image || ""),
     status: news.status || "published",
     breaking: Boolean(news.breaking),
     featured: true,
@@ -2031,12 +2080,16 @@ function renderNewsList() {
     const row = document.createElement("article");
     row.className = "news-item";
     const status = item.status || "pending";
+    const stateBadge = `<span class="news-item-state ${escapeHTML(status)}">${status === "published" ? "✓" : status === "rejected" ? "!" : "…" } ${escapeHTML(status.toUpperCase())}</span>`;
     const articleLink = status === "published" && item.articleUrl
       ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> Open</a>`
       : "";
     row.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.tag || item.category || "UPDATE")}</span>
-      <strong>${escapeHTML(item.title || "Untitled news")}</strong>
+      <div class="news-item-head">
+        <strong>${escapeHTML(item.title || "Untitled news")}</strong>
+        ${stateBadge}
+      </div>
       <div class="news-item-meta">
         <small class="status-${escapeHTML(status)}">${escapeHTML(status.toUpperCase())}</small>
         <small>${escapeHTML(item.category || "Breaking")}</small>
@@ -2064,6 +2117,10 @@ function renderNewsList() {
         <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
       </div>
     `;
+    const liveStateBadge = row.querySelector(".news-item-state");
+    if (liveStateBadge) {
+      liveStateBadge.innerHTML = `${status === "published" ? "&#10003;" : status === "rejected" ? "!" : "&#8230;"} ${escapeHTML(status.toUpperCase())}`;
+    }
     fields.newsList.appendChild(row);
   });
 }
@@ -2111,12 +2168,63 @@ async function resetAll() {
   showStatus("Reset complete. Refresh index.html to remove admin updates.");
 }
 
+async function clearAllPosts() {
+  const confirmed = window.confirm("Delete all AI + manual posts from MongoDB? This cannot be undone.");
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const result = await apiRequest("/api/admin/clear-posts", {
+      method: "POST",
+      body: JSON.stringify({ confirm: true }),
+      loadingMessage: "Sabhi posts delete ho rahe hain..."
+    });
+
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    state.topStory = {
+      enabled: false,
+      kicker: "BREAKING NEWS",
+      kickerHi: "",
+      title: "",
+      titleHi: "",
+      summary: "",
+      summaryHi: "",
+      body: "",
+      bodyHi: "",
+      image: "",
+      status: "published",
+      breaking: false,
+      featured: false,
+      trending: false,
+      language: "en"
+    };
+    state.ticker = [];
+    state.news = [];
+    state.manualNews = [];
+    fillTopStory();
+    fillTicker();
+    clearNewsForm();
+    clearManualForm();
+    renderNewsList();
+    renderManualNewsList();
+    updateReviewTabs();
+    saveLocalState();
+    await loadDashboard();
+    showStatus(`All posts removed. AI ${result.deletedAi || 0}, manual ${result.deletedManual || 0}.`, "success");
+  } catch (error) {
+    showStatus(`All posts delete failed: ${error.message}`, "error");
+  }
+}
+
 function bindEvents() {
   fields.loginForm.addEventListener("submit", handleLogin);
   fields.logoutAdmin.addEventListener("click", logoutAdmin);
   fields.refreshDashboard?.addEventListener("click", loadDashboard);
   document.getElementById("publishAll").addEventListener("click", publishState);
   document.getElementById("resetAll").addEventListener("click", resetAll);
+  fields.clearAllPosts?.addEventListener("click", clearAllPosts);
   document.getElementById("addNews").addEventListener("click", clearNewsForm);
   document.getElementById("clearNewsForm").addEventListener("click", clearNewsForm);
   document.getElementById("newsForm").addEventListener("submit", saveNewsItem);

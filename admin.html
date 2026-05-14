@@ -70,11 +70,15 @@
       <div class="admin-actions">
         <button class="ghost-btn" id="logoutAdmin" type="button"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
         <button class="ghost-btn" id="resetAll" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        <button class="danger-btn" id="clearAllPosts" type="button"><i class="fa-solid fa-trash-can"></i> Delete All Posts</button>
         <button class="primary-btn" id="publishAll" type="button"><i class="fa-solid fa-floppy-disk"></i> Publish Changes</button>
       </div>
     </header>
 
-    <div class="status-line" id="statusLine">Changes save in this browser and show on index.html preview.</div>
+    <div class="status-line" id="statusLine" data-tone="info">
+      <span class="status-line-icon" aria-hidden="true">i</span>
+      <span class="status-line-text" id="statusLineText">Changes save in this browser and show on index.html preview.</span>
+    </div>
 
     <section class="panel dashboard-panel" id="dashboardPanel">
       <div class="panel-head">
