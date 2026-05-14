@@ -1562,6 +1562,279 @@ function normalizeCategoryLinks() {
   });
 }
 
+const UTF_MOJIBAKE_BYTES = {
+  0x20AC: 0x80,
+  0x201A: 0x82,
+  0x0192: 0x83,
+  0x201E: 0x84,
+  0x2026: 0x85,
+  0x2020: 0x86,
+  0x2021: 0x87,
+  0x02C6: 0x88,
+  0x2030: 0x89,
+  0x0160: 0x8A,
+  0x2039: 0x8B,
+  0x0152: 0x8C,
+  0x017D: 0x8E,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201C: 0x93,
+  0x201D: 0x94,
+  0x2022: 0x95,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x02DC: 0x98,
+  0x2122: 0x99,
+  0x0161: 0x9A,
+  0x203A: 0x9B,
+  0x0153: 0x9C,
+  0x017E: 0x9E,
+  0x0178: 0x9F
+};
+
+const EXTRA_HI_LABELS_V2 = {
+  "BREAKING NEWS": "\u092c\u094d\u0930\u0947\u0915\u093f\u0902\u0917 \u0928\u094d\u092f\u0942\u091c\u093c",
+  "DISTRICT LATEST NEWS": "\u091c\u093f\u0932\u093e \u0932\u0947\u091f\u0947\u0938\u094d\u091f \u0928\u094d\u092f\u0942\u091c\u093c",
+  "Trending News": "\u091f\u094d\u0930\u0947\u0902\u0921\u093f\u0902\u0917 \u0928\u094d\u092f\u0942\u091c\u093c",
+  "Visit Astrology": "\u0930\u093e\u0936\u093f\u092b\u0932 \u0926\u0947\u0916\u0947\u0902",
+  "Latest News": "\u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902",
+  "World": "\u0926\u0947\u0936-\u0926\u0941\u0928\u093f\u092f\u093e",
+  "Weather": "\u092e\u094c\u0938\u092e"
+};
+
+function repairMojibakeText(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[à-ÿŒœŠšŽžŸ€‚ƒ„…†‡ˆ‰‹›‘’“”•–—˜™]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? code : (UTF_MOJIBAKE_BYTES[code] ?? 0x3f);
+    }));
+
+    return new TextDecoder("utf-8").decode(bytes)
+      .replace(/\uFFFD/g, "")
+      .replace(/Â°/g, "°")
+      .replace(/â€™/g, "'")
+      .trim();
+  } catch (error) {
+    return text;
+  }
+}
+
+function looksCorruptHindi(value) {
+  return /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(String(value || ""));
+}
+
+function normalizeDisplayText(value) {
+  const text = String(value || "").trim();
+  const normalized = looksCorruptHindi(text) ? repairMojibakeText(text) : text;
+  return normalized
+    .replace(/Â°/g, "°")
+    .replace(/â€™/g, "'")
+    .trim();
+}
+
+function getHindiText(en, hi) {
+  const english = normalizeDisplayText(en);
+  const hindi = normalizeDisplayText(hi);
+
+  if (EXTRA_HI_LABELS_V2[english]) {
+    return EXTRA_HI_LABELS_V2[english];
+  }
+
+  if (CLEAN_HI_LABELS[english]) {
+    return normalizeDisplayText(CLEAN_HI_LABELS[english]);
+  }
+
+  if (UI_HI_LABELS[english]) {
+    return normalizeDisplayText(UI_HI_LABELS[english]);
+  }
+
+  if (HINDI_TEXT_BY_EN[english]) {
+    return normalizeDisplayText(HINDI_TEXT_BY_EN[english]);
+  }
+
+  if (hindi) {
+    return hindi;
+  }
+
+  return english;
+}
+
+function getLocalizedText(en, hi, language) {
+  return language === "hi" ? getHindiText(en, hi) : normalizeDisplayText(en);
+}
+
+function applyUiLanguage(language) {
+  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
+
+  document.querySelectorAll(selector).forEach((node) => {
+    const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());
+
+    if (!node.dataset.autoEn) {
+      node.dataset.autoEn = original;
+    }
+
+    node.textContent = language === "hi" ? getHindiText(original, node.dataset.hi) : original;
+  });
+
+  document.querySelectorAll("[data-en]").forEach((node) => {
+    node.dataset.en = normalizeDisplayText(node.dataset.en);
+  });
+}
+
+function setLanguage(language) {
+  currentLanguage = language;
+  document.documentElement.lang = language === "hi" ? "hi" : "en";
+  try {
+    localStorage.setItem("khabriJunctionLanguage", currentLanguage);
+  } catch (error) {
+    // Language still applies on this page.
+  }
+
+  document.querySelectorAll("[data-en][data-hi]").forEach((node) => {
+    node.textContent = getLocalizedText(node.dataset.en, node.dataset.hi, language);
+  });
+
+  document.querySelectorAll(".language-switch button").forEach((button) => {
+    button.textContent = button.dataset.lang === "hi" ? "\u0939\u093f\u0902\u0926\u0940" : "English";
+    button.classList.toggle("active", button.dataset.lang === language);
+  });
+
+  const searchInput = document.querySelector('.site-search input[name="q"]');
+  if (searchInput) {
+    const placeholder = language === "hi" ? "\u0916\u092c\u0930 \u0916\u094b\u091c\u0947\u0902" : "Search news";
+    searchInput.placeholder = placeholder;
+    searchInput.setAttribute("aria-label", placeholder);
+  }
+
+  updateMarkets();
+  renderTopStory(false);
+  applyUiLanguage(language);
+  const stickyButton = document.getElementById("stickySubscribeCta");
+  if (stickyButton) {
+    stickyButton.textContent = language === "hi" ? "\u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902" : "Latest News";
+  }
+}
+
+function updateMarkets() {
+  const marketList = document.getElementById("marketList");
+  if (!marketList) {
+    return;
+  }
+  marketList.innerHTML = "";
+
+  markets.forEach((market) => {
+    const label = currentLanguage === "hi" ? "\u0906\u091c \u0915\u0940 \u0915\u094d\u0932\u094b\u091c\u093f\u0902\u0917" : "Today close";
+    const row = document.createElement("div");
+    row.className = "market-row";
+    row.innerHTML = `
+      <div>
+        <strong>${market.name}</strong>
+        <small>${label}</small>
+      </div>
+      <span class="up">
+        <i class="fa-solid fa-arrow-trend-up"></i>
+        ${market.value} (${market.change})
+      </span>
+    `;
+    marketList.appendChild(row);
+  });
+}
+
+function renderWeatherWidget(weather = []) {
+  if (!weather.length) {
+    return;
+  }
+
+  const main = document.querySelector("main");
+  const anchor = document.querySelector(".admin-updates-section") || document.querySelector(".section-block");
+
+  if (!main || !anchor) {
+    return;
+  }
+
+  let section = document.getElementById("homeWeatherWidget");
+  const sectionHTML = `
+    <div class="section-title"><span></span><strong>\u092e\u094c\u0938\u092e \u0915\u0940 \u091c\u093e\u0928\u0915\u093e\u0930\u0940</strong></div>
+    <div class="weather-mini-grid">
+      ${weather.map((item) => `
+        <a class="weather-mini-card" href="/category/weather">
+          <strong>${escapeHTML(item.city || "City")}</strong>
+          <span>${escapeHTML(item.temp || "--")}</span>
+          <small>${escapeHTML(item.condition || "Weather update")}</small>
+        </a>
+      `).join("")}
+    </div>
+  `;
+
+  if (section) {
+    section.innerHTML = sectionHTML;
+    applyUiLanguage(currentLanguage);
+    return;
+  }
+
+  section = document.createElement("section");
+  section.id = "homeWeatherWidget";
+  section.className = "section-block reveal visible";
+  section.innerHTML = sectionHTML;
+  main.insertBefore(section, anchor.nextSibling);
+  applyUiLanguage(currentLanguage);
+}
+
+async function realtimeWeatherFallback(weather = []) {
+  const places = [
+    { city: "Durg", latitude: 21.19, longitude: 81.28 },
+    { city: "Bhilai", latitude: 21.21, longitude: 81.38 },
+    { city: "Raipur", latitude: 21.25, longitude: 81.63 }
+  ];
+
+  try {
+    const live = await Promise.all(places.map(async (place) => {
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${place.latitude}&longitude=${place.longitude}&current=temperature_2m&timezone=Asia%2FKolkata`, { cache: "no-store" });
+      const payload = await response.json();
+      const temp = payload.current?.temperature_2m;
+      return {
+        city: place.city,
+        temp: Number.isFinite(Number(temp)) ? `${Math.round(Number(temp))}°C` : "",
+        condition: "\u0930\u093f\u092f\u0932-\u091f\u093e\u0907\u092e \u0924\u093e\u092a\u092e\u093e\u0928"
+      };
+    }));
+    return live.some((item) => item.temp) ? live : weather;
+  } catch (error) {
+    return weather;
+  }
+}
+
+function createStickySubscribeCta() {
+  if (document.getElementById("stickySubscribeCta")) {
+    return;
+  }
+
+  const cta = document.createElement("button");
+  cta.id = "stickySubscribeCta";
+  cta.className = "sticky-subscribe-cta";
+  cta.type = "button";
+  cta.textContent = currentLanguage === "hi" ? "\u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902" : "Latest News";
+  document.body.appendChild(cta);
+
+  const toggle = () => {
+    const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+    const progress = scrollable > 0 ? window.scrollY / scrollable : 0;
+    cta.classList.toggle("visible", progress > 0.4);
+  };
+
+  cta.addEventListener("click", () => {
+    window.location.href = "/category/breaking";
+  });
+  window.addEventListener("scroll", toggle, { passive: true });
+  toggle();
+}
+
 initLoader();
 normalizeCategoryLinks();
 applyAdminData();

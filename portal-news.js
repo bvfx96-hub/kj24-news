@@ -598,6 +598,211 @@ function addPortalLanguageSwitch() {
   });
 }
 
+const PORTAL_UTF_MOJIBAKE_BYTES = {
+  0x20AC: 0x80,
+  0x201A: 0x82,
+  0x0192: 0x83,
+  0x201E: 0x84,
+  0x2026: 0x85,
+  0x2020: 0x86,
+  0x2021: 0x87,
+  0x02C6: 0x88,
+  0x2030: 0x89,
+  0x0160: 0x8A,
+  0x2039: 0x8B,
+  0x0152: 0x8C,
+  0x017D: 0x8E,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201C: 0x93,
+  0x201D: 0x94,
+  0x2022: 0x95,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x02DC: 0x98,
+  0x2122: 0x99,
+  0x0161: 0x9A,
+  0x203A: 0x9B,
+  0x0153: 0x9C,
+  0x017E: 0x9E,
+  0x0178: 0x9F
+};
+
+function repairPortalMojibake(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[à-ÿŒœŠšŽžŸ€‚ƒ„…†‡ˆ‰‹›‘’“”•–—˜™]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? code : (PORTAL_UTF_MOJIBAKE_BYTES[code] ?? 0x3f);
+    }));
+
+    return new TextDecoder("utf-8").decode(bytes)
+      .replace(/\uFFFD/g, "")
+      .replace(/Â°/g, "°")
+      .replace(/â€™/g, "'")
+      .trim();
+  } catch (error) {
+    return text;
+  }
+}
+
+function normalizePortalText(value) {
+  const text = String(value || "").trim();
+  const normalized = /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(text) ? repairPortalMojibake(text) : text;
+  return normalized
+    .replace(/Â°/g, "°")
+    .replace(/â€™/g, "'")
+    .trim();
+}
+
+function uiText(en, hi) {
+  if (portalLanguage !== "hi") {
+    return normalizePortalText(en);
+  }
+
+  if (PORTAL_HINDI_TEXT[en]) {
+    return normalizePortalText(PORTAL_HINDI_TEXT[en]);
+  }
+
+  const repaired = normalizePortalText(hi);
+  return repaired || normalizePortalText(en);
+}
+
+function portalStaticLabel(value) {
+  const text = normalizePortalText(value);
+  const labels = {
+    "Fast local news for Chhattisgarh": "\u091b\u0924\u094d\u0924\u0940\u0938\u0917\u0922\u093c \u0915\u0940 \u0924\u0947\u091c\u093c \u0932\u094b\u0915\u0932 \u0916\u092c\u0930\u0947\u0902",
+    "Home": "\u0939\u094b\u092e",
+    "Durg": "\u0926\u0941\u0930\u094d\u0917",
+    "Bhilai": "\u092d\u093f\u0932\u093e\u0908",
+    "Raipur": "\u0930\u093e\u092f\u092a\u0941\u0930",
+    "Bilaspur": "\u092c\u093f\u0932\u093e\u0938\u092a\u0941\u0930",
+    "Politics": "\u0930\u093e\u091c\u0928\u0940\u0924\u093f",
+    "Crime": "\u0915\u094d\u0930\u093e\u0907\u092e",
+    "Sports": "\u0938\u094d\u092a\u094b\u0930\u094d\u091f\u094d\u0938",
+    "Entertainment": "\u092e\u0928\u094b\u0930\u0902\u091c\u0928",
+    "Health": "\u0939\u0947\u0932\u094d\u0925",
+    "Jobs": "\u091c\u0949\u092c\u094d\u0938",
+    "ADVERTISEMENT SPACE": "\u0935\u093f\u091c\u094d\u091e\u093e\u092a\u0928 \u0938\u094d\u0925\u093e\u0928",
+    "Latest News": "\u0924\u093e\u091c\u093c\u093e \u0916\u092c\u0930\u0947\u0902",
+    "Top News": "\u091f\u0949\u092a \u0916\u092c\u0930\u0947\u0902",
+    "Photos": "\u092b\u094b\u091f\u094b",
+    "Cricket": "\u0915\u094d\u0930\u093f\u0915\u0947\u091f",
+    "Football": "\u092b\u0941\u091f\u092c\u0949\u0932",
+    "Tennis": "\u091f\u0947\u0928\u093f\u0938",
+    "Photo": "\u092b\u094b\u091f\u094b",
+    "Video": "\u0935\u0940\u0921\u093f\u092f\u094b",
+    "SPONSOR SLOT": "\u0938\u094d\u092a\u0949\u0928\u094d\u0938\u0930 \u0938\u094d\u0932\u0949\u091f",
+    "All Rights Reserved": "\u0938\u0930\u094d\u0935\u093e\u0927\u093f\u0915\u093e\u0930 \u0938\u0941\u0930\u0915\u094d\u0937\u093f\u0924"
+  };
+
+  return labels[text] || text;
+}
+
+function localizePortalTitle(text) {
+  const raw = normalizePortalText(text);
+  if (portalLanguage !== "hi") {
+    return raw;
+  }
+
+  return raw
+    .replace(/^Home \/\s*/i, "\u0939\u094b\u092e / ")
+    .replace(/\bNews\b/g, "\u0938\u092e\u093e\u091a\u093e\u0930")
+    .replace(/\bDurg\b/g, "\u0926\u0941\u0930\u094d\u0917")
+    .replace(/\bBhilai\b/g, "\u092d\u093f\u0932\u093e\u0908")
+    .replace(/\bRaipur\b/g, "\u0930\u093e\u092f\u092a\u0941\u0930")
+    .replace(/\bBilaspur\b/g, "\u092c\u093f\u0932\u093e\u0938\u092a\u0941\u0930")
+    .replace(/\bRajnandgaon\b/g, "\u0930\u093e\u091c\u0928\u093e\u0902\u0926\u0917\u093e\u0902\u0935")
+    .replace(/\bKhairagarh\b/g, "\u0916\u0948\u0930\u093e\u0917\u0922\u093c")
+    .replace(/\bKawardha\b/g, "\u0915\u0935\u0930\u094d\u0927\u093e")
+    .replace(/\bAstrology\b/g, "\u0930\u093e\u0936\u093f\u092b\u0932")
+    .replace(/\bBreaking\b/g, "\u092c\u094d\u0930\u0947\u0915\u093f\u0902\u0917")
+    .replace(/\bPolitics\b/g, "\u0930\u093e\u091c\u0928\u0940\u0924\u093f")
+    .replace(/\bCrime\b/g, "\u0915\u094d\u0930\u093e\u0907\u092e")
+    .replace(/\bSports\b/g, "\u0938\u094d\u092a\u094b\u0930\u094d\u091f\u094d\u0938")
+    .replace(/\bEntertainment\b/g, "\u092e\u0928\u094b\u0930\u0902\u091c\u0928")
+    .replace(/\bHealth\b/g, "\u0939\u0947\u0932\u094d\u0925")
+    .replace(/\bJobs\b/g, "\u091c\u0949\u092c\u094d\u0938");
+}
+
+function translatePortalStatic() {
+  document.documentElement.lang = portalLanguage === "hi" ? "hi" : "en";
+  document.querySelectorAll(".portal-brand span, .portal-main-nav a, .portal-top-ad, .portal-tabs a, .portal-section-title, .portal-ad, .portal-side-ad, .portal-side-block h2, .portal-read-more").forEach((node) => {
+    const english = normalizePortalText(node.dataset.portalEn || node.textContent);
+    if (!node.dataset.portalEn) {
+      node.dataset.portalEn = english;
+    }
+    node.textContent = portalLanguage === "hi" ? portalStaticLabel(english) : english;
+  });
+
+  const backLink = document.querySelector(".portal-back");
+  if (backLink) {
+    const english = normalizePortalText(backLink.dataset.portalEn || backLink.textContent);
+    if (!backLink.dataset.portalEn) {
+      backLink.dataset.portalEn = english;
+    }
+    backLink.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const title = document.querySelector(".portal-title");
+  if (title) {
+    const english = normalizePortalText(title.dataset.portalEn || title.textContent);
+    if (!title.dataset.portalEn) {
+      title.dataset.portalEn = english;
+    }
+    title.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const footer = document.querySelector(".portal-footer");
+  if (footer) {
+    const english = normalizePortalText(footer.dataset.portalEn || footer.textContent).replace("? 2026", "© 2026");
+    if (!footer.dataset.portalEn) {
+      footer.dataset.portalEn = english;
+    }
+    footer.textContent = portalLanguage === "hi"
+      ? `© 2026 KHABRI JUNCTION - ${portalStaticLabel("All Rights Reserved")}`
+      : english;
+  }
+}
+
+function addPortalLanguageSwitch() {
+  const header = document.querySelector(".portal-site-header");
+
+  if (!header || document.getElementById("portalLanguageSwitch")) {
+    return;
+  }
+
+  const switcher = document.createElement("div");
+  switcher.className = "portal-language-switch";
+  switcher.id = "portalLanguageSwitch";
+  switcher.innerHTML = `
+    <button class="${portalLanguage === "hi" ? "active" : ""}" type="button" data-portal-lang="hi">हिंदी</button>
+    <button class="${portalLanguage === "en" ? "active" : ""}" type="button" data-portal-lang="en">English</button>
+  `;
+  header.appendChild(switcher);
+  switcher.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-portal-lang]");
+
+    if (!button) {
+      return;
+    }
+
+    portalLanguage = button.dataset.portalLang;
+    localStorage.setItem(PORTAL_LANGUAGE_KEY, portalLanguage);
+    switcher.querySelectorAll("button").forEach((item) => {
+      item.textContent = item.dataset.portalLang === "hi" ? "हिंदी" : "English";
+      item.classList.toggle("active", item.dataset.portalLang === portalLanguage);
+    });
+    translatePortalStatic();
+    loadPortalMongoNews();
+  });
+}
+
 createPortalModal();
 addPortalLanguageSwitch();
 translatePortalStatic();
