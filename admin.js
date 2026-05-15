@@ -7,6 +7,10 @@ const API_BASE_URL = window.KJ_API_BASE_URL
   || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
     ? DEFAULT_REMOTE_API_BASE
     : "");
+const NEWS_SYNC_KEY = "khabriJunctionNewsSync";
+const newsSyncChannel = typeof BroadcastChannel === "function"
+  ? new BroadcastChannel("khabri-junction-news-sync")
+  : null;
 const fallbackImage = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CMS_CATEGORIES = [
   "Breaking",
@@ -67,36 +71,40 @@ const CMS_CATEGORIES = [
 ];
 const CMS_DISTRICTS = [
   { label: "Auto / None", value: "" },
-  { label: "Durg", value: "durg" },
-  { label: "Bhilai", value: "bhilai" },
-  { label: "Raipur", value: "raipur" },
-  { label: "Bilaspur", value: "bilaspur" },
-  { label: "Rajnandgaon", value: "rajnandgaon" },
-  { label: "Kawardha", value: "kawardha" },
-  { label: "Khairagarh", value: "khairagarh" },
   { label: "Balod", value: "balod" },
+  { label: "Baloda Bazar-Bhatapara", value: "baloda-bazar-bhatapara" },
+  { label: "Balrampur-Ramanujganj", value: "balrampur-ramanujganj" },
+  { label: "Bastar", value: "bastar" },
   { label: "Bemetara", value: "bemetara" },
+  { label: "Bhilai", value: "bhilai" },
+  { label: "Bijapur", value: "bijapur" },
+  { label: "Bilaspur", value: "bilaspur" },
+  { label: "Dantewada", value: "dantewada" },
   { label: "Dhamtari", value: "dhamtari" },
+  { label: "Durg", value: "durg" },
   { label: "Mahasamund", value: "mahasamund" },
   { label: "Gariaband", value: "gariaband" },
-  { label: "Mungeli", value: "mungeli" },
-  { label: "Korba", value: "korba" },
-  { label: "Raigarh", value: "raigarh" },
+  { label: "Gaurela-Pendra-Marwahi", value: "gaurela-pendra-marwahi" },
   { label: "Janjgir-Champa", value: "janjgir-champa" },
-  { label: "Sakti", value: "sakti" },
-  { label: "Sarangarh", value: "sarangarh" },
-  { label: "Surguja", value: "surguja" },
-  { label: "Bastar", value: "bastar" },
-  { label: "Kanker", value: "kanker" },
-  { label: "Kondagaon", value: "kondagaon" },
-  { label: "Dantewada", value: "dantewada" },
-  { label: "Sukma", value: "sukma" },
-  { label: "Bijapur", value: "bijapur" },
-  { label: "Narayanpur", value: "narayanpur" },
   { label: "Jashpur", value: "jashpur" },
-  { label: "Koriya", value: "koriya" },
-  { label: "Balrampur", value: "balrampur" },
-  { label: "Surajpur", value: "surajpur" }
+  { label: "Kanker", value: "kanker" },
+  { label: "Kawardha / Kabirdham", value: "kabirdham" },
+  { label: "Khairagarh-Chhuikhadan-Gandai", value: "khairagarh-chhuikhadan-gandai" },
+  { label: "Kondagaon", value: "kondagaon" },
+  { label: "Korba", value: "korba" },
+  { label: "Korea", value: "korea" },
+  { label: "Manendragarh-Chirmiri-Bharatpur", value: "manendragarh-chirmiri-bharatpur" },
+  { label: "Mohla-Manpur-Ambagarh Chowki", value: "mohla-manpur-ambagarh-chowki" },
+  { label: "Mungeli", value: "mungeli" },
+  { label: "Narayanpur", value: "narayanpur" },
+  { label: "Raigarh", value: "raigarh" },
+  { label: "Raipur", value: "raipur" },
+  { label: "Rajnandgaon", value: "rajnandgaon" },
+  { label: "Sakti", value: "sakti" },
+  { label: "Sarangarh-Bilaigarh", value: "sarangarh-bilaigarh" },
+  { label: "Sukma", value: "sukma" },
+  { label: "Surajpur", value: "surajpur" },
+  { label: "Surguja", value: "surguja" }
 ];
 
 let state = {
@@ -152,6 +160,8 @@ const fields = {
   useSourceImage: document.getElementById("useSourceImage"),
   generateAiThumbnail: document.getElementById("generateAiThumbnail"),
   regenerateThumbnail: document.getElementById("regenerateThumbnail"),
+  publishResult: document.getElementById("publishResult"),
+  adminToastStack: document.getElementById("adminToastStack"),
   newsBreaking: document.getElementById("newsBreaking"),
   newsFeatured: document.getElementById("newsFeatured"),
   newsTrending: document.getElementById("newsTrending"),
@@ -240,7 +250,8 @@ const fields = {
   previewSummary: document.getElementById("previewSummary"),
   previewBody: document.getElementById("previewBody"),
   previewLanguageSwitch: document.getElementById("previewLanguageSwitch"),
-  previewLanguageButtons: document.querySelectorAll("[data-preview-lang]")
+  previewLanguageButtons: document.querySelectorAll("[data-preview-lang]"),
+  newsFormSubmit: document.querySelector("#newsForm .primary-btn[type='submit']")
 };
 let automationCountdownTimer = null;
 let activeAdminRequests = 0;
@@ -276,6 +287,164 @@ function populateCmsTaxonomy() {
   setSelectOptions(fields.manualCategory, categoryOptions);
   setSelectOptions(fields.newsCity, CMS_DISTRICTS);
   setSelectOptions(fields.manualCity, CMS_DISTRICTS);
+  setSelectOptions(fields.pushDistrict, [{ label: "All districts", value: "" }, ...CMS_DISTRICTS.filter((district) => district.value)]);
+}
+
+function districtLabelFromValue(value = "") {
+  const match = CMS_DISTRICTS.find((district) => district.value === value);
+  return match?.label || "";
+}
+
+function categorySlug(value = "") {
+  return slugifyAdmin(String(value || ""));
+}
+
+function districtRequiredForCategory(category = "") {
+  const slug = categorySlug(category);
+  return slug === "local-news" || CMS_DISTRICTS.some((district) => district.value && district.value === slug);
+}
+
+function validateNewsEditorItem(item, options = {}) {
+  const errors = [];
+  const category = item.category || "";
+  const districtRequired = districtRequiredForCategory(category);
+  const headline = item.title || item.titleHi || "";
+  const body = item.body || item.bodyHi || "";
+
+  if (!headline.trim()) {
+    errors.push("Headline required hai.");
+  }
+
+  if (!category.trim()) {
+    errors.push("Category required hai.");
+  }
+
+  if (districtRequired && !String(item.city || "").trim()) {
+    errors.push("Is category ke liye district select karna zaroori hai.");
+  }
+
+  if (body.trim().length < 100) {
+    errors.push("Body kam se kam 100 characters ka hona chahiye.");
+  }
+
+  if (options.focusFirst !== false && errors.length) {
+    if (!headline.trim()) {
+      fields.newsTitle.focus();
+    } else if (!category.trim()) {
+      fields.newsCategory.focus();
+    } else if (districtRequired && !String(item.city || "").trim()) {
+      fields.newsCity?.focus();
+    } else if (body.trim().length < 100) {
+      fields.newsBody.focus();
+    }
+  }
+
+  return errors;
+}
+
+function publishResultMarkup(item = {}) {
+  const title = escapeHTML(item.titleHi || item.title || "Published article");
+  const summary = escapeHTML(item.summaryHi || item.summary || "Article is now live on the website.");
+  const category = escapeHTML(item.category || "News");
+  const district = escapeHTML(item.district || districtLabelFromValue(item.city) || "Chhattisgarh");
+  const articleUrl = item.articleUrl ? absolutizeBackendUrl(item.articleUrl) : "";
+
+  return `
+    <strong><i class="fa-solid fa-circle-check"></i> Article published successfully</strong>
+    <p>${title}</p>
+    <p>${summary}</p>
+    <div class="publish-result-meta">
+      <span>${category}</span>
+      <span>${district}</span>
+      <span>${escapeHTML(formatDateTime(item.publishedAt || item.createdAt || new Date()))}</span>
+    </div>
+    <div class="publish-result-actions">
+      ${articleUrl ? `<a class="primary-btn" href="${escapeHTML(articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> View Article</a>` : ""}
+      <button class="ghost-btn" type="button" data-publish-result-edit="${escapeHTML(item._id || "")}"><i class="fa-solid fa-pen"></i> Edit Article</button>
+    </div>
+  `;
+}
+
+function showPublishResult(item = null) {
+  if (!fields.publishResult) {
+    return;
+  }
+
+  if (!item) {
+    fields.publishResult.hidden = true;
+    fields.publishResult.innerHTML = "";
+    return;
+  }
+
+  fields.publishResult.hidden = false;
+  fields.publishResult.innerHTML = publishResultMarkup(item);
+}
+
+function showToast(message, tone = "success", detail = "") {
+  if (!fields.adminToastStack) {
+    return;
+  }
+
+  const toast = document.createElement("article");
+  toast.className = `admin-toast ${tone}`;
+  toast.innerHTML = `
+    <span class="admin-toast-icon" aria-hidden="true">${tone === "success" ? "✓" : "!"}</span>
+    <div>
+      <strong>${escapeHTML(message)}</strong>
+      ${detail ? `<p>${escapeHTML(detail)}</p>` : ""}
+    </div>
+  `;
+  fields.adminToastStack.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add("visible"));
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 220);
+  }, 3200);
+}
+
+function setButtonLoading(button, isLoading, nextLabel = "") {
+  if (!button) {
+    return;
+  }
+
+  if (isLoading) {
+    button.dataset.originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = nextLabel || "Saving...";
+    return;
+  }
+
+  button.disabled = false;
+  if (button.dataset.originalHtml) {
+    button.innerHTML = button.dataset.originalHtml;
+    delete button.dataset.originalHtml;
+  }
+}
+
+function announceNewsSync(action = "updated", payload = {}) {
+  const stamp = Date.now();
+  const message = { action, stamp, ...payload };
+
+  try {
+    localStorage.setItem(NEWS_SYNC_KEY, JSON.stringify(message));
+  } catch (error) {
+    // Ignore localStorage write issues; BroadcastChannel may still work.
+  }
+
+  newsSyncChannel?.postMessage(message);
+}
+
+function handlePublishedArticleSuccess(item, message = "Article published successfully") {
+  showPublishResult(item);
+  showStatus(message, "success");
+  showToast("Article published successfully", "success", item.titleHi || item.title || "");
+  announceNewsSync("published", {
+    id: item._id,
+    slug: item.slug,
+    categorySlug: item.categorySlug,
+    districtSlug: item.districtSlug || item.city || ""
+  });
 }
 
 function setAccess(isAllowed) {
@@ -1076,7 +1245,18 @@ async function saveManualNews(event) {
       body: JSON.stringify(manualPayload(uploadedUrl)),
       loadingMessage: "Manual news save ho raha hai..."
     });
-    showStatus(saved.status === "published" ? "Manual news published. Homepage priority is active." : "Manual news saved.");
+    if ((saved.status || "draft") === "published") {
+      showStatus("Manual news published. Homepage priority is active.");
+      showToast("Article published successfully", "success", saved.titleHi || saved.title || "");
+      announceNewsSync("published", {
+        id: saved._id,
+        slug: saved.slug,
+        categorySlug: saved.categorySlug,
+        districtSlug: saved.districtSlug || saved.city || ""
+      });
+    } else {
+      showStatus("Manual news saved.");
+    }
     clearManualForm();
     await loadManualNews();
     await loadDashboard();
@@ -1505,6 +1685,9 @@ function apiToAdminItem(news) {
     categoryPage: absolutizeBackendUrl(news.categoryPage || ""),
     categoryBadge: news.categoryBadge || news.tag || news.category || "UPDATE",
     city: news.city || "",
+    district: news.district || districtLabelFromValue(news.city) || "",
+    districtSlug: news.districtSlug || news.city || "",
+    districtPage: absolutizeBackendUrl(news.districtPage || ""),
     image: absolutizeBackendUrl(news.image || "") || fallbackImage,
     sourceImage: absolutizeBackendUrl(news.sourceImage || ""),
     optimizedThumbnail: absolutizeBackendUrl(news.optimizedThumbnail || ""),
@@ -1529,6 +1712,7 @@ function apiToAdminItem(news) {
     publishedAt: news.publishedAt,
     sourceName: news.sourceName || "",
     feedSourceName: news.feedSourceName || "",
+    sourceCredit: news.sourceCredit || news.sourceName || news.feedSourceName || "",
     sourcePublishedAt: news.sourcePublishedAt,
     freshnessScore: news.freshnessScore,
     slug: news.slug || "",
@@ -1592,6 +1776,7 @@ function newsPayload(item, overrides = {}) {
     bodyHi: item.bodyHi || (language === "hi" ? item.body : "") || "",
     tag: item.categoryBadge || item.tag || category,
     categoryBadge: item.categoryBadge || item.tag || category,
+    sourceCredit: item.sourceCredit || item.sourceName || item.feedSourceName || "",
     ...overrides
   };
 }
@@ -1738,6 +1923,7 @@ function clearNewsForm() {
   fields.newsBreaking.checked = false;
   fields.newsFeatured.checked = false;
   fields.newsTrending.checked = false;
+  showPublishResult(null);
 }
 
 function fillNewsForm(index) {
@@ -1765,11 +1951,13 @@ function fillNewsForm(index) {
   fields.newsBreaking.checked = Boolean(item.breaking);
   fields.newsFeatured.checked = Boolean(item.featured);
   fields.newsTrending.checked = Boolean(item.trending);
+  showPublishResult((item.status || "pending") === "published" ? item : null);
   fields.newsTitle.focus();
 }
 
 async function saveNewsItem(event) {
   event.preventDefault();
+  const submitButton = fields.newsFormSubmit;
   const detectedCategory = detectCategory(`${fields.newsTitle.value} ${fields.newsSummary.value} ${fields.newsBody.value} ${fields.newsTag.value}`);
   const category = fields.newsCategory.value || detectedCategory;
   const titleInput = fields.newsTitle.value.trim() || fields.newsTitleHi.value.trim();
@@ -1806,9 +1994,11 @@ async function saveNewsItem(event) {
     item.bodyHi = item.bodyHi || item.body;
   }
 
-  if (!item.title) {
-    showStatus("Please add a news title before saving.");
-    fields.newsTitle.focus();
+  const errors = validateNewsEditorItem(item);
+
+  if (errors.length) {
+    showStatus(errors[0], "error");
+    showToast("Publishing failed. Please try again.", "error", errors[0]);
     return;
   }
 
@@ -1817,6 +2007,11 @@ async function saveNewsItem(event) {
   const currentImage = fields.newsImage.value.trim();
   const originalImage = fields.newsImage.dataset.original || "";
   const imageChanged = Boolean(currentImage) && currentImage !== originalImage;
+  const savingPublished = (item.status || "pending") === "published";
+  let savedItem = null;
+
+  setButtonLoading(submitButton, true, savingPublished ? "Publishing..." : "Saving...");
+  showStatus(savingPublished ? "Publishing article..." : "Saving news item...", "working");
 
   try {
     const saved = existing?._id
@@ -1840,7 +2035,7 @@ async function saveNewsItem(event) {
           body: JSON.stringify(newsPayload(item))
         });
 
-    const savedItem = apiToAdminItem(saved);
+    savedItem = apiToAdminItem(saved);
 
     if (existing) {
       state.news[index] = savedItem;
@@ -1848,7 +2043,18 @@ async function saveNewsItem(event) {
       state.news.unshift(savedItem);
     }
 
-    showStatus("News saved to MongoDB.");
+    if ((savedItem.status || "pending") === "published") {
+      handlePublishedArticleSuccess(savedItem);
+    } else {
+      showPublishResult(null);
+      showStatus("News saved to MongoDB.");
+      announceNewsSync("saved", {
+        id: savedItem._id,
+        slug: savedItem.slug,
+        categorySlug: savedItem.categorySlug,
+        districtSlug: savedItem.districtSlug || savedItem.city || ""
+      });
+    }
     fields.newsImage.dataset.original = savedItem.sourceImage || savedItem.optimizedThumbnail || savedItem.aiThumbnail || savedItem.image || "";
   } catch (error) {
     if (existing) {
@@ -1857,14 +2063,24 @@ async function saveNewsItem(event) {
       state.news.unshift(item);
     }
 
-    showStatus(`MongoDB save failed. Saved locally only: ${error.message}`);
+    showPublishResult(null);
+    showStatus(`MongoDB save failed. Saved locally only: ${error.message}`, "error");
+    showToast("Publishing failed. Please try again.", "error", error.message);
+    renderNewsList();
+    saveLocalState();
+    setButtonLoading(submitButton, false);
+    return;
   }
 
   clearNewsForm();
+  if ((savedItem?.status || "pending") === "published") {
+    showPublishResult(savedItem);
+  }
   renderNewsList();
   loadDashboard();
   syncTicker();
   saveLocalState();
+  setButtonLoading(submitButton, false);
 }
 
 async function deleteNewsItem(index) {
@@ -1885,11 +2101,17 @@ async function deleteNewsItem(index) {
 
   state.news.splice(index, 1);
   renderNewsList();
+  announceNewsSync("deleted", {
+    id: item._id,
+    slug: item.slug,
+    categorySlug: item.categorySlug,
+    districtSlug: item.districtSlug || item.city || ""
+  });
   syncTicker();
   saveLocalState();
 }
 
-async function updateNewsItem(index, overrides, message) {
+async function updateNewsItem(index, overrides, message, options = {}) {
   const item = state.news[index];
 
   if (!item) {
@@ -1897,11 +2119,20 @@ async function updateNewsItem(index, overrides, message) {
   }
 
   const updatedItem = { ...item, ...overrides };
+  const targetStatus = updatedItem.status || item.status || "pending";
+  const button = options.button || null;
+
+  setButtonLoading(button, true, targetStatus === "published" ? "Publishing..." : "Updating...");
+  if (targetStatus === "published") {
+    showStatus("Publishing article...", "working");
+  }
 
   try {
     const saved = item._id
-      ? await apiRequest(`/api/news/${item._id}`, {
-          method: "PUT",
+      ? await apiRequest(targetStatus === "published"
+        ? `/api/news/${item._id}/approve`
+        : `/api/news/${item._id}`, {
+          method: targetStatus === "published" ? "POST" : "PUT",
           body: JSON.stringify(newsPayload(updatedItem, overrides))
         })
       : await apiRequest("/api/news", {
@@ -1910,13 +2141,31 @@ async function updateNewsItem(index, overrides, message) {
         });
 
     state.news[index] = apiToAdminItem(saved);
-    showStatus(message);
+
+    if ((state.news[index].status || "pending") === "published") {
+      handlePublishedArticleSuccess(state.news[index], message);
+    } else {
+      showPublishResult(null);
+      showStatus(message);
+      announceNewsSync("updated", {
+        id: state.news[index]._id,
+        slug: state.news[index].slug,
+        categorySlug: state.news[index].categorySlug,
+        districtSlug: state.news[index].districtSlug || state.news[index].city || ""
+      });
+    }
   } catch (error) {
     state.news[index] = updatedItem;
-    showStatus(`${message} Locally updated only: ${error.message}`);
+    showStatus(`${message} Locally updated only: ${error.message}`, "error");
+    if (targetStatus === "published") {
+      showToast("Publishing failed. Please try again.", "error", error.message);
+    }
+  } finally {
+    setButtonLoading(button, false);
   }
 
   renderNewsList();
+  loadDashboard();
   saveLocalState();
 }
 
@@ -2070,10 +2319,14 @@ async function bulkApprovePending() {
     });
 
     showStatus(`Bulk approved ${result.approved || 0} articles.`);
+    showToast("Article published successfully", "success", `${result.approved || 0} article(s) approved.`);
+    announceNewsSync("bulk-published", { count: result.approved || 0 });
     await loadStateFromApi();
     await loadAutomationSettings();
+    await loadDashboard();
   } catch (error) {
     showStatus(`Bulk approve failed: ${error.message}`);
+    showToast("Publishing failed. Please try again.", "error", error.message);
   }
 }
 
@@ -2095,8 +2348,9 @@ function renderNewsList() {
     const status = item.status || "pending";
     const stateBadge = `<span class="news-item-state ${escapeHTML(status)}">${status === "published" ? "✓" : status === "rejected" ? "!" : "…" } ${escapeHTML(status.toUpperCase())}</span>`;
     const articleLink = status === "published" && item.articleUrl
-      ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> Open</a>`
+      ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> View Article</a>`
       : "";
+    const districtLabel = item.district || districtLabelFromValue(item.city) || "";
     row.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.tag || item.category || "UPDATE")}</span>
       <div class="news-item-head">
@@ -2106,8 +2360,8 @@ function renderNewsList() {
       <div class="news-item-meta">
         <small class="status-${escapeHTML(status)}">${escapeHTML(status.toUpperCase())}</small>
         <small>${escapeHTML(item.category || "Breaking")}</small>
-        ${item.city ? `<small>${escapeHTML(item.city.toUpperCase())}</small>` : ""}
-        ${item.sourceName ? `<small>SOURCE ${escapeHTML(item.sourceName)}</small>` : ""}
+        ${districtLabel ? `<small>${escapeHTML(districtLabel)}</small>` : ""}
+        ${item.sourceCredit || item.sourceName ? `<small>SOURCE ${escapeHTML(item.sourceCredit || item.sourceName)}</small>` : ""}
         ${item.thumbnailStatus ? `<small>THUMB ${escapeHTML(item.thumbnailStatus.toUpperCase())}</small>` : ""}
         ${item.sourcePublishedAt ? `<small>RSS ${escapeHTML(formatDateTime(item.sourcePublishedAt))}</small>` : ""}
         ${Number.isFinite(Number(item.freshnessScore)) ? `<small>FRESH ${Number(item.freshnessScore)}</small>` : ""}
@@ -2130,9 +2384,9 @@ function renderNewsList() {
         <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
       </div>
     `;
-    const liveStateBadge = row.querySelector(".news-item-state");
-    if (liveStateBadge) {
-      liveStateBadge.innerHTML = `${status === "published" ? "&#10003;" : status === "rejected" ? "!" : "&#8230;"} ${escapeHTML(status.toUpperCase())}`;
+    const stateBadgeNode = row.querySelector(".news-item-state");
+    if (stateBadgeNode) {
+      stateBadgeNode.textContent = `${status === "published" ? "✓" : status === "rejected" ? "!" : "…"} ${status.toUpperCase()}`;
     }
     fields.newsList.appendChild(row);
   });
@@ -2226,6 +2480,8 @@ async function clearAllPosts() {
     saveLocalState();
     await loadDashboard();
     showStatus(`All posts removed. AI ${result.deletedAi || 0}, manual ${result.deletedManual || 0}.`, "success");
+    showToast("All posts removed", "success", `AI ${result.deletedAi || 0}, manual ${result.deletedManual || 0}`);
+    announceNewsSync("cleared", { deletedAi: result.deletedAi || 0, deletedManual: result.deletedManual || 0 });
   } catch (error) {
     showStatus(`All posts delete failed: ${error.message}`, "error");
   }
@@ -2282,6 +2538,18 @@ function bindEvents() {
     button.addEventListener("click", () => setReviewTab(button.dataset.statusFilter));
   });
 
+  fields.publishResult?.addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-publish-result-edit]");
+    if (!editButton) {
+      return;
+    }
+
+    const index = state.news.findIndex((item) => item._id === editButton.dataset.publishResultEdit);
+    if (index >= 0) {
+      fillNewsForm(index);
+    }
+  });
+
   fields.newsList.addEventListener("click", (event) => {
     const previewButton = event.target.closest("[data-preview]");
     const editButton = event.target.closest("[data-edit]");
@@ -2302,7 +2570,7 @@ function bindEvents() {
     }
 
     if (approveButton) {
-      updateNewsItem(Number(approveButton.dataset.approve), { status: "published" }, "News approved and published.");
+      updateNewsItem(Number(approveButton.dataset.approve), { status: "published" }, "News approved and published.", { button: approveButton });
     }
 
     if (pendingButton) {
@@ -2320,7 +2588,7 @@ function bindEvents() {
     }
 
     if (topButton) {
-      updateNewsItem(Number(topButton.dataset.top), { featured: true, trending: true, status: "published" }, "Top story set.");
+      updateNewsItem(Number(topButton.dataset.top), { featured: true, trending: true, status: "published" }, "Top story set.", { button: topButton });
     }
 
     if (trendingButton) {

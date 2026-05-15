@@ -587,6 +587,7 @@
             <button class="ghost-btn" id="autoTranslateNews" type="button"><i class="fa-solid fa-language"></i> Auto Translate</button>
             <button class="primary-btn" type="submit"><i class="fa-solid fa-check"></i> Save News Item</button>
           </div>
+          <div class="publish-result" id="publishResult" hidden></div>
         </form>
 
         <div class="news-list" id="newsList" aria-live="polite"></div>
@@ -608,6 +609,8 @@
       <div id="previewBody"></div>
     </article>
   </div>
+
+  <div class="admin-toast-stack" id="adminToastStack" aria-live="polite" aria-atomic="true"></div>
 
   <script src="admin.js"></script>
 </body>

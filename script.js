@@ -10,6 +10,10 @@ const API_BASE_URL = window.KJ_API_BASE_URL
   || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
     ? DEFAULT_REMOTE_API_BASE
     : "");
+const NEWS_SYNC_KEY = "khabriJunctionNewsSync";
+const newsSyncChannel = typeof BroadcastChannel === "function"
+  ? new BroadcastChannel("khabri-junction-news-sync")
+  : null;
 const FALLBACK_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CATEGORY_LINKS = {
   "breaking.html": "/category/breaking",
@@ -547,11 +551,16 @@ function normalizeApiNewsItem(item = {}) {
     optimizedThumbnail: absoluteContentUrl(item.optimizedThumbnail || ""),
     aiThumbnail: absoluteContentUrl(item.aiThumbnail || ""),
     articleUrl: safeSitePath(item.articleUrl || ""),
-    categoryPage: safeSitePath(item.categoryPage || "")
+    categoryPage: safeSitePath(item.categoryPage || ""),
+    districtPage: safeSitePath(item.districtPage || "")
   };
 }
 
 function newsPageLink(item = {}, mode = "article") {
+  if (mode === "district") {
+    return safeSitePath(item.districtPage) || safeSitePath(item.categoryPage) || (item.districtSlug ? `/district/${item.districtSlug}` : (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking"));
+  }
+
   if (mode === "category") {
     return safeSitePath(item.categoryPage) || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
   }
@@ -671,12 +680,31 @@ function emptyNewsMarkup(type = "card") {
   `;
 }
 
+function districtEmptyMarkupList() {
+  const placeholders = [
+    { en: "Durg", hi: "दुर्ग", href: "durg.html" },
+    { en: "Bhilai", hi: "भिलाई", href: "bhilai.html" },
+    { en: "Rajnandgaon", hi: "राजनांदगांव", href: "rajnandgaon.html" },
+    { en: "Bilaspur", hi: "बिलासपुर", href: "bilaspur.html" }
+  ];
+  const summaryEn = "Fresh district news will appear here after publish.";
+  const summaryHi = "नई खबर publish होते ही यहां दिखाई देगी।";
+
+  return placeholders.map((item) => `
+    <article class="district-card news-empty-card" data-page-link="${item.href}" data-city="${item.en.toLowerCase()}">
+      <h3 data-en="${item.en}" data-hi="${item.hi}">${currentLanguage === "hi" ? item.hi : item.en}</h3>
+      <p data-en="${summaryEn}" data-hi="${summaryHi}">${currentLanguage === "hi" ? summaryHi : summaryEn}</p>
+      <a class="visit-btn" href="${item.href}?lang=${currentLanguage}" data-en="Visit Page" data-hi="पेज देखें">${currentLanguage === "hi" ? "पेज देखें" : "Visit Page"}</a>
+    </article>
+  `).join("");
+}
+
 function renderHomepageEmptyState() {
   homepageLiveNews = [];
   setSectionTitleForGrid(".latest-grid", "Trending News", "ट्रेंडिंग न्यूज़");
   const replacements = [
     [".city-grid", emptyNewsMarkup("card").repeat(3)],
-    [".district-news-grid", emptyNewsMarkup("district").repeat(4)],
+    [".district-news-grid", districtEmptyMarkupList()],
     [".latest-grid", emptyNewsMarkup("card").repeat(3)],
     [".entertainment-grid", emptyNewsMarkup("card").repeat(3)],
     [".world-grid", emptyNewsMarkup("card").repeat(3)],
@@ -737,7 +765,9 @@ function applyNewsToCard(card, item, options = {}) {
   }
 
   const titleNode = card.querySelector("h1, h2, h3");
-  const districtNameEn = item.category || (item.city ? `${item.city}`.replace(/(^\w)/, (char) => char.toUpperCase()) : "");
+  const districtNameEn = item.city
+    ? `${item.city}`.replace(/(^\w)/, (char) => char.toUpperCase())
+    : item.category || "";
   const districtNameHi = getHindiText(districtNameEn, districtNameEn);
   if (titleNode) {
     const cardTitleEn = card.classList.contains("district-card") && districtNameEn ? districtNameEn : titleEn;
@@ -845,7 +875,7 @@ function hydrateHomepageSections(news = []) {
   });
 
   const districtCards = Array.from(document.querySelectorAll(".district-news-grid .district-card"));
-  ["kawardha", "khairagarh", "rajnandgaon", "bilaspur"].forEach((slug, index) => {
+  ["durg", "bhilai", "rajnandgaon", "bilaspur"].forEach((slug, index) => {
     const item = takeNews(sorted, 1, used, (newsItem) => newsMatches(newsItem, slug))[0] || takeNews(sorted, 1, used)[0];
     applyNewsToCard(districtCards[index], item, { mode: "category" });
   });
@@ -1455,6 +1485,7 @@ function setLanguage(language) {
   updateMarkets();
   renderTopStory(false);
   applyUiLanguage(language);
+  addCardMeta();
   const stickyButton = document.getElementById("stickySubscribeCta");
   if (stickyButton) {
     stickyButton.textContent = language === "hi" ? "ताजा खबरें" : "Latest News";
@@ -2036,3 +2067,313 @@ setupMobileFooterAccordion();
 startLiveUpdates();
 loadMongoNews();
 loadSiteSettings();
+
+let homepageNewsSyncTimer = null;
+
+function queueHomepageNewsRefresh() {
+  window.clearTimeout(homepageNewsSyncTimer);
+  homepageNewsSyncTimer = window.setTimeout(() => {
+    loadMongoNews();
+  }, 220);
+}
+
+function setupHomepageNewsSync() {
+  if (window.__khabriHomepageSyncBound) {
+    return;
+  }
+
+  window.__khabriHomepageSyncBound = true;
+  newsSyncChannel?.addEventListener("message", queueHomepageNewsRefresh);
+  window.addEventListener("storage", (event) => {
+    if (event.key === NEWS_SYNC_KEY) {
+      queueHomepageNewsRefresh();
+    }
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      queueHomepageNewsRefresh();
+    }
+  });
+}
+
+function emptyNewsMarkup(type = "card") {
+  const badge = currentLanguage === "hi" ? "ताजा" : "LIVE";
+  const title = currentLanguage === "hi" ? "नई पोस्ट जल्द आएगी" : "Fresh posts will appear soon";
+  const summary = currentLanguage === "hi"
+    ? "पुरानी पोस्ट हटाई जा चुकी हैं। नई खबर publish होते ही यहां दिखाई देगी।"
+    : "Older posts have been cleared. Newly published stories will appear here.";
+
+  if (type === "district") {
+    return `
+      <article class="district-card news-empty-card" style="background: linear-gradient(135deg, rgba(20, 22, 26, 0.92), rgba(167, 12, 21, 0.92)), url('${FALLBACK_NEWS_IMAGE}') center/cover;">
+        <h3>${badge}</h3>
+        <p>${summary}</p>
+        <button class="visit-btn" type="button" disabled>${title}</button>
+      </article>
+    `;
+  }
+
+  if (type === "mini") {
+    return `
+      <article class="news-empty-card">
+        <p>${summary}</p>
+        <button type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </article>
+    `;
+  }
+
+  if (type === "video") {
+    return `
+      <article class="video-card linked-news-card news-empty-card">
+        <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+        <span class="play-btn"><i class="fa-solid fa-play"></i></span>
+        <div>
+          <span class="tag">${badge}</span>
+          <h3>${title}</h3>
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="news-card news-empty-card">
+      <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+      <div class="card-body">
+        <span class="tag">${badge}</span>
+        <h3>${title}</h3>
+        <p>${summary}</p>
+        <button class="read-btn" type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </div>
+    </article>
+  `;
+}
+
+function districtEmptyMarkupList() {
+  const placeholders = [
+    { en: "Durg", hi: "दुर्ग", href: "/district/durg" },
+    { en: "Bhilai", hi: "भिलाई", href: "/district/bhilai" },
+    { en: "Rajnandgaon", hi: "राजनांदगांव", href: "/district/rajnandgaon" },
+    { en: "Bilaspur", hi: "बिलासपुर", href: "/district/bilaspur" }
+  ];
+  const summaryEn = "Fresh district news will appear here after publish.";
+  const summaryHi = "नई खबर publish होते ही यहां दिखाई देगी।";
+
+  return placeholders.map((item) => `
+    <article class="district-card news-empty-card" data-page-link="${item.href}" data-city="${item.en.toLowerCase()}">
+      <h3 data-en="${item.en}" data-hi="${item.hi}">${currentLanguage === "hi" ? item.hi : item.en}</h3>
+      <p data-en="${summaryEn}" data-hi="${summaryHi}">${currentLanguage === "hi" ? summaryHi : summaryEn}</p>
+      <a class="visit-btn" href="${item.href}?lang=${currentLanguage}" data-en="Visit Page" data-hi="पेज देखें">${currentLanguage === "hi" ? "पेज देखें" : "Visit Page"}</a>
+    </article>
+  `).join("");
+}
+
+function newsPageLink(item = {}, mode = "article") {
+  if (mode === "district") {
+    return safeSitePath(item.districtPage) || safeSitePath(item.categoryPage) || (item.districtSlug ? `/district/${item.districtSlug}` : (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking"));
+  }
+
+  if (mode === "category") {
+    return safeSitePath(item.categoryPage) || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
+  }
+
+  return safeSitePath(item.articleUrl) || safeSitePath(item.categoryPage) || (item.categorySlug ? `/category/${item.categorySlug}` : "/category/breaking");
+}
+
+function applyNewsToCard(card, item, options = {}) {
+  if (!card || !item) {
+    return;
+  }
+
+  const mode = options.mode || "article";
+  const titleEn = localizedNewsField(item, "title", "en") || localizedNewsField(item, "title", "hi") || item.title || "News update";
+  const titleHi = localizedNewsField(item, "title", "hi") || titleEn;
+  const summaryEn = localizedNewsField(item, "summary", "en") || localizedNewsField(item, "body", "en") || titleEn;
+  const summaryHi = localizedNewsField(item, "summary", "hi") || localizedNewsField(item, "body", "hi") || titleHi;
+  const bodyEn = localizedNewsField(item, "body", "en") || summaryEn;
+  const bodyHi = localizedNewsField(item, "body", "hi") || summaryHi;
+  const image = item.image || FALLBACK_NEWS_IMAGE;
+  const categoryEn = normalizeDisplayText(item.categoryBadge || item.category || "News");
+  const categoryHi = getHindiText(categoryEn, categoryEn);
+  const districtEn = normalizeDisplayText(item.district || item.city || "");
+  const districtHi = districtEn ? getHindiText(districtEn, districtEn) : "";
+  const pageLink = newsPageLink(item, mode);
+
+  card.dataset.newsTitle = titleEn;
+  card.dataset.newsHiTitle = titleHi;
+  card.dataset.newsBody = bodyEn;
+  card.dataset.newsHiBody = bodyHi;
+  card.dataset.articleUrl = mode === "article" ? (safeSitePath(item.articleUrl) || pageLink) : "";
+  card.dataset.pageLink = pageLink;
+  card.dataset.city = item.city || "";
+  card.dataset.category = item.category || "";
+  card.dataset.categoryLabel = categoryEn;
+  card.dataset.categoryLabelHi = categoryHi;
+  card.dataset.districtLabel = districtEn;
+  card.dataset.districtLabelHi = districtHi;
+  card.dataset.publishedAt = item.publishedAt || item.createdAt || "";
+
+  const imageNode = card.querySelector("img");
+  if (imageNode) {
+    imageNode.src = image;
+    imageNode.alt = titleEn;
+  }
+
+  if (card.classList.contains("district-card")) {
+    card.style.background = `linear-gradient(135deg, rgba(20, 22, 26, 0.88), rgba(167, 12, 21, 0.86)), url("${image}") center/cover`;
+  }
+
+  const tagNode = card.querySelector(".tag");
+  if (tagNode) {
+    tagNode.dataset.en = categoryEn;
+    tagNode.dataset.hi = categoryHi;
+    tagNode.textContent = getLocalizedText(categoryEn, categoryHi, currentLanguage);
+  }
+
+  const titleNode = card.querySelector("h1, h2, h3");
+  if (titleNode) {
+    titleNode.dataset.en = titleEn;
+    titleNode.dataset.hi = titleHi;
+    titleNode.textContent = getLocalizedText(titleEn, titleHi, currentLanguage);
+  }
+
+  const summaryNode = card.querySelector(".card-body p, p");
+  if (summaryNode) {
+    summaryNode.dataset.en = summaryEn;
+    summaryNode.dataset.hi = summaryHi;
+    summaryNode.textContent = getLocalizedText(summaryEn, summaryHi, currentLanguage);
+  }
+
+  const actionNode = card.querySelector(".read-btn, .visit-btn, button");
+  const actionEn = options.buttonEn || (mode === "district" || mode === "category" ? "Read More" : "Read Full News");
+  const actionHi = options.buttonHi || (mode === "district" || mode === "category" ? "और पढ़ें" : "पूरी खबर पढ़ें");
+
+  if (actionNode) {
+    actionNode.dataset.en = actionEn;
+    actionNode.dataset.hi = actionHi;
+    actionNode.textContent = getLocalizedText(actionEn, actionHi, currentLanguage);
+
+    if (actionNode.tagName === "A") {
+      actionNode.href = articleHref(item, mode);
+    }
+  }
+}
+
+function addCardMeta() {
+  document.querySelectorAll(".news-card, .district-card, .mini-news-grid article").forEach((card) => {
+    if (card.classList.contains("lead-story")) {
+      return;
+    }
+
+    const body = card.querySelector(".card-body") || card;
+    let meta = card.querySelector(".card-meta-row");
+
+    if (!meta) {
+      meta = document.createElement("div");
+      meta.className = "card-meta-row";
+      const titleNode = body.querySelector("h3, p");
+      if (titleNode) {
+        titleNode.insertAdjacentElement("afterend", meta);
+      } else {
+        body.appendChild(meta);
+      }
+    }
+
+    const categoryEn = card.dataset.categoryLabel || body.querySelector(".tag")?.dataset.en || card.dataset.category || "News";
+    const categoryHi = card.dataset.categoryLabelHi || body.querySelector(".tag")?.dataset.hi || categoryEn;
+    const districtEn = card.dataset.districtLabel || "";
+    const districtHi = card.dataset.districtLabelHi || districtEn;
+    const rawDate = card.dataset.publishedAt;
+    const date = rawDate ? new Date(rawDate) : null;
+    const timeText = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleString(currentLanguage === "hi" ? "hi-IN" : "en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+      : new Date().toLocaleTimeString(currentLanguage === "hi" ? "hi-IN" : "en-IN", { hour: "2-digit", minute: "2-digit" });
+
+    meta.innerHTML = `
+      <span>${escapeHTML(getLocalizedText(categoryEn, categoryHi, currentLanguage))}</span>
+      ${districtEn ? `<span>${escapeHTML(getLocalizedText(districtEn, districtHi, currentLanguage))}</span>` : ""}
+      <time>${escapeHTML(timeText)}</time>
+    `;
+  });
+}
+
+function hydrateHomepageSections(news = []) {
+  const published = Array.isArray(news)
+    ? news.filter((item) => !item.status || item.status === "published")
+    : [];
+
+  if (!published.length) {
+    return;
+  }
+
+  homepageLiveNews = published.slice();
+  document.querySelectorAll(".admin-updates-section").forEach((section) => section.remove());
+
+  const sorted = published.slice().sort((a, b) => (
+    Number(Boolean(b.breaking)) - Number(Boolean(a.breaking)) ||
+    Number(Boolean(b.featured)) - Number(Boolean(a.featured)) ||
+    Number(Boolean(b.trending)) - Number(Boolean(a.trending)) ||
+    new Date(b.publishedAt || b.createdAt || 0) - new Date(a.publishedAt || a.createdAt || 0)
+  ));
+
+  const storyUsed = new Set();
+  const topStoriesNews = [
+    ...takeNews(sorted, 5, storyUsed, (item) => item.breaking || item.featured || item.trending),
+    ...takeNews(sorted, 5, storyUsed)
+  ].slice(0, 5);
+
+  if (topStoriesNews.length) {
+    topStories.splice(0, topStories.length, ...topStoriesNews.map(newsToStory));
+    storyIndex = 0;
+    renderTopStory(false);
+    refreshHomepageTicker(topStoriesNews.concat(sorted));
+    updateHomepageSeo(topStoriesNews[0]);
+  }
+
+  const used = new Set(topStoriesNews.map((item) => newsIdentity(item)));
+  const cityCards = Array.from(document.querySelectorAll(".city-grid .news-card"));
+  ["durg", "bhilai", "raipur"].forEach((slug, index) => {
+    const item = takeNews(sorted, 1, used, (newsItem) => newsMatches(newsItem, slug))[0] || takeNews(sorted, 1, used)[0];
+    applyNewsToCard(cityCards[index], item);
+  });
+
+  const districtCards = Array.from(document.querySelectorAll(".district-news-grid .district-card"));
+  ["durg", "bhilai", "rajnandgaon", "bilaspur"].forEach((slug, index) => {
+    const item = takeNews(sorted, 1, used, (newsItem) => newsMatches(newsItem, slug))[0] || takeNews(sorted, 1, used)[0];
+    applyNewsToCard(districtCards[index], item, { mode: "district" });
+  });
+
+  setSectionTitleForGrid(".latest-grid", "Trending News", "ट्रेंडिंग न्यूज़");
+  Array.from(document.querySelectorAll(".latest-grid .news-card")).forEach((card) => {
+    const item = takeNews(sorted, 1, used, (newsItem) => newsItem.trending || newsMatches(newsItem, "sports") || newsMatches(newsItem, "politics") || newsMatches(newsItem, "health") || newsMatches(newsItem, "jobs"))[0]
+      || takeNews(sorted, 1, used)[0];
+    applyNewsToCard(card, item);
+  });
+
+  Array.from(document.querySelectorAll(".entertainment-grid .news-card")).forEach((card) => {
+    const item = takeNews(sorted, 1, used, (newsItem) => newsMatches(newsItem, "entertainment"))[0]
+      || takeNews(sorted, 1, used)[0];
+    applyNewsToCard(card, item);
+  });
+
+  Array.from(document.querySelectorAll(".world-grid .news-card")).forEach((card) => {
+    const item = takeNews(sorted, 1, used, (newsItem) => !newsItem.city && !newsMatches(newsItem, "durg") && !newsMatches(newsItem, "bhilai") && !newsMatches(newsItem, "raipur"))[0]
+      || takeNews(sorted, 1, used)[0];
+    applyNewsToCard(card, item);
+  });
+
+  Array.from(document.querySelectorAll(".mini-news-grid article")).forEach((card) => {
+    const item = takeNews(sorted, 1, used)[0];
+    applyNewsToCard(card, item);
+  });
+
+  const videoGrid = document.querySelector(".video-grid");
+  if (videoGrid?.dataset.customVideos !== "true") {
+    Array.from(document.querySelectorAll(".video-grid .video-card")).forEach((card) => {
+      const item = takeNews(sorted, 1, used, (newsItem) => newsItem.trending || /video|reel|viral/i.test(`${newsItem.category || ""} ${newsItem.title || ""} ${newsItem.summary || ""}`))[0]
+        || takeNews(sorted, 1, used)[0];
+      applyNewsToCard(card, item);
+    });
+  }
+}
+
+setupHomepageNewsSync();

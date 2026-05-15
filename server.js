@@ -137,33 +137,53 @@ const CITY_DEFINITIONS = [
   { label: "Bhilai", slug: "bhilai", keywords: ["bhilai"] },
   { label: "Raipur", slug: "raipur", keywords: ["raipur"] },
   { label: "Bilaspur", slug: "bilaspur", keywords: ["bilaspur"] },
-  { label: "Rajnandgaon", slug: "rajnandgaon", keywords: ["rajnandgaon"] },
-  { label: "Kawardha", slug: "kawardha", keywords: ["kawardha", "kabirdham"] },
-  { label: "Khairagarh", slug: "khairagarh", keywords: ["khairagarh"] },
   { label: "Balod", slug: "balod", keywords: ["balod"] },
-  { label: "Bemetara", slug: "bemetara", keywords: ["bemetara"] },
-  { label: "Dhamtari", slug: "dhamtari", keywords: ["dhamtari"] },
-  { label: "Mahasamund", slug: "mahasamund", keywords: ["mahasamund"] },
-  { label: "Gariaband", slug: "gariaband", keywords: ["gariaband"] },
-  { label: "Mungeli", slug: "mungeli", keywords: ["mungeli"] },
-  { label: "Korba", slug: "korba", keywords: ["korba"] },
-  { label: "Raigarh", slug: "raigarh", keywords: ["raigarh"] },
-  { label: "Janjgir-Champa", slug: "janjgir-champa", keywords: ["janjgir", "champa"] },
-  { label: "Sakti", slug: "sakti", keywords: ["sakti"] },
-  { label: "Sarangarh", slug: "sarangarh", keywords: ["sarangarh", "bilaigarh"] },
-  { label: "Surguja", slug: "surguja", keywords: ["surguja", "ambikapur"] },
+  { label: "Baloda Bazar-Bhatapara", slug: "baloda-bazar-bhatapara", keywords: ["baloda bazar", "bhatapara", "baloda-bazar-bhatapara"] },
+  { label: "Balrampur-Ramanujganj", slug: "balrampur-ramanujganj", keywords: ["balrampur", "ramanujganj", "balrampur-ramanujganj"] },
   { label: "Bastar", slug: "bastar", keywords: ["bastar", "jagdalpur"] },
-  { label: "Kanker", slug: "kanker", keywords: ["kanker"] },
-  { label: "Kondagaon", slug: "kondagaon", keywords: ["kondagaon"] },
-  { label: "Dantewada", slug: "dantewada", keywords: ["dantewada"] },
-  { label: "Sukma", slug: "sukma", keywords: ["sukma"] },
+  { label: "Bemetara", slug: "bemetara", keywords: ["bemetara"] },
   { label: "Bijapur", slug: "bijapur", keywords: ["bijapur"] },
-  { label: "Narayanpur", slug: "narayanpur", keywords: ["narayanpur"] },
+  { label: "Dantewada", slug: "dantewada", keywords: ["dantewada"] },
+  { label: "Dhamtari", slug: "dhamtari", keywords: ["dhamtari"] },
+  { label: "Gariaband", slug: "gariaband", keywords: ["gariaband"] },
+  { label: "Gaurela-Pendra-Marwahi", slug: "gaurela-pendra-marwahi", keywords: ["gaurela", "pendra", "marwahi", "gaurela-pendra-marwahi"] },
+  { label: "Janjgir-Champa", slug: "janjgir-champa", keywords: ["janjgir", "champa", "janjgir-champa"] },
   { label: "Jashpur", slug: "jashpur", keywords: ["jashpur"] },
-  { label: "Koriya", slug: "koriya", keywords: ["koriya", "korea"] },
-  { label: "Balrampur", slug: "balrampur", keywords: ["balrampur"] },
-  { label: "Surajpur", slug: "surajpur", keywords: ["surajpur"] }
+  { label: "Kanker", slug: "kanker", keywords: ["kanker"] },
+  { label: "Kawardha / Kabirdham", slug: "kabirdham", keywords: ["kabirdham", "kawardha"] },
+  { label: "Khairagarh-Chhuikhadan-Gandai", slug: "khairagarh-chhuikhadan-gandai", keywords: ["khairagarh", "chhuikhadan", "gandai", "khairagarh-chhuikhadan-gandai"] },
+  { label: "Kondagaon", slug: "kondagaon", keywords: ["kondagaon"] },
+  { label: "Korba", slug: "korba", keywords: ["korba"] },
+  { label: "Korea", slug: "korea", keywords: ["korea", "koriya"] },
+  { label: "Mahasamund", slug: "mahasamund", keywords: ["mahasamund"] },
+  { label: "Manendragarh-Chirmiri-Bharatpur", slug: "manendragarh-chirmiri-bharatpur", keywords: ["manendragarh", "chirmiri", "bharatpur", "mcb", "manendragarh-chirmiri-bharatpur"] },
+  { label: "Mohla-Manpur-Ambagarh Chowki", slug: "mohla-manpur-ambagarh-chowki", keywords: ["mohla", "manpur", "ambagarh chowki", "mohla-manpur-ambagarh-chowki"] },
+  { label: "Mungeli", slug: "mungeli", keywords: ["mungeli"] },
+  { label: "Narayanpur", slug: "narayanpur", keywords: ["narayanpur"] },
+  { label: "Raigarh", slug: "raigarh", keywords: ["raigarh"] },
+  { label: "Rajnandgaon", slug: "rajnandgaon", keywords: ["rajnandgaon"] },
+  { label: "Sakti", slug: "sakti", keywords: ["sakti"] },
+  { label: "Sarangarh-Bilaigarh", slug: "sarangarh-bilaigarh", keywords: ["sarangarh", "bilaigarh", "sarangarh-bilaigarh"] },
+  { label: "Sukma", slug: "sukma", keywords: ["sukma"] },
+  { label: "Surajpur", slug: "surajpur", keywords: ["surajpur"] },
+  { label: "Surguja", slug: "surguja", keywords: ["surguja", "ambikapur"] }
 ];
+
+function districtDefinitionFromValue(value = "") {
+  const normalizedSlug = toSlug(value);
+  const normalizedText = slugText(value);
+
+  return CITY_DEFINITIONS.find((district) => (
+    district.slug === normalizedSlug ||
+    slugText(district.label) === normalizedText ||
+    district.keywords.some((keyword) => normalizedText === slugText(keyword))
+  )) || null;
+}
+
+function districtRoutePath(value = "") {
+  const district = districtDefinitionFromValue(value);
+  return district ? `/district/${district.slug}` : "";
+}
 const CG_LOCAL_NEWS_SOURCES = [
   { name: "Haribhoomi Chhattisgarh", query: "Chhattisgarh latest site:haribhoomi.com", priority: 1 },
   { name: "Patrika Chhattisgarh", query: "Chhattisgarh latest site:patrika.com", priority: 1 },
@@ -407,6 +427,9 @@ function looksCopiedFromSource(candidate, source) {
 function cleanNewsCopyText(value, options = {}) {
   const targetLanguage = normalizeText(options.targetLanguage || "");
   let cleaned = normalizeText(value)
+    .replace(/&nbsp;?/giu, " ")
+    .replace(/&#160;/giu, " ")
+    .replace(/&amp;/giu, "&")
     .replace(/\|\s*google news\s*$/iu, "")
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -418,9 +441,26 @@ function cleanNewsCopyText(value, options = {}) {
       .replace(new RegExp(`(?:^|\\n)\\s*${safeName}\\s*(?=\\n|$)`, "giu"), "\n");
   });
 
+  cleaned = cleaned
+    .replace(/\s*(?:\||-|:|\/)\s*(?:Patrika News|Amar Ujala|Dainik Bhaskar|Haribhoomi|News18|TV9|ETV Bharat|Lalluram|CGWALL|The Hitavada|Zee MPCG)\s*$/giu, "")
+    .replace(/^\s*(?:Patrika News|Amar Ujala|Dainik Bhaskar|Haribhoomi|News18|TV9|ETV Bharat|Lalluram|CGWALL|The Hitavada|Zee MPCG)\s*[:|-]\s*/giu, "");
+
   if (targetLanguage === "hi" && hasHindiText(cleaned)) {
     cleaned = cleaned.replace(/^[A-Za-z][A-Za-z0-9\s'’&(),.-]{6,}:\s*(?=[\u0900-\u097F])/u, "");
   }
+
+  cleaned = cleaned
+    .replace(/^(ai generated|ai-generated|generated by ai)\s*[:|-]?\s*/gimu, "")
+    .replace(/^(khabri junction desk|desk report|news desk)\s*[:|-]?\s*/gimu, "")
+    .replace(/^available information.*$/gimu, "")
+    .replace(/^.*desk ने (?:संकलित|तैयार) किया है।?$/gimu, "")
+    .replace(/^.*उपलब्ध शुरुआती जानकारी.*$/gimu, "")
+    .replace(/^फिलहाल पाठकों को सलाह है.*$/gimu, "")
+    .replace(/^जैसे-जैसे आधिकारिक जानकारी.*$/gimu, "")
+    .replace(/(?:\s*[|:/-]\s*)?(?:source|स्रोत)\s*[:|-]?\s*$/gimu, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return cleaned
     .replace(/[ \t]+\n/g, "\n")
@@ -1558,7 +1598,10 @@ function normalizeNews(input, existing = {}) {
   const automated = normalizeBoolean(input.automated || existing.automated);
   const categoryDefinition = categoryDefinitionForNews(input, existing);
   const combinedText = `${input.title} ${input.titleEn} ${input.titleHi} ${input.summary} ${input.summaryEn} ${input.summaryHi} ${input.body} ${input.bodyEn} ${input.bodyHi} ${input.sourceTitle} ${input.category} ${input.tag}`;
-  const city = normalizeText(input.city || existing.city || inferCity(combinedText));
+  const directDistrict = normalizeText(input.city || existing.city || input.districtHint || existing.districtHint || inferCity(combinedText));
+  const fallbackDistrict = districtDefinitionFromValue(categoryDefinition.slug);
+  const districtDefinition = districtDefinitionFromValue(directDistrict) || fallbackDistrict;
+  const city = normalizeText(districtDefinition?.slug || directDistrict);
   const status = normalizeText(input.status || existing.status || (automated ? "pending" : "published"));
   const sourceUrl = normalizeText(input.sourceUrl || existing.sourceUrl);
   const sourceHash = normalizeText(input.sourceHash || existing.sourceHash || sourceHashFromUrl(sourceUrl));
@@ -1566,18 +1609,26 @@ function normalizeNews(input, existing = {}) {
   const sourcePublishedAt = parseDateCandidate(input.sourcePublishedAt || existing.sourcePublishedAt);
   const freshnessScoreValue = Number(input.freshnessScore ?? existing.freshnessScore);
   const categoryBadge = normalizeText(input.categoryBadge || input.tag || categoryDefinition.badge);
+  const cmsUploadedImage = [
+    input.image,
+    input.sourceImage,
+    input.optimizedThumbnail,
+    input.aiThumbnail
+  ].map((item) => normalizeText(item)).find(isCmsUploadedImage) || "";
   const sourceImage = preferredSourceImage(input, existing);
   const sourceImageChanged = Boolean(sourceImage) && sourceImage !== normalizeText(existing.sourceImage);
-  const optimizedThumbnail = normalizeText(input.optimizedThumbnail || (sourceImageChanged ? "" : existing.optimizedThumbnail)) || buildWatermarkedSourceThumbnail({
-    ...input,
-    ...existing,
-    title,
-    categoryBadge,
-    category: categoryDefinition.label,
-    city,
-    sourceImage
-  });
-  const aiThumbnail = normalizeText(input.aiThumbnail || (sourceImageChanged ? "" : existing.aiThumbnail));
+  const optimizedThumbnail = cmsUploadedImage
+    ? ""
+    : normalizeText(input.optimizedThumbnail || (sourceImageChanged ? "" : existing.optimizedThumbnail)) || buildWatermarkedSourceThumbnail({
+      ...input,
+      ...existing,
+      title,
+      categoryBadge,
+      category: categoryDefinition.label,
+      city,
+      sourceImage
+    });
+  const aiThumbnail = cmsUploadedImage ? "" : normalizeText(input.aiThumbnail || (sourceImageChanged ? "" : existing.aiThumbnail));
   const fallbackThumbnail = generateNewsThumbnail({ title, categoryBadge, category: categoryDefinition.label, city });
   const thumbnailHash = normalizeText(input.thumbnailHash || (sourceImageChanged ? "" : existing.thumbnailHash) || thumbnailHashForNews({
     ...input,
@@ -1587,7 +1638,7 @@ function normalizeNews(input, existing = {}) {
     city,
     sourceImage
   }));
-  const image = optimizedThumbnail || aiThumbnail || sourceImage || normalizeText(input.image || existing.image) || fallbackThumbnail;
+  const image = cmsUploadedImage || optimizedThumbnail || aiThumbnail || sourceImage || normalizeText(input.image || existing.image) || fallbackThumbnail;
   const tag = deriveNewsTagString(input, existing, categoryDefinition.label, city) || normalizeText(input.categoryBadge || categoryDefinition.badge);
   const imageCrop = normalizeImageCrop(input.imageCrop || existing.imageCrop);
   const news = {
@@ -1610,7 +1661,7 @@ function normalizeNews(input, existing = {}) {
     optimizedThumbnail,
     aiThumbnail,
     thumbnailHash,
-    thumbnailStatus: normalizeText(input.thumbnailStatus || (sourceImageChanged ? "" : existing.thumbnailStatus) || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
+    thumbnailStatus: normalizeText(cmsUploadedImage ? "manual-upload" : input.thumbnailStatus || (sourceImageChanged ? "" : existing.thumbnailStatus) || (optimizedThumbnail ? "source-watermarked" : aiThumbnail ? "ai-generated" : "fallback")),
     createdAt: existing.createdAt || input.createdAt || now,
     updatedAt: now,
     publishedAt: status === "published"
@@ -1626,6 +1677,7 @@ function normalizeNews(input, existing = {}) {
     tag,
     tags: normalizeTagList(input.tags || existing.tags || tag),
     author: normalizeText(input.author || existing.author || "Khabri Junction Desk"),
+    sourceCredit: cmsUploadedImage ? "" : normalizeText(input.sourceCredit || existing.sourceCredit || input.sourceName || existing.sourceName || input.feedSourceName || existing.feedSourceName),
     imageAlt: normalizeText(input.imageAlt || existing.imageAlt || title),
     imageCredit: normalizeText(input.imageCredit || existing.imageCredit),
     imageSource: normalizeText(input.imageSource || existing.imageSource || sourceUrl),
@@ -1694,6 +1746,8 @@ function serializeNews(doc) {
     return null;
   }
 
+  const district = districtDefinitionFromValue(doc.city || doc.districtHint);
+
   return {
     _id: String(doc._id),
     title: doc.title,
@@ -1710,6 +1764,9 @@ function serializeNews(doc) {
     categoryPage: landingPageForNews(doc),
     categoryBadge: doc.categoryBadge,
     city: doc.city,
+    district: district?.label || "",
+    districtSlug: district?.slug || normalizeText(doc.city || ""),
+    districtPage: district ? districtRoutePath(district.slug) : "",
     image: doc.image,
     sourceImage: doc.sourceImage,
     optimizedThumbnail: doc.optimizedThumbnail,
@@ -1731,6 +1788,7 @@ function serializeNews(doc) {
     tag: doc.tag,
     tags: Array.isArray(doc.tags) ? doc.tags : normalizeTagList(doc.tag),
     author: doc.author || "Khabri Junction Desk",
+    sourceCredit: doc.sourceCredit || doc.sourceName || doc.feedSourceName || "",
     metaTitle: doc.metaTitle,
     metaDescription: doc.metaDescription,
     ogTitle: doc.ogTitle,
@@ -1889,24 +1947,86 @@ function primaryNewsImage(news = {}) {
   return normalizeText(news.optimizedThumbnail || news.aiThumbnail || news.sourceImage || news.image);
 }
 
+function isCmsUploadedImage(value = "") {
+  const image = normalizeText(value);
+
+  if (!image) {
+    return false;
+  }
+
+  try {
+    const parsed = new URL(image, SITE_URL || `http://localhost:${PORT}`);
+    return /^\/(?:assets\/uploads|api\/uploads)\//i.test(parsed.pathname);
+  } catch (error) {
+    return /^\/(?:assets\/uploads|api\/uploads)\//i.test(image);
+  }
+}
+
+function uploadedFeaturedImage(news = {}) {
+  return [
+    news.image,
+    news.sourceImage,
+    news.optimizedThumbnail,
+    news.aiThumbnail
+  ].map((item) => normalizeText(item)).find(isCmsUploadedImage) || "";
+}
+
+function articleFeaturedImage(news = {}) {
+  return uploadedFeaturedImage(news)
+    || normalizeText(news.optimizedThumbnail)
+    || normalizeText(news.aiThumbnail)
+    || normalizeText(news.image)
+    || normalizeText(news.sourceImage)
+    || DEFAULT_NEWS_IMAGE;
+}
+
+function articleImageCredit(news = {}, featuredImage = "", language = "hi") {
+  if (!featuredImage || isCmsUploadedImage(featuredImage)) {
+    return "";
+  }
+
+  const source = normalizeText(news.imageCredit || news.sourceCredit || news.sourceName || news.feedSourceName);
+  if (!source || /^khabri junction(?: desk)?$/i.test(source)) {
+    return "";
+  }
+
+  return `${language === "hi" ? "\u091b\u0935\u093f \u0938\u094d\u0930\u094b\u0924" : "Image source"}: ${source}`;
+}
+
+function stripBodyImages(value = "") {
+  return normalizeText(value)
+    .replace(/<figure\b[\s\S]*?<\/figure>/gi, " ")
+    .replace(/<img\b[^>]*>/gi, " ")
+    .replace(/!\[[^\]]*]\([^)]*\)/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function validatePublishableNews(news) {
   const details = [];
-  const bodyWords = Math.max(
-    wordCount(news.body),
-    wordCount(news.bodyHi),
-    wordCount(news.bodyEn)
+  const bodyLength = Math.max(
+    normalizeText(news.body).length,
+    normalizeText(news.bodyHi).length,
+    normalizeText(news.bodyEn).length
   );
+  const categorySlug = normalizeText(news.categorySlug || toSlug(news.category));
+  const districtRequired = categorySlug === "local-news" || Boolean(districtDefinitionFromValue(categorySlug));
 
-  if (bodyWords < 400) {
-    details.push("minimum 400 words required before publish");
+  if (bodyLength < 100) {
+    details.push("body minimum 100 characters is required");
   }
 
   if (!normalizeText(news.slug)) {
     details.push("unique slug is required");
   }
 
-  if (!primaryNewsImage(news)) {
-    details.push("featured image is required");
+  if (!normalizeText(news.category)) {
+    details.push("category is required");
+  }
+
+  if (districtRequired && !districtDefinitionFromValue(news.city || news.districtHint)) {
+    details.push("district is required for local district news");
   }
 
   if (!normalizeText(news.metaTitle)) {
@@ -2010,18 +2130,18 @@ function buildNewsQuery(query) {
   });
 
   if (query.district && !mongoQuery.city) {
-    mongoQuery.city = toSlug(query.district);
+    mongoQuery.city = districtDefinitionFromValue(query.district)?.slug || toSlug(query.district);
   }
 
   if (query.section) {
     const section = toSlug(query.section);
     const sectionCategory = categoryFromValue(section);
-    const sectionCity = CITY_DEFINITIONS.find((city) => city.slug === section);
+    const sectionCity = districtDefinitionFromValue(section);
 
     if (section === "breaking") {
       andConditions.push({ $or: [{ categorySlug: "breaking" }, { breaking: true }] });
     } else if (sectionCity) {
-      andConditions.push({ $or: [{ categorySlug: section }, { city: section }] });
+      andConditions.push({ $or: [{ categorySlug: sectionCity.slug }, { city: sectionCity.slug }] });
     } else if (sectionCategory) {
       mongoQuery.categorySlug = sectionCategory.slug;
     }
@@ -2964,13 +3084,11 @@ function buildFallbackHindiArticle(item) {
     : `${titlePrefix} को लेकर नई जानकारी सामने आई है।`;
   const title = `${titlePrefix}: ${summaryLine.replace(/[।!?].*$/u, "").trim()}`.slice(0, 95);
   const summary = summaryLine.replace(/\s+/g, " ").trim();
-  const paragraphOne = summary;
-  const paragraphTwo = `${titlePrefix} से जुड़ी उपलब्ध शुरुआती जानकारी को Khabri Junction desk ने साफ और तटस्थ रूप में संकलित किया है।`;
-  const paragraphThree = city
-    ? `${city.charAt(0).toUpperCase()}${city.slice(1)} से जुड़े इस अपडेट में आधिकारिक जानकारी आने पर कॉपी को और विस्तार दिया जाएगा।`
-    : "जैसे-जैसे आधिकारिक जानकारी और पुष्टि सामने आएगी, इस खबर को अपडेट किया जाएगा।";
-  const paragraphFour = "फिलहाल पाठकों को सलाह है कि इस विषय में केवल आधिकारिक अपडेट और विश्वसनीय स्रोतों पर भरोसा करें।";
-  const body = [paragraphOne, paragraphTwo, paragraphThree, paragraphFour].filter(Boolean).join("\n\n");
+  const locationLabel = districtDefinitionFromValue(city)?.label || category || "छत्तीसगढ़";
+  const paragraphOne = `${summary} यह मामला ${locationLabel} से जुड़ा है और शुरुआती जानकारी के अनुसार घटनाक्रम ने स्थानीय स्तर पर ध्यान खींचा है।`;
+  const paragraphTwo = `घटना कब हुई, किस वजह से सामने आई और इससे कौन-कौन प्रभावित हुआ, इसे लेकर संबंधित पक्षों से जानकारी जुटाई जा रही है।`;
+  const paragraphThree = `मौके और हालात से जुड़ी पुष्टि के आधार पर प्रशासनिक तथा आधिकारिक पक्ष सामने आने पर खबर को आगे अपडेट किया जाएगा।`;
+  const body = [paragraphOne, paragraphTwo, paragraphThree].filter(Boolean).join("\n\n");
 
   return {
     title,
@@ -3000,11 +3118,14 @@ Rewrite rules:
 - Do NOT copy-paste the source headline, source summary, or source wording.
 - Create a fresh Hindi headline in Khabri Junction's own style.
 - Rewrite the story in original Hindi language while keeping only the verified facts.
+- Write in clean professional Hindi newsroom style.
+- Follow 5W structure naturally: क्या, कहाँ, कब, कौन, कैसे.
 - Do not reuse more than 7 consecutive words from the source text.
 - Do not translate word-for-word; paraphrase naturally for local Hindi readers.
 - Do not add fake quotes, fake names, fake numbers, or unverified allegations.
 - Do not include publisher/source names like ${item.sourceName || "source name"} inside the final headline or body.
 - Do not leave HTML entities like &nbsp; in the output.
+- Do not include lines like "AI generated", "desk ne sankalit kiya", "available information", or disclaimer-style filler.
 
 Return ONLY valid JSON with:
 {
@@ -3948,12 +4069,13 @@ function localizedNews(news, language) {
 
 function renderNewsSchema(news, related, req) {
   const url = articleUrl(news, req);
+  const image = articleFeaturedImage(news);
   const schema = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
     headline: news.title,
     description: news.metaDescription || news.summary,
-    image: [news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE],
+    image: [image],
     datePublished: news.publishedAt || news.createdAt,
     dateModified: news.updatedAt || news.createdAt,
     mainEntityOfPage: {
@@ -3975,8 +4097,8 @@ function renderNewsSchema(news, related, req) {
     },
     articleSection: news.category,
     keywords: news.keywords,
-    thumbnailUrl: news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE,
-    creditText: news.sourceName || "Khabri Junction Desk",
+    thumbnailUrl: image,
+    creditText: articleImageCredit(news, image, "en") || "Khabri Junction Desk",
     isPartOf: {
       "@type": "NewsMediaOrganization",
       name: "Khabri Junction"
@@ -4022,19 +4144,159 @@ function articlePageLabels(language) {
   };
 }
 
-function articleDistrictLabel(news = {}) {
-  const city = normalizeText(news.city || news.districtHint);
-  return categoryFromValue(city)?.label || city || "";
+const HINDI_DISTRICT_LABELS = {
+  Durg: "\u0926\u0941\u0930\u094d\u0917",
+  Bhilai: "\u092d\u093f\u0932\u093e\u0908",
+  Raipur: "\u0930\u093e\u092f\u092a\u0941\u0930",
+  Bilaspur: "\u092c\u093f\u0932\u093e\u0938\u092a\u0941\u0930",
+  Balod: "\u092c\u093e\u0932\u094b\u0926",
+  "Baloda Bazar-Bhatapara": "\u092c\u0932\u094c\u0926\u093e \u092c\u093e\u091c\u093e\u0930-\u092d\u093e\u091f\u093e\u092a\u093e\u0930\u093e",
+  "Balrampur-Ramanujganj": "\u092c\u0932\u0930\u093e\u092e\u092a\u0941\u0930-\u0930\u093e\u092e\u093e\u0928\u0941\u091c\u0917\u0902\u091c",
+  Bastar: "\u092c\u0938\u094d\u0924\u0930",
+  Bemetara: "\u092c\u0947\u092e\u0947\u0924\u0930\u093e",
+  Bijapur: "\u092c\u0940\u091c\u093e\u092a\u0941\u0930",
+  Dantewada: "\u0926\u0902\u0924\u0947\u0935\u093e\u0921\u093c\u093e",
+  Dhamtari: "\u0927\u092e\u0924\u0930\u0940",
+  Gariaband: "\u0917\u0930\u093f\u092f\u093e\u092c\u0902\u0926",
+  "Gaurela-Pendra-Marwahi": "\u0917\u094c\u0930\u0947\u0932\u093e-\u092a\u0947\u0902\u0921\u094d\u0930\u093e-\u092e\u0930\u0935\u093e\u0939\u0940",
+  "Janjgir-Champa": "\u091c\u093e\u0902\u091c\u0917\u0940\u0930-\u091a\u093e\u0902\u092a\u093e",
+  Jashpur: "\u091c\u0936\u092a\u0941\u0930",
+  Kanker: "\u0915\u093e\u0902\u0915\u0947\u0930",
+  "Kawardha / Kabirdham": "\u0915\u0935\u0930\u094d\u0927\u093e",
+  "Khairagarh-Chhuikhadan-Gandai": "\u0916\u0948\u0930\u093e\u0917\u0922\u093c",
+  Kondagaon: "\u0915\u094b\u0902\u0921\u093e\u0917\u093e\u0902\u0935",
+  Rajnandgaon: "\u0930\u093e\u091c\u0928\u093e\u0902\u0926\u0917\u093e\u0902\u0935",
+  Korba: "\u0915\u094b\u0930\u092c\u093e",
+  Korea: "\u0915\u094b\u0930\u093f\u092f\u093e",
+  Mahasamund: "\u092e\u0939\u093e\u0938\u092e\u0941\u0902\u0926",
+  "Manendragarh-Chirmiri-Bharatpur": "\u092e\u0928\u0947\u0902\u0926\u094d\u0930\u0917\u0922\u093c-\u091a\u093f\u0930\u092e\u093f\u0930\u0940-\u092d\u0930\u0924\u092a\u0941\u0930",
+  "Mohla-Manpur-Ambagarh Chowki": "\u092e\u094b\u0939\u0932\u093e-\u092e\u093e\u0928\u092a\u0941\u0930-\u0905\u0902\u092c\u093e\u0917\u0922\u093c \u091a\u094c\u0915\u0940",
+  Mungeli: "\u092e\u0941\u0902\u0917\u0947\u0932\u0940",
+  Narayanpur: "\u0928\u093e\u0930\u093e\u092f\u0923\u092a\u0941\u0930",
+  Raigarh: "\u0930\u093e\u092f\u0917\u0922\u093c",
+  Sakti: "\u0938\u0915\u094d\u0924\u0940",
+  "Sarangarh-Bilaigarh": "\u0938\u093e\u0930\u0902\u0917\u0922\u093c-\u092c\u093f\u0932\u093e\u0908\u0917\u0922\u093c",
+  Sukma: "\u0938\u0941\u0915\u092e\u093e",
+  Surajpur: "\u0938\u0942\u0930\u091c\u092a\u0941\u0930",
+  Jagdalpur: "\u091c\u0917\u0926\u0932\u092a\u0941\u0930",
+  Ambikapur: "\u0905\u0902\u092c\u093f\u0915\u093e\u092a\u0941\u0930",
+  Surguja: "\u0938\u0930\u0917\u0941\u091c\u093e",
+  Bastar: "\u092c\u0938\u094d\u0924\u0930"
+};
+
+const TOP_DISTRICT_NAV_SLUGS = [
+  "raipur",
+  "durg",
+  "bhilai",
+  "bilaspur",
+  "korba",
+  "rajnandgaon",
+  "raigarh",
+  "bastar",
+  "surguja",
+  "kabirdham",
+  "khairagarh-chhuikhadan-gandai"
+];
+
+const TOP_DISTRICT_NAV_LABELS = {
+  bastar: { hi: "\u091c\u0917\u0926\u0932\u092a\u0941\u0930", en: "Jagdalpur" },
+  surguja: { hi: "\u0905\u0902\u092c\u093f\u0915\u093e\u092a\u0941\u0930", en: "Ambikapur" },
+  kabirdham: { hi: "\u0915\u0935\u0930\u094d\u0927\u093e", en: "Kawardha" },
+  "khairagarh-chhuikhadan-gandai": { hi: "\u0916\u0948\u0930\u093e\u0917\u0922\u093c", en: "Khairagarh" }
+};
+
+function districtNavLabel(district, language = "hi") {
+  if (!district) {
+    return "";
+  }
+
+  if (language === "hi") {
+    return HINDI_DISTRICT_LABELS[district.label] || district.label;
+  }
+
+  return district.label;
 }
 
-function articleTags(news = {}) {
-  return Array.from(new Set([
-    normalizeText(news.categoryBadge),
-    normalizeText(news.category),
-    articleDistrictLabel(news),
-    ...normalizeText(news.tag).split(",").map((item) => normalizeText(item)),
-    "Khabri Junction"
-  ].filter(Boolean))).slice(0, 6);
+function portalHeaderNav(language = "hi", activeDistrictSlug = "") {
+  const activeSlug = normalizeText(activeDistrictSlug);
+  const topDistricts = TOP_DISTRICT_NAV_SLUGS
+    .map((slug) => districtDefinitionFromValue(slug))
+    .filter(Boolean);
+  const dropdownDistricts = CITY_DEFINITIONS.filter((district) => district.slug !== "bhilai");
+  const homeLabel = language === "hi" ? "\u0939\u094b\u092e" : "Home";
+  const allLabel = language === "hi" ? "\u0938\u092d\u0940 \u091c\u093f\u0932\u0947" : "All Districts";
+  const topLinks = topDistricts.map((district) => {
+    const active = district.slug === activeSlug ? " active" : "";
+    const labelOverride = TOP_DISTRICT_NAV_LABELS[district.slug]?.[language];
+    return `<a class="portal-nav-link${active}" href="${districtRoutePath(district.slug)}">${escapeHTML(labelOverride || districtNavLabel(district, language))}</a>`;
+  }).join("");
+  const dropdownLinks = dropdownDistricts.map((district) => {
+    const active = district.slug === activeSlug ? " active" : "";
+    return `<a class="${active.trim()}" href="${districtRoutePath(district.slug)}">${escapeHTML(districtNavLabel(district, language))}</a>`;
+  }).join("");
+
+  return `<nav class="portal-main-nav" aria-label="${language === "hi" ? "\u091c\u093f\u0932\u093e \u0928\u0947\u0935\u093f\u0917\u0947\u0936\u0928" : "District navigation"}">
+      <a class="portal-nav-link" href="/index.html">${homeLabel}</a>
+      ${topLinks}
+      <details class="portal-district-menu">
+        <summary>${allLabel}</summary>
+        <div class="portal-district-list">${dropdownLinks}</div>
+      </details>
+    </nav>`;
+}
+
+function articleDistrictLabel(news = {}, language = "en") {
+  const district = districtDefinitionFromValue(news.city || news.districtHint);
+  const label = district?.label || normalizeText(news.city || news.districtHint) || "";
+  return language === "hi" ? (HINDI_DISTRICT_LABELS[label] || label) : label;
+}
+
+function sameDisplayLabel(left = "", right = "") {
+  return slugText(left) === slugText(right);
+}
+
+function articleCategoryLabel(news = {}, language = "hi") {
+  const category = normalizeText(news.category || news.categoryBadge);
+  const categoryDefinition = categoryFromValue(news.categorySlug || category);
+  const district = articleDistrictLabel(news, "en");
+  const label = categoryDefinition?.label || category;
+
+  if (district && sameDisplayLabel(label, district)) {
+    return language === "hi" ? "\u0932\u094b\u0915\u0932 \u0928\u094d\u092f\u0942\u091c\u093c" : "Local News";
+  }
+
+  return label || (language === "hi" ? "\u0916\u092c\u0930" : "News");
+}
+
+function articleTags(news = {}, language = "hi") {
+  const district = articleDistrictLabel(news, language);
+  const englishEquivalentKeys = language === "hi"
+    ? new Set([slugText(articleCategoryLabel(news, "en")), slugText(articleDistrictLabel(news, "en"))].filter(Boolean))
+    : new Set();
+  const blocked = new Set(["khabri-junction", "khabri junction", "kj", "kj-news"]);
+  const seen = new Set();
+  const candidates = [
+    articleCategoryLabel(news, language),
+    district,
+    ...normalizeText(news.tag).split(",").map((item) => normalizeText(item))
+  ];
+
+  return candidates
+    .map((tag) => normalizeText(tag))
+    .filter((tag) => {
+      const key = slugText(tag);
+      if (!tag || !key || blocked.has(key) || key.includes("khabri junction") || englishEquivalentKeys.has(key)) {
+        return false;
+      }
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 5);
 }
 
 function renderBreadcrumbSchema(news, req, language) {
@@ -4068,14 +4330,54 @@ function renderBreadcrumbSchema(news, req, language) {
 }
 
 function formatArticleDate(value, language = "hi") {
-  return new Date(value || Date.now()).toLocaleString(language === "en" ? "en-IN" : "hi-IN", {
+  const date = new Date(value || Date.now());
+
+  if (language === "hi") {
+    const dateText = new Intl.DateTimeFormat("hi-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }).format(date);
+    const timeText = new Intl.DateTimeFormat("hi-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    }).format(date);
+
+    return `${dateText}, ${timeText} बजे IST`;
+  }
+
+  return date.toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
     day: "2-digit",
-    month: "short",
+    month: "long",
     year: "numeric",
     hour: "2-digit",
-    minute: "2-digit"
+    minute: "2-digit",
+    hour12: true
   });
+}
+
+function articleImageFallbackDataUri(title = "Khabri Junction") {
+  const safeTitle = escapeHTML(normalizeText(title).slice(0, 92) || "Khabri Junction");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+    <rect width="1200" height="675" fill="#f3f4f6"/>
+    <rect x="46" y="46" width="1108" height="583" rx="18" fill="#fff" stroke="#d8dee8"/>
+    <text x="80" y="132" fill="#c1121f" font-family="Arial, sans-serif" font-size="34" font-weight="800">KHABRI JUNCTION</text>
+    <text x="80" y="338" fill="#151922" font-family="Arial, sans-serif" font-size="54" font-weight="800">${safeTitle}</text>
+    <text x="80" y="420" fill="#6b7280" font-family="Arial, sans-serif" font-size="28">Image unavailable</text>
+  </svg>`;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
+
+function articleImageMarkup(src, alt, className, options = {}) {
+  const fallback = articleImageFallbackDataUri(alt);
+  const loading = options.loading || "lazy";
+  const priority = loading === "eager" ? "fetchpriority=\"high\"" : "";
+  return `<img class="${escapeHTML(className)}" src="${escapeHTML(src || fallback)}" alt="${escapeHTML(alt || "")}" loading="${escapeHTML(loading)}" decoding="async" ${priority} onerror="this.onerror=null;this.src='${escapeHTML(fallback)}';this.classList.add('image-fallback');">`;
 }
 
 function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
@@ -4086,16 +4388,16 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const categoryUrl = landingPageForNews(news);
   const shareText = encodeURIComponent(article.title);
   const shareUrl = encodeURIComponent(url);
-  const sourceName = news.sourceName || news.feedSourceName || "Khabri Junction";
+  const sourceName = news.sourceCredit || news.sourceName || news.feedSourceName || "Khabri Junction";
   const authorName = normalizeText(news.author || "Khabri Junction Desk");
   const publishedAt = news.publishedAt || news.sourcePublishedAt || news.createdAt;
   const updatedAt = news.updatedAt || publishedAt;
-  const districtLabel = articleDistrictLabel(news);
-  const tags = articleTags(news);
-  const articleBanner = news.optimizedThumbnail || news.aiThumbnail || news.image || DEFAULT_NEWS_IMAGE;
-  const sourceFigure = news.sourceImage && news.sourceImage !== articleBanner
-    ? `<figure class="article-source-figure"><img class="article-source-image" src="${escapeHTML(news.sourceImage)}" alt="${escapeHTML(article.title)} original image" loading="lazy" decoding="async"><figcaption>Image credit: ${escapeHTML(sourceName)}</figcaption></figure>`
-    : "";
+  const categoryLabel = articleCategoryLabel(news, language);
+  const districtLabel = articleDistrictLabel(news, language);
+  const activeDistrictSlug = districtDefinitionFromValue(news.city || news.districtHint)?.slug || "";
+  const tags = articleTags(news, language);
+  const articleBanner = articleFeaturedImage(news);
+  const imageCredit = articleImageCredit(news, articleBanner, language);
   const tagChips = tags.map((tag) => `<span>${escapeHTML(tag)}</span>`).join("");
   const relatedCards = related.map((item) => `
     <a class="article-related-card" href="${escapeHTML(articleUrl(item, req))}?lang=${language}">
@@ -4109,7 +4411,8 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const nextLink = adjacent.next
     ? `<a href="${escapeHTML(articleUrl(adjacent.next, req))}?lang=${language}"><span>${language === "hi" ? "\u0905\u0917\u0932\u0940 \u0916\u092c\u0930" : "Next story"}</span><strong>${escapeHTML(localizedValue(adjacent.next, "title", language))}</strong></a>`
     : "";
-  const paragraphs = escapeHTML(article.body || article.summary)
+  const bodyText = stripBodyImages(article.body || article.summary);
+  const paragraphs = escapeHTML(bodyText)
     .split(/\n{2,}/)
     .filter(Boolean)
     .map((paragraph) => `<p>${paragraph}</p>`)
@@ -4119,11 +4422,13 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const sidebarAd = normalizeText(settings.ads?.sidebar);
   const mobileStickyAd = normalizeText(settings.ads?.["mobile-sticky"]);
   const taxonomyMeta = [
-    `<div><strong>${escapeHTML(labels.category)}</strong><span>${escapeHTML(news.category || labels.news)}</span></div>`,
+    `<div><strong>${escapeHTML(labels.category)}</strong><span>${escapeHTML(categoryLabel)}</span></div>`,
     districtLabel ? `<div><strong>${escapeHTML(labels.district)}</strong><span>${escapeHTML(districtLabel)}</span></div>` : "",
-    `<div><strong>${escapeHTML(labels.author)}</strong><span>${escapeHTML(authorName)}</span></div>`,
-    `<div><strong>${escapeHTML(labels.source)}</strong><span>${escapeHTML(sourceName)}</span></div>`
+    `<div><strong>${escapeHTML(labels.author)}</strong><span>${escapeHTML(authorName)}</span></div>`
   ].filter(Boolean).join("");
+  const sourceCreditMarkup = imageCredit
+    ? `<p class="article-source-credit">${escapeHTML(imageCredit)}</p>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="${escapeHTML(language)}" translate="no">
@@ -4155,19 +4460,9 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html" aria-label="Khabri Junction home">
       <img src="/assets/logo-kj.png" alt="Khabri Junction logo">
-      <div><strong>KHABRI JUNCTION</strong><span>à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚</span></div>
+      <div><strong>KHABRI JUNCTION</strong><span>छत्तीसगढ़ की ताजा खबरें</span></div>
     </a>
-    <nav class="portal-main-nav" aria-label="News pages">
-      <a href="/index.html">à¤¹à¥‹à¤®</a>
-      <a href="/durg.html">à¤¦à¥à¤°à¥à¤—</a>
-      <a href="/bhilai.html">à¤­à¤¿à¤²à¤¾à¤ˆ</a>
-      <a href="/raipur.html">à¤°à¤¾à¤¯à¤ªà¥à¤°</a>
-      <a href="/bilaspur.html">à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°</a>
-      <a href="/politics.html">à¤°à¤¾à¤œà¤¨à¥€à¤¤à¤¿</a>
-      <a href="/crime.html">à¤•à¥à¤°à¤¾à¤‡à¤®</a>
-      <a href="/sports.html">à¤–à¥‡à¤²</a>
-      <a href="/astrology.html">à¤°à¤¾à¤¶à¤¿à¤«à¤²</a>
-    </nav>
+    ${portalHeaderNav(language, activeDistrictSlug)}
     <div class="portal-language-switch" aria-label="Article language">
       <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(url)}?lang=hi">हिंदी</a>
       <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(url)}?lang=en">English</a>
@@ -4176,9 +4471,12 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <main class="article-shell">
     <article class="article-main">
       <a class="portal-back" href="${escapeHTML(categoryUrl)}">${escapeHTML(labels.home)} / ${escapeHTML(news.category || labels.news)}</a>
-      <span class="tag">${escapeHTML(news.categoryBadge || news.category || "NEWS")}</span>
+      <span class="tag">${escapeHTML(categoryLabel)}</span>
       <h1>${escapeHTML(article.title)}</h1>
       <p class="article-summary">${escapeHTML(article.summary)}</p>
+      <figure class="article-hero-figure">
+        ${articleImageMarkup(articleBanner, article.title, "article-hero-image", { loading: "eager" })}
+      </figure>
       <div class="article-meta">
         <span>${escapeHTML(labels.published)}: ${escapeHTML(formatArticleDate(publishedAt, language))}</span>
         <span>${escapeHTML(labels.updated)}: ${escapeHTML(formatArticleDate(updatedAt, language))}</span>
@@ -4186,19 +4484,18 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
       <div class="article-meta-grid">
         ${taxonomyMeta}
       </div>
-      <div class="article-taxonomy">
+      ${tagChips ? `<div class="article-taxonomy">
         <strong>${escapeHTML(labels.tags)}</strong>
         <div class="article-taxonomy-chips">${tagChips}</div>
-      </div>
+      </div>` : ""}
       <div class="share-row" aria-label="Share article">
         <a href="https://www.facebook.com/sharer/sharer.php?u=${shareUrl}" target="_blank" rel="noopener">Facebook</a>
         <a href="https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareText}" target="_blank" rel="noopener">X</a>
         <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" rel="noopener">WhatsApp</a>
       </div>
-      <img class="article-hero-image" src="${escapeHTML(articleBanner)}" alt="${escapeHTML(article.title)}" loading="eager" decoding="async">
       ${adTop ? `<div class="ad-slot in-article-ad adsense-ready">${adTop}</div>` : ""}
-      ${sourceFigure}
       <div class="article-body">${paragraphs}</div>
+      ${sourceCreditMarkup}
       ${adBottom ? `<div class="ad-slot in-article-ad adsense-ready">${adBottom}</div>` : ""}
       <nav class="article-next-prev" aria-label="Next and previous articles">${prevLink}${nextLink}</nav>
     </article>
@@ -4255,7 +4552,7 @@ function renderSearchPage(results, query, req) {
 <body class="article-page">
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>Fast local news for Chhattisgarh</span></div></a>
-    <nav class="portal-main-nav"><a href="/index.html">Home</a><a href="/durg.html">Durg</a><a href="/sports.html">Sports</a><a href="/politics.html">Politics</a><a href="/crime.html">Crime</a></nav>
+    ${portalHeaderNav(language, "")}
   </header>
   <main class="search-shell">
     <form class="portal-search-form" action="/search" method="get">
@@ -4286,6 +4583,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   const routeTitle = normalizeText(route.title);
   const routeDescription = normalizeText(route.description);
   const cleanSettings = normalizeSiteSettings(settings || {});
+  const activeDistrictSlug = districtDefinitionFromValue(route.districtLabel || route.category || route.path)?.slug || "";
   const ui = {
     readMore: "\u092a\u0942\u0930\u0940 \u0916\u092c\u0930 \u092a\u0922\u093c\u0947\u0902",
     brandTagline: "\u091b\u0924\u094d\u0924\u0940\u0938\u0917\u0922\u093c \u0915\u0940 \u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902",
@@ -4310,13 +4608,23 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   const canonical = `${publicBaseUrl(req)}${route.path}`;
   const cards = articles.map((rawItem) => {
     const item = localizedNews(rawItem, "hi");
+    const districtLabel = articleDistrictLabel(rawItem);
+    const publishedAt = formatArticleDate(rawItem.publishedAt || rawItem.createdAt, "hi");
     return `
       <article class="news-card">
-        <img src="${escapeHTML(item.optimizedThumbnail || item.aiThumbnail || item.image || DEFAULT_NEWS_IMAGE)}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
+        <img src="${escapeHTML(articleFeaturedImage(rawItem))}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
         <div class="card-body">
-          <span class="tag">${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+          <div class="card-chip-row">
+            <span class="tag">${escapeHTML(item.categoryBadge || item.category || "NEWS")}</span>
+            ${districtLabel ? `<span class="tag tag-muted">${escapeHTML(districtLabel)}</span>` : ""}
+          </div>
           <h3>${escapeHTML(item.title)}</h3>
           <p>${escapeHTML(item.summary || "")}</p>
+          <div class="card-meta-row">
+            <span>${escapeHTML(item.category || "खबर")}</span>
+            ${districtLabel ? `<span>${escapeHTML(districtLabel)}</span>` : ""}
+            <time>${escapeHTML(publishedAt)}</time>
+          </div>
           <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">${ui.readMore}</a>
         </div>
       </article>`;
@@ -4374,17 +4682,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   <div class="ad-slot article-top-ad">${cleanSettings.ads?.header || "ADVERTISEMENT"}</div>
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>${ui.brandTagline}</span></div></a>
-    <nav class="portal-main-nav">
-      <a href="/index.html">${ui.home}</a>
-      <a href="/durg.html">${ui.durg}</a>
-      <a href="/bhilai.html">${ui.bhilai}</a>
-      <a href="/raipur-news">${ui.raipur}</a>
-      <a href="/market-news">${ui.market}</a>
-      <a href="/weather-update">${ui.weather}</a>
-      <a href="/viral-videos">${ui.reels}</a>
-      <a href="/desh-duniya-news">${ui.world}</a>
-      <a href="/mp-shahdol-news">${ui.shahdol}</a>
-    </nav>
+    ${portalHeaderNav("hi", activeDistrictSlug)}
   </header>
   <main class="portal-shell">
     <section class="portal-layout">
@@ -5138,8 +5436,40 @@ async function sendCategoryPage(req, res, next, rawSlug) {
   }
 }
 
+async function sendDistrictPage(req, res, next, rawSlug) {
+  try {
+    const district = districtDefinitionFromValue(rawSlug);
+    const settings = await getSiteSettings();
+
+    if (!district) {
+      return res.status(404).type("html").send(renderCategoryLandingPage({
+        path: req.path,
+        title: "District Not Found",
+        category: "Local News",
+        districtLabel: "Chhattisgarh",
+        description: "यह जिला पेज अभी उपलब्ध नहीं है। ताजा खबरों के लिए होम या लोकल न्यूज़ सेक्शन देखें।"
+      }, [], settings, req));
+    }
+
+    const articles = await getCombinedPublishedNews({ status: "published", city: district.slug }, 24);
+    return res.type("html").send(renderCategoryLandingPage({
+      path: districtRoutePath(district.slug),
+      title: `${district.label} News`,
+      category: "Local News",
+      districtLabel: district.label,
+      description: `${district.label} की ताजा खबरें, लोकल अपडेट, प्रशासनिक सूचना और पब्लिक रिपोर्ट Khabri Junction पर पढ़ें।`
+    }, articles, settings, req));
+  } catch (error) {
+    next(error);
+  }
+}
+
 app.get("/category/:slug", requireDatabase, (req, res, next) => {
   sendCategoryPage(req, res, next, req.params.slug);
+});
+
+app.get("/district/:slug", requireDatabase, (req, res, next) => {
+  sendDistrictPage(req, res, next, req.params.slug);
 });
 
 CLEAN_CATEGORY_ROUTES.forEach((route) => {
@@ -5206,7 +5536,8 @@ app.get("/sitemap.xml", requireDatabase, async (req, res, next) => {
       "health.html",
       "jobs.html",
       "web-stories",
-      ...CATEGORY_DEFINITIONS.map((category) => categoryRoutePath(category).replace(/^\/+/, ""))
+      ...CATEGORY_DEFINITIONS.map((category) => categoryRoutePath(category).replace(/^\/+/, "")),
+      ...CITY_DEFINITIONS.map((district) => districtRoutePath(district.slug).replace(/^\/+/, ""))
     ];
     const [manualNews, aiNews] = await Promise.all([
       manualNewsCollection.find({ status: "published" }).sort({ publishedAt: -1, createdAt: -1 }).limit(1000).toArray(),
@@ -5433,7 +5764,7 @@ app.get("/api/news/category/:slug", requireDatabase, async (req, res, next) => {
 
 app.get("/api/news/district/:slug", requireDatabase, async (req, res, next) => {
   try {
-    const district = CITY_DEFINITIONS.find((item) => item.slug === toSlug(req.params.slug));
+    const district = districtDefinitionFromValue(req.params.slug);
 
     if (!district) {
       return res.status(404).json({ error: "district not found" });
