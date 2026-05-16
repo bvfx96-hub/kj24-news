@@ -403,6 +403,64 @@ function showToast(message, tone = "success", detail = "") {
   }, 3200);
 }
 
+function showToast(message, tone = "success", detail = "") {
+  if (!fields.adminToastStack) {
+    return;
+  }
+
+  const toast = document.createElement("article");
+  toast.className = `admin-toast ${tone}`;
+  toast.innerHTML = `
+    <span class="admin-toast-icon" aria-hidden="true">${tone === "success" ? "\u2713" : "!"}</span>
+    <div>
+      <strong>${escapeHTML(message)}</strong>
+      ${detail ? `<p>${escapeHTML(detail)}</p>` : ""}
+    </div>
+  `;
+  fields.adminToastStack.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add("visible"));
+  window.setTimeout(() => {
+    toast.classList.remove("visible");
+    window.setTimeout(() => toast.remove(), 220);
+  }, 3200);
+}
+
+function statusMeta(status = "pending") {
+  const key = String(status || "pending").toLowerCase();
+
+  if (key === "published") {
+    return { key, label: "PUBLISHED", text: "Published", icon: "\u2713" };
+  }
+
+  if (key === "rejected") {
+    return { key, label: "REJECTED", text: "Rejected", icon: "!" };
+  }
+
+  if (key === "draft") {
+    return { key, label: "DRAFT", text: "Draft", icon: "" };
+  }
+
+  return { key: "pending", label: "PENDING", text: "Pending", icon: "\u2026" };
+}
+
+function statusBadgeMarkup(status = "pending") {
+  const meta = statusMeta(status);
+  return `<span class="news-item-state ${escapeHTML(meta.key)}">${escapeHTML(`${meta.icon ? `${meta.icon} ` : ""}${meta.label}`)}</span>`;
+}
+
+function statusPillMarkup(status = "pending") {
+  const meta = statusMeta(status);
+  return `<small class="status-${escapeHTML(meta.key)}">${escapeHTML(`${meta.icon ? `${meta.icon} ` : ""}${meta.label}`)}</small>`;
+}
+
+function showSavedOutcome(item = {}, fallbackMessage = "News updated.") {
+  const meta = statusMeta(item.status || "pending");
+  const title = item.titleHi || item.title || item.titleEn || "";
+  showStatus(`${fallbackMessage} Status: ${meta.text}.`, "success");
+  showToast("Update saved", "success", `${meta.text}${title ? `: ${title}` : ""}`);
+}
+
 function setButtonLoading(button, isLoading, nextLabel = "") {
   if (!button) {
     return;
@@ -562,6 +620,26 @@ function showStatus(message, tone = "") {
   const icon = fields.statusLine?.querySelector(".status-line-icon");
   if (icon) {
     icon.textContent = nextTone === "success" ? "✓" : nextTone === "working" ? "…" : "!";
+  }
+}
+
+function showStatus(message, tone = "") {
+  const text = friendlyErrorMessage(message);
+  const nextTone = tone || statusToneFromMessage(text);
+
+  if (fields.statusLine) {
+    fields.statusLine.dataset.tone = nextTone;
+  }
+
+  if (fields.statusLineText) {
+    fields.statusLineText.textContent = text;
+  } else if (fields.statusLine) {
+    fields.statusLine.textContent = text;
+  }
+
+  const icon = fields.statusLine?.querySelector(".status-line-icon");
+  if (icon) {
+    icon.textContent = nextTone === "success" ? "\u2713" : nextTone === "working" ? "\u2026" : "!";
   }
 }
 
@@ -1206,11 +1284,15 @@ function renderManualNews() {
   state.manualNews.forEach((item) => {
     const card = document.createElement("article");
     card.className = "news-item";
+    const status = item.status || "draft";
     card.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.category || "MANUAL")}</span>
-      <strong>${escapeHTML(item.titleHi || item.title)}</strong>
+      <div class="news-item-head">
+        <strong>${escapeHTML(item.titleHi || item.title)}</strong>
+        ${statusBadgeMarkup(status)}
+      </div>
       <div class="news-item-meta">
-        <small class="status-${escapeHTML(item.status || "draft")}">${escapeHTML(item.status || "draft")}</small>
+        ${statusPillMarkup(status)}
         <small>${escapeHTML(item.city || "no district")}</small>
         <small>Views ${Number(item.views || 0)}</small>
         <small>Clicks ${Number(item.clicks || 0)}</small>
@@ -1246,7 +1328,7 @@ async function saveManualNews(event) {
       loadingMessage: "Manual news save ho raha hai..."
     });
     if ((saved.status || "draft") === "published") {
-      showStatus("Manual news published. Homepage priority is active.");
+      showStatus("Manual news published. Homepage priority is active.", "success");
       showToast("Article published successfully", "success", saved.titleHi || saved.title || "");
       announceNewsSync("published", {
         id: saved._id,
@@ -1255,7 +1337,7 @@ async function saveManualNews(event) {
         districtSlug: saved.districtSlug || saved.city || ""
       });
     } else {
-      showStatus("Manual news saved.");
+      showSavedOutcome(saved, "Manual news saved.");
     }
     clearManualForm();
     await loadManualNews();
@@ -1292,7 +1374,24 @@ function setPreviewLanguage(language = "hi") {
   renderPreviewModalLanguage();
 }
 
-function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary = "", bodyHtml = "", bodyText = "", localized = null, defaultLanguage = "hi" }) {
+function previewMetaMarkup(item = {}) {
+  const meta = statusMeta(item.status || "pending");
+  const district = item.district || districtLabelFromValue(item.city) || "";
+  const date = item.publishedAt || item.updatedAt || item.createdAt || item.sourcePublishedAt || "";
+  const chips = [
+    `${meta.icon ? `${meta.icon} ` : ""}${meta.label}`,
+    item.category || item.categoryBadge || item.tag || "",
+    district,
+    date ? formatDateTime(date) : ""
+  ].filter(Boolean);
+
+  return chips.length
+    ? `<div class="preview-meta">${chips.map((chip) => `<span>${escapeHTML(chip)}</span>`).join("")}</div>`
+    : "";
+}
+
+function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary = "", bodyHtml = "", bodyText = "", localized = null, defaultLanguage = "hi", status = "" }) {
+  const meta = statusMeta(status || "pending");
   previewModalState = {
     badge,
     image,
@@ -1304,13 +1403,22 @@ function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary =
   };
 
   fields.previewBadge.textContent = badge;
+  fields.previewBadge.className = status ? `preview-status-${meta.key}` : "";
   fields.previewLanguageSwitch.hidden = !localized;
 
   if (image) {
+    fields.previewImage.onerror = () => {
+      fields.previewImage.onerror = null;
+      fields.previewImage.src = fallbackImage;
+      fields.previewImage.alt = "";
+      fields.previewImage.classList.add("is-fallback");
+    };
+    fields.previewImage.classList.remove("is-fallback");
     fields.previewImage.src = image;
-    fields.previewImage.alt = title || "Preview";
+    fields.previewImage.alt = "";
     fields.previewImage.hidden = false;
   } else {
+    fields.previewImage.onerror = null;
     fields.previewImage.hidden = true;
   }
 
@@ -1321,19 +1429,21 @@ function openPreviewModal({ badge = "PREVIEW", image = "", title = "", summary =
 
 function previewManualNews() {
   const payload = manualPayload();
+  const meta = previewMetaMarkup(payload);
   openPreviewModal({
     badge: payload.category || "MANUAL",
     image: payload.image || fallbackImage,
+    status: payload.status || "pending",
     localized: {
       hi: {
         title: payload.titleHi || payload.title,
         summary: payload.summaryHi || "",
-        bodyHtml: previewMarkupFromText(payload.bodyHi || "")
+        bodyHtml: `${meta}${previewMarkupFromText(payload.bodyHi || "")}`
       },
       en: {
         title: payload.titleEn || payload.title,
         summary: payload.summaryEn || "",
-        bodyHtml: previewMarkupFromText(payload.bodyEn || payload.bodyHi || "")
+        bodyHtml: `${meta}${previewMarkupFromText(payload.bodyEn || payload.bodyHi || "")}`
       }
     }
   });
@@ -1341,20 +1451,27 @@ function previewManualNews() {
 
 function previewNewsDraft() {
   const badge = fields.newsTag.value.trim() || fields.newsCategory.value || "PREVIEW";
+  const status = fields.newsStatus.value || "pending";
+  const meta = previewMetaMarkup({
+    status,
+    category: fields.newsCategory.value || badge,
+    city: fields.newsCity.value || ""
+  });
 
   openPreviewModal({
     badge,
     image: fields.newsImage.value.trim() || fallbackImage,
+    status,
     localized: {
       hi: {
         title: fields.newsTitleHi.value.trim() || fields.newsTitle.value.trim(),
         summary: fields.newsSummaryHi.value.trim() || fields.newsSummary.value.trim(),
-        bodyHtml: previewMarkupFromText(fields.newsBodyHi.value.trim() || fields.newsBody.value.trim())
+        bodyHtml: `${meta}${previewMarkupFromText(fields.newsBodyHi.value.trim() || fields.newsBody.value.trim())}`
       },
       en: {
         title: fields.newsTitle.value.trim() || fields.newsTitleHi.value.trim(),
         summary: fields.newsSummary.value.trim() || fields.newsSummaryHi.value.trim(),
-        bodyHtml: previewMarkupFromText(fields.newsBody.value.trim() || fields.newsBodyHi.value.trim())
+        bodyHtml: `${meta}${previewMarkupFromText(fields.newsBody.value.trim() || fields.newsBodyHi.value.trim())}`
       }
     }
   });
@@ -2047,7 +2164,7 @@ async function saveNewsItem(event) {
       handlePublishedArticleSuccess(savedItem);
     } else {
       showPublishResult(null);
-      showStatus("News saved to MongoDB.");
+      showSavedOutcome(savedItem, "News saved to MongoDB.");
       announceNewsSync("saved", {
         id: savedItem._id,
         slug: savedItem.slug,
@@ -2123,9 +2240,7 @@ async function updateNewsItem(index, overrides, message, options = {}) {
   const button = options.button || null;
 
   setButtonLoading(button, true, targetStatus === "published" ? "Publishing..." : "Updating...");
-  if (targetStatus === "published") {
-    showStatus("Publishing article...", "working");
-  }
+  showStatus(targetStatus === "published" ? "Publishing article..." : "Updating news status...", "working");
 
   try {
     const saved = item._id
@@ -2146,7 +2261,7 @@ async function updateNewsItem(index, overrides, message, options = {}) {
       handlePublishedArticleSuccess(state.news[index], message);
     } else {
       showPublishResult(null);
-      showStatus(message);
+      showSavedOutcome(state.news[index], message);
       announceNewsSync("updated", {
         id: state.news[index]._id,
         slug: state.news[index].slug,
@@ -2217,6 +2332,47 @@ function previewNewsItem(index) {
         title: item.titleEn || "Untitled news",
         summary: item.summaryEn || "",
         bodyHtml: `
+          ${sourceLine ? `<strong>Source</strong><p>${sourceLine}</p>` : ""}
+          <strong>English Copy</strong>
+          <p>${escapeHTML(item.bodyEn || item.summaryEn || item.titleEn || "English translation is being prepared.")}</p>
+        `
+      }
+    }
+  });
+}
+
+function previewNewsItem(index) {
+  const item = state.news[index];
+
+  if (!item) {
+    return;
+  }
+
+  const meta = previewMetaMarkup(item);
+  const sourceLine = item.sourceName
+    ? `${escapeHTML(item.sourceName)}${item.sourcePublishedAt ? ` - ${escapeHTML(formatDateTime(item.sourcePublishedAt))}` : ""}`
+    : "";
+
+  openPreviewModal({
+    badge: item.categoryBadge || item.tag || item.category || "PREVIEW",
+    image: item.image || item.optimizedThumbnail || item.aiThumbnail || item.sourceImage || fallbackImage,
+    status: item.status || "pending",
+    localized: {
+      hi: {
+        title: item.titleHi || item.title || "Untitled news",
+        summary: item.summaryHi || item.summary || "",
+        bodyHtml: `
+          ${meta}
+          ${sourceLine ? `<strong>स्रोत</strong><p>${sourceLine}</p>` : ""}
+          <strong>हिंदी कॉपी</strong>
+          <p>${escapeHTML(item.bodyHi || item.summaryHi || item.titleHi || "Hindi copy will auto-fill after save when OpenAI quota is available.")}</p>
+        `
+      },
+      en: {
+        title: item.titleEn || item.title || "Untitled news",
+        summary: item.summaryEn || item.summary || "",
+        bodyHtml: `
+          ${meta}
           ${sourceLine ? `<strong>Source</strong><p>${sourceLine}</p>` : ""}
           <strong>English Copy</strong>
           <p>${escapeHTML(item.bodyEn || item.summaryEn || item.titleEn || "English translation is being prepared.")}</p>
@@ -2392,6 +2548,63 @@ function renderNewsList() {
   });
 }
 
+function renderNewsList() {
+  fields.newsList.innerHTML = "";
+  updateReviewTabs();
+  const visibleNews = state.news
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => (item.status || "pending") === activeStatusFilter);
+
+  if (!visibleNews.length) {
+    fields.newsList.innerHTML = `<div class="news-item"><strong>No ${escapeHTML(activeStatusFilter)} news found.</strong><p>Items will appear here after AI automation or admin edits.</p></div>`;
+    return;
+  }
+
+  visibleNews.forEach(({ item, index }) => {
+    const row = document.createElement("article");
+    row.className = "news-item";
+    const status = item.status || "pending";
+    const articleLink = status === "published" && item.articleUrl
+      ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> View Article</a>`
+      : "";
+    const districtLabel = item.district || districtLabelFromValue(item.city) || "";
+    row.innerHTML = `
+      <span>${escapeHTML(item.categoryBadge || item.tag || item.category || "UPDATE")}</span>
+      <div class="news-item-head">
+        <strong>${escapeHTML(item.title || item.titleHi || "Untitled news")}</strong>
+        ${statusBadgeMarkup(status)}
+      </div>
+      <div class="news-item-meta">
+        ${statusPillMarkup(status)}
+        <small>${escapeHTML(item.category || "Breaking")}</small>
+        ${districtLabel ? `<small>${escapeHTML(districtLabel)}</small>` : ""}
+        ${item.sourceCredit || item.sourceName ? `<small>SOURCE ${escapeHTML(item.sourceCredit || item.sourceName)}</small>` : ""}
+        ${item.thumbnailStatus ? `<small>THUMB ${escapeHTML(item.thumbnailStatus.toUpperCase())}</small>` : ""}
+        ${item.sourcePublishedAt ? `<small>RSS ${escapeHTML(formatDateTime(item.sourcePublishedAt))}</small>` : ""}
+        ${Number.isFinite(Number(item.freshnessScore)) ? `<small>FRESH ${Number(item.freshnessScore)}</small>` : ""}
+        ${item.translationStatus ? `<small>TRANS ${escapeHTML(item.translationStatus.toUpperCase())}</small>` : ""}
+        ${item.breaking ? "<small>BREAKING</small>" : ""}
+        ${item.trending ? "<small>TRENDING</small>" : ""}
+        ${item.featured ? "<small>TOP STORY</small>" : ""}
+      </div>
+      <p>${escapeHTML(item.summaryHi || item.summary || item.body || "No summary added.")}</p>
+      <div class="item-actions">
+        <button class="ghost-btn" type="button" data-preview="${index}"><i class="fa-solid fa-eye"></i> Preview</button>
+        <button class="ghost-btn" type="button" data-edit="${index}"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button class="primary-btn" type="button" data-approve="${index}"><i class="fa-solid fa-check"></i> Approve & Publish</button>
+        <button class="ghost-btn" type="button" data-pending="${index}"><i class="fa-solid fa-clock"></i> Pending</button>
+        <button class="danger-btn" type="button" data-reject="${index}"><i class="fa-solid fa-ban"></i> Reject</button>
+        <button class="ghost-btn" type="button" data-breaking="${index}"><i class="fa-solid fa-bolt"></i> Breaking</button>
+        <button class="ghost-btn" type="button" data-top="${index}"><i class="fa-solid fa-star"></i> Top</button>
+        <button class="ghost-btn" type="button" data-trending="${index}"><i class="fa-solid fa-arrow-trend-up"></i> Trend</button>
+        ${articleLink}
+        <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
+    `;
+    fields.newsList.appendChild(row);
+  });
+}
+
 async function resetAll() {
   const confirmed = window.confirm("Remove all admin updates from this browser?");
 
@@ -2475,7 +2688,7 @@ async function clearAllPosts() {
     clearNewsForm();
     clearManualForm();
     renderNewsList();
-    renderManualNewsList();
+    renderManualNews();
     updateReviewTabs();
     saveLocalState();
     await loadDashboard();
@@ -2488,6 +2701,12 @@ async function clearAllPosts() {
 }
 
 function bindEvents() {
+  fields.previewLanguageButtons.forEach((button) => {
+    if (button.dataset.previewLang === "hi") {
+      button.textContent = "हिंदी";
+    }
+  });
+
   fields.loginForm.addEventListener("submit", handleLogin);
   fields.logoutAdmin.addEventListener("click", logoutAdmin);
   fields.refreshDashboard?.addEventListener("click", loadDashboard);
@@ -2574,17 +2793,17 @@ function bindEvents() {
     }
 
     if (pendingButton) {
-      updateNewsItem(Number(pendingButton.dataset.pending), { status: "pending" }, "News moved to pending.");
+      updateNewsItem(Number(pendingButton.dataset.pending), { status: "pending" }, "News moved to pending.", { button: pendingButton });
     }
 
     if (rejectButton) {
-      updateNewsItem(Number(rejectButton.dataset.reject), { status: "rejected", featured: false, breaking: false, trending: false }, "News rejected.");
+      updateNewsItem(Number(rejectButton.dataset.reject), { status: "rejected", featured: false, breaking: false, trending: false }, "News rejected.", { button: rejectButton });
     }
 
     if (breakingButton) {
       const index = Number(breakingButton.dataset.breaking);
       const item = state.news[index];
-      updateNewsItem(index, { breaking: !item.breaking, category: item.breaking ? item.category : item.category || "Breaking" }, "Breaking flag updated.");
+      updateNewsItem(index, { breaking: !item.breaking, category: item.breaking ? item.category : item.category || "Breaking" }, "Breaking flag updated.", { button: breakingButton });
     }
 
     if (topButton) {
@@ -2594,7 +2813,7 @@ function bindEvents() {
     if (trendingButton) {
       const index = Number(trendingButton.dataset.trending);
       const item = state.news[index];
-      updateNewsItem(index, { trending: !item.trending }, "Trending flag updated.");
+      updateNewsItem(index, { trending: !item.trending }, "Trending flag updated.", { button: trendingButton });
     }
 
     if (deleteButton) {

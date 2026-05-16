@@ -229,7 +229,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = node.dataset.autoEn || node.dataset.en || node.textContent.trim();
@@ -298,7 +298,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());
@@ -1568,6 +1568,39 @@ function bindNewsOpenButtons() {
 function bindActions() {
   const menu = document.querySelector(".main-menu");
   const menuToggle = document.getElementById("menuToggle");
+  const districtMenu = document.querySelector(".menu-district-menu");
+
+  const positionDistrictMenu = () => {
+    if (!districtMenu?.open || window.matchMedia("(max-width: 680px)").matches) {
+      return;
+    }
+
+    const summary = districtMenu.querySelector("summary");
+    const list = districtMenu.querySelector(".menu-district-list");
+
+    if (!summary || !list) {
+      return;
+    }
+
+    const rect = summary.getBoundingClientRect();
+    const width = Math.min(620, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12));
+    const top = Math.min(rect.bottom + 10, window.innerHeight - Math.min(list.scrollHeight || 430, 430) - 12);
+
+    districtMenu.style.setProperty("--district-menu-width", `${width}px`);
+    districtMenu.style.setProperty("--district-menu-left", `${left}px`);
+    districtMenu.style.setProperty("--district-menu-top", `${Math.max(12, top)}px`);
+  };
+
+  districtMenu?.addEventListener("toggle", positionDistrictMenu);
+  window.addEventListener("resize", positionDistrictMenu);
+  window.addEventListener("scroll", positionDistrictMenu, { passive: true });
+
+  document.addEventListener("click", (event) => {
+    if (districtMenu?.open && !event.target.closest(".menu-district-menu")) {
+      districtMenu.open = false;
+    }
+  });
 
   menuToggle.addEventListener("click", () => {
     const isOpen = menu.classList.toggle("open");
@@ -1576,6 +1609,7 @@ function bindActions() {
 
   document.querySelectorAll(".menu-links a").forEach((link) => {
     link.addEventListener("click", () => {
+      districtMenu?.removeAttribute("open");
       menu.classList.remove("open");
       menuToggle.setAttribute("aria-expanded", "false");
     });
@@ -1883,7 +1917,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());

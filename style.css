@@ -343,14 +343,14 @@ img {
 .main-menu {
   position: sticky;
   top: 0;
-  z-index: 24;
+  z-index: 42;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px clamp(16px, 4vw, 60px);
+  gap: 10px;
+  padding: 8px clamp(16px, 4vw, 60px);
   color: #fff;
-  background: var(--red-dark);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  background: #c1121f;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
 }
 
 .menu-toggle {
@@ -369,14 +369,15 @@ img {
 .menu-links {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   overflow-x: auto;
+  overflow-y: visible;
   min-width: 0;
   max-width: 100%;
-  padding-bottom: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.5) rgba(255, 255, 255, 0.12);
-  -ms-overflow-style: auto;
+  padding-bottom: 0;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
 }
@@ -384,7 +385,7 @@ img {
 .menu-links::-webkit-scrollbar,
 .quick-links::-webkit-scrollbar,
 .portal-main-nav::-webkit-scrollbar {
-  height: 6px;
+  height: 0;
 }
 
 .menu-links::-webkit-scrollbar-track,
@@ -401,23 +402,95 @@ img {
   background: rgba(255, 255, 255, 0.5);
 }
 
-.menu-links a {
+.menu-links a,
+.menu-district-menu summary {
   flex: 0 0 auto;
   padding: 8px 10px;
   border-radius: 6px;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
   scroll-snap-align: start;
 }
 
-.menu-links a:hover {
+.menu-links a:hover,
+.menu-district-menu summary:hover {
   background: rgba(255, 255, 255, 0.16);
 }
 
+.menu-district-menu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.menu-district-menu summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  list-style: none;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.menu-district-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.menu-district-menu summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.menu-district-list {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(130px, 1fr));
+  gap: 5px;
+  width: min(620px, calc(100vw - 24px));
+  max-height: min(70vh, 430px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 20px 46px rgba(0, 0, 0, 0.28);
+}
+
+.menu-district-menu[open] .menu-district-list {
+  position: fixed;
+  top: var(--district-menu-top, 120px);
+  left: var(--district-menu-left, 12px);
+  right: auto;
+  width: var(--district-menu-width, min(620px, calc(100vw - 24px)));
+}
+
+.menu-district-list a {
+  color: #151922;
+  padding: 9px 10px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.menu-district-list a:hover {
+  color: #fff;
+  background: var(--red);
+}
+
 .quickbar {
+  display: none;
   position: relative;
   z-index: 18;
-  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
@@ -464,7 +537,7 @@ img {
 }
 
 .coverage-strip {
-  display: flex;
+  display: none;
   align-items: center;
   gap: 10px;
   padding: 10px clamp(16px, 4vw, 60px);
@@ -2861,6 +2934,33 @@ body.ads-pending .mobile-sticky-ad:not(.adsense-ready) {
     padding-bottom: 0;
     scrollbar-width: auto;
     scroll-snap-type: none;
+  }
+
+  .menu-district-menu {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .menu-district-menu summary {
+    justify-content: center;
+    width: 100%;
+    min-height: 42px;
+    background: #fff;
+    color: var(--red-dark);
+  }
+
+  .menu-district-list {
+    position: static;
+    grid-template-columns: 1fr;
+    width: 100%;
+    max-height: 280px;
+    margin-top: 8px;
+    box-shadow: none;
+  }
+
+  .menu-district-menu[open] .menu-district-list {
+    position: static;
+    width: 100%;
   }
 
   .main-menu.open .menu-links {
