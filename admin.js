@@ -166,6 +166,8 @@ const fields = {
   newsFeatured: document.getElementById("newsFeatured"),
   newsTrending: document.getElementById("newsTrending"),
   newsList: document.getElementById("newsList"),
+  closeNewsEditor: document.getElementById("closeNewsEditor"),
+  newsEditorMode: document.getElementById("newsEditorMode"),
   statusLine: document.getElementById("statusLine"),
   statusLineText: document.getElementById("statusLineText"),
   adminLoading: document.getElementById("adminLoading"),
@@ -670,6 +672,49 @@ function escapeHTML(value) {
     .replaceAll("'", "&#39;");
 }
 
+function escapeRegExp(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function stripSourceNameFromText(value = "", item = {}) {
+  let text = String(value || "").trim();
+  const sources = [
+    item.sourceCredit,
+    item.sourceName,
+    item.feedSourceName,
+    "Patrika News",
+    "Amar Ujala",
+    "Dainik Bhaskar",
+    "Haribhoomi",
+    "News18",
+    "TV9",
+    "ETV Bharat",
+    "Lalluram",
+    "CGWALL"
+  ].filter(Boolean);
+
+  sources.forEach((source) => {
+    const pattern = escapeRegExp(source);
+    text = text
+      .replace(new RegExp(`\\s*(?:[|:/-]\\s*)?${pattern}\\s*$`, "giu"), "")
+      .replace(new RegExp(`^\\s*${pattern}\\s*[:|-]\\s*`, "giu"), "")
+      .trim();
+  });
+
+  return text;
+}
+
+function openNewsEditorPanel(mode = "Edit news") {
+  if (fields.newsEditorMode) {
+    fields.newsEditorMode.textContent = mode;
+  }
+  document.body.classList.add("news-editor-modal-open");
+}
+
+function closeNewsEditorPanel() {
+  document.body.classList.remove("news-editor-modal-open");
+}
+
 function saveLocalState(message) {
   try {
     localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(createLocalStateSnapshot()));
@@ -1096,9 +1141,11 @@ async function uploadAndFill(input, targetField, label) {
     const uploaded = await uploadImage(file);
     targetField.value = uploaded.url;
     input.value = "";
-    showStatus(`${label} uploaded. Ab Save dabayein.`);
+    showStatus(`${label} uploaded. Ab Save dabayein.`, "success");
+    showToast(`${label} uploaded`, "success", "Save News Item dabane par article update ho jayega.");
   } catch (error) {
-    showStatus(`${label} upload failed: ${error.message}`);
+    showStatus(`${label} upload failed: ${error.message}`, "error");
+    showToast(`${label} upload failed`, "error", error.message);
   } finally {
     input.disabled = false;
   }
@@ -1794,6 +1841,11 @@ function detectCategory(value) {
 
 function apiToAdminItem(news) {
   const sourceLanguage = sourceLanguageOfNews(news);
+  const sourceInfo = {
+    sourceCredit: news.sourceCredit,
+    sourceName: news.sourceName,
+    feedSourceName: news.feedSourceName
+  };
   return {
     _id: news._id,
     tag: news.categoryBadge || news.tag || news.category || "UPDATE",
@@ -1811,15 +1863,15 @@ function apiToAdminItem(news) {
     aiThumbnail: absolutizeBackendUrl(news.aiThumbnail || ""),
     thumbnailHash: news.thumbnailHash || "",
     thumbnailStatus: news.thumbnailStatus || "",
-    title: news.title || "",
-    titleEn: news.titleEn || (sourceLanguage === "en" ? news.title || "" : ""),
-    titleHi: news.titleHi || (sourceLanguage === "hi" ? news.title || "" : ""),
-    summary: news.summary || "",
-    summaryEn: news.summaryEn || (sourceLanguage === "en" ? news.summary || "" : ""),
-    summaryHi: news.summaryHi || (sourceLanguage === "hi" ? news.summary || "" : ""),
-    body: news.body || "",
-    bodyEn: news.bodyEn || (sourceLanguage === "en" ? news.body || "" : ""),
-    bodyHi: news.bodyHi || (sourceLanguage === "hi" ? news.body || "" : ""),
+    title: stripSourceNameFromText(news.title || "", sourceInfo),
+    titleEn: stripSourceNameFromText(news.titleEn || (sourceLanguage === "en" ? news.title || "" : ""), sourceInfo),
+    titleHi: stripSourceNameFromText(news.titleHi || (sourceLanguage === "hi" ? news.title || "" : ""), sourceInfo),
+    summary: stripSourceNameFromText(news.summary || "", sourceInfo),
+    summaryEn: stripSourceNameFromText(news.summaryEn || (sourceLanguage === "en" ? news.summary || "" : ""), sourceInfo),
+    summaryHi: stripSourceNameFromText(news.summaryHi || (sourceLanguage === "hi" ? news.summary || "" : ""), sourceInfo),
+    body: stripSourceNameFromText(news.body || "", sourceInfo),
+    bodyEn: stripSourceNameFromText(news.bodyEn || (sourceLanguage === "en" ? news.body || "" : ""), sourceInfo),
+    bodyHi: stripSourceNameFromText(news.bodyHi || (sourceLanguage === "hi" ? news.body || "" : ""), sourceInfo),
     status: news.status || "pending",
     breaking: Boolean(news.breaking),
     featured: Boolean(news.featured),
@@ -2023,6 +2075,7 @@ function fillTicker() {
 }
 
 function clearNewsForm() {
+  closeNewsEditorPanel();
   fields.editingIndex.value = "";
   fields.newsTag.value = "";
   fields.newsCategory.value = "Durg";
@@ -2069,6 +2122,7 @@ function fillNewsForm(index) {
   fields.newsFeatured.checked = Boolean(item.featured);
   fields.newsTrending.checked = Boolean(item.trending);
   showPublishResult((item.status || "pending") === "published" ? item : null);
+  openNewsEditorPanel("Edit AI news");
   fields.newsTitle.focus();
 }
 
@@ -2444,9 +2498,11 @@ async function runThumbnailAction(action) {
     state.news[index] = apiToAdminItem(saved);
     fillNewsForm(index);
     renderNewsList();
-    showStatus(action === "use-source" ? "Source image thumbnail applied." : "AI thumbnail generated.");
+    showStatus(action === "use-source" ? "Source image thumbnail applied." : "AI thumbnail generated.", "success");
+    showToast(action === "use-source" ? "Image updated" : "AI thumbnail ready", "success", state.news[index].titleHi || state.news[index].title || "");
   } catch (error) {
-    showStatus(`Thumbnail update failed: ${error.message}`);
+    showStatus(`Thumbnail update failed: ${error.message}`, "error");
+    showToast("Thumbnail update failed", "error", error.message);
   } finally {
     buttons.forEach((button) => {
       button.disabled = false;
@@ -2713,8 +2769,12 @@ function bindEvents() {
   document.getElementById("publishAll").addEventListener("click", publishState);
   document.getElementById("resetAll").addEventListener("click", resetAll);
   fields.clearAllPosts?.addEventListener("click", clearAllPosts);
-  document.getElementById("addNews").addEventListener("click", clearNewsForm);
+  document.getElementById("addNews").addEventListener("click", () => {
+    clearNewsForm();
+    openNewsEditorPanel("Add AI news");
+  });
   document.getElementById("clearNewsForm").addEventListener("click", clearNewsForm);
+  fields.closeNewsEditor?.addEventListener("click", clearNewsForm);
   document.getElementById("newsForm").addEventListener("submit", saveNewsItem);
   fields.newsUpload?.addEventListener("change", () => uploadAndFill(fields.newsUpload, fields.newsImage, "News image"));
   fields.previewNewsDraft?.addEventListener("click", previewNewsDraft);
@@ -2751,6 +2811,11 @@ function bindEvents() {
   fields.previewModal.addEventListener("click", (event) => {
     if (event.target === fields.previewModal) {
       closePreview();
+    }
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("news-editor-modal-open")) {
+      clearNewsForm();
     }
   });
   fields.reviewTabButtons.forEach((button) => {

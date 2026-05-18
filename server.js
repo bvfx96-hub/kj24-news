@@ -4045,12 +4045,13 @@ function requestedLanguage(req) {
 
 function localizedValue(news, field, language) {
   const sourceLanguage = sourceLanguageForNews(news);
+  const fallback = normalizeText(news[field] || news[`${field}Hi`] || news[`${field}En`] || "");
 
   if (language === "hi") {
-    return normalizeText(news[`${field}Hi`] || (sourceLanguage === "hi" ? news[field] : ""));
+    return normalizeText(news[`${field}Hi`] || (sourceLanguage === "hi" ? news[field] : "") || fallback);
   }
 
-  return normalizeText(news[`${field}En`] || (sourceLanguage === "en" ? news[field] : ""));
+  return normalizeText(news[`${field}En`] || (sourceLanguage === "en" ? news[field] : "") || fallback);
 }
 
 function localizedNews(news, language) {
@@ -4384,6 +4385,18 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const language = requestedLanguage(req);
   const labels = articlePageLabels(language);
   const article = localizedNews(news, language);
+  const cleanArticleOptions = {
+    targetLanguage: language,
+    sourceName: news.sourceName || news.sourceCredit,
+    feedSourceName: news.feedSourceName
+  };
+  article.title = cleanNewsCopyText(article.title, cleanArticleOptions) || article.title;
+  article.summary = cleanNewsCopyText(article.summary, cleanArticleOptions) || article.summary;
+  article.body = cleanNewsCopyText(article.body, cleanArticleOptions) || article.body;
+  article.metaTitle = cleanNewsCopyText(article.metaTitle, cleanArticleOptions) || article.metaTitle;
+  article.metaDescription = cleanNewsCopyText(article.metaDescription, cleanArticleOptions) || article.metaDescription;
+  article.ogTitle = cleanNewsCopyText(article.ogTitle, cleanArticleOptions) || article.ogTitle;
+  article.ogDescription = cleanNewsCopyText(article.ogDescription, cleanArticleOptions) || article.ogDescription;
   const url = articleUrl(news, req);
   const categoryUrl = landingPageForNews(news);
   const shareText = encodeURIComponent(article.title);
