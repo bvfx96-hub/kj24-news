@@ -1527,7 +1527,7 @@ section {
 }
 
 .policy-wrap::before {
-  content: "LATEST UPDATE";
+  content: "KHABRI JUNCTION";
   display: inline-flex;
   width: fit-content;
   margin-bottom: 14px;
@@ -1644,6 +1644,188 @@ section {
 .news-page .policy-wrap::after,
 .news-page::after {
   display: none;
+}
+
+.policy-page .policy-wrap::after,
+.policy-page::after {
+  display: none;
+}
+
+.policy-links {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.policy-links strong {
+  color: var(--ink);
+}
+
+.policy-links nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.policy-links a {
+  display: inline-flex;
+  width: fit-content;
+  padding: 8px 11px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: #f8fafc;
+  font-weight: 800;
+}
+
+.policy-language-switch {
+  width: min(960px, calc(100% - 32px));
+  margin: 14px auto 0;
+  justify-content: flex-start;
+}
+
+.policy-language-switch button {
+  min-width: 78px;
+}
+
+.policy-footer {
+  padding: 16px;
+  color: #b8c0cc;
+  background: #15181f;
+  text-align: center;
+  font-size: 0.86rem;
+}
+
+.policy-site-footer {
+  margin-top: 34px;
+}
+
+.policy-site-footer .footer-grid {
+  width: min(1280px, calc(100% - 28px));
+}
+
+.footer a {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  max-width: 100%;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+  transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.footer a:hover,
+.footer a:focus-visible,
+.footer a.active,
+.footer a[aria-current="page"] {
+  color: #fff;
+  background: rgba(215, 15, 28, 0.18);
+  outline: none;
+  transform: translateX(2px);
+}
+
+.footer li,
+.footer p {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .footer {
+    padding: 18px 14px 14px;
+  }
+
+  .footer-grid,
+  .policy-site-footer .footer-grid {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+    padding: 0;
+  }
+
+  .footer-grid > div {
+    min-width: 0;
+    padding: 12px 0;
+  }
+
+  .footer-grid > div:nth-child(2) ul,
+  .footer-grid > div:nth-child(3) ul {
+    columns: 1 !important;
+  }
+
+  .footer h3 {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+  }
+
+  .footer li {
+    margin-bottom: 4px;
+    font-size: 0.86rem;
+  }
+
+  .footer a {
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+
+  .footer-grid > div:first-child {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .footer-grid > div:first-child p {
+    min-width: 0;
+  }
+
+  .footer-notify-box {
+    width: 100%;
+    grid-template-columns: 1fr !important;
+    padding: 12px;
+  }
+
+  .footer-notify-actions,
+  .footer-notify-box .read-btn {
+    width: 100%;
+  }
+
+  .policy-language-switch {
+    width: calc(100% - 20px);
+    margin-top: 10px;
+  }
+
+  .policy-language-switch button {
+    min-width: 68px;
+    padding-inline: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .footer {
+    padding-inline: 10px;
+  }
+
+  .footer h3 {
+    font-size: 0.88rem;
+  }
+
+  .footer li,
+  .footer a,
+  .footer p {
+    font-size: 0.8rem;
+  }
+
+  .footer a {
+    min-height: 34px;
+  }
 }
 
 .news-page .policy-wrap {
@@ -1984,6 +2166,11 @@ section {
 .portal-language-switch button.active {
   color: #fff;
   background: var(--red);
+}
+
+.category-language-switch {
+  width: fit-content;
+  margin: 0 0 14px auto;
 }
 
 .portal-container {
@@ -4016,5 +4203,140 @@ body.ads-pending .mobile-sticky-ad:not(.adsense-ready) {
   .entertainment-grid,
   .page-link-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Final footer override: keep links tappable and prevent mobile overflow. */
+.footer a,
+.footer a:visited {
+  cursor: pointer;
+  pointer-events: auto !important;
+  text-decoration: none;
+}
+
+.footer a:hover,
+.footer a:focus-visible,
+.footer a.active,
+.footer a[aria-current="page"] {
+  color: #fff !important;
+  background: rgba(215, 15, 28, 0.18);
+}
+
+.footer li,
+.footer p,
+.footer a {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+@media (max-width: 768px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .footer {
+    padding: 12px 10px 10px !important;
+  }
+
+  .footer-grid,
+  .policy-site-footer .footer-grid {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 0 !important;
+    padding: 0 !important;
+  }
+
+  .footer-grid > div,
+  .footer-grid > div:first-child {
+    display: block !important;
+    min-width: 0 !important;
+    padding: 8px 0 !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .footer-grid > div:nth-child(2) ul,
+  .footer-grid > div:nth-child(3) ul {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    columns: auto !important;
+    column-gap: 0 !important;
+  }
+
+  .footer img {
+    width: 34px !important;
+    height: 34px !important;
+    margin: 0 0 5px !important;
+  }
+
+  .footer h3,
+  .footer-grid > div > p:first-of-type {
+    margin: 0 0 6px !important;
+    font-size: 0.86rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .footer li {
+    margin: 0 !important;
+    font-size: 0.78rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .footer a {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100% !important;
+    min-height: 28px !important;
+    padding: 4px 6px !important;
+    border-radius: 6px;
+    font-size: 0.78rem !important;
+    line-height: 1.22 !important;
+  }
+
+  .footer p {
+    font-size: 0.78rem !important;
+    line-height: 1.35 !important;
+  }
+
+  .footer-notify-box {
+    width: 100% !important;
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+  }
+
+  .footer-notify-actions,
+  .footer-notify-box .read-btn {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .footer {
+    padding-inline: 10px !important;
+  }
+
+  .footer h3 {
+    font-size: 0.9rem !important;
+  }
+
+  .footer a,
+  .footer li,
+  .footer p {
+    font-size: 0.74rem !important;
+  }
+
+  .footer a {
+    min-height: 26px !important;
+    padding-inline: 5px !important;
+  }
+
+  .footer-grid > div:nth-child(2) ul,
+  .footer-grid > div:nth-child(3) ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 }

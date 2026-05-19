@@ -16,21 +16,32 @@ const newsSyncChannel = typeof BroadcastChannel === "function"
   : null;
 const FALLBACK_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const CATEGORY_LINKS = {
-  "breaking.html": "/category/breaking",
-  "durg.html": "/category/durg",
-  "bhilai.html": "/category/bhilai",
-  "raipur.html": "/category/raipur",
-  "bilaspur.html": "/category/bilaspur",
-  "kawardha.html": "/category/kawardha",
-  "khairagarh.html": "/category/khairagarh",
-  "rajnandgaon.html": "/category/rajnandgaon",
+  "breaking.html": "/category/breaking-news",
+  "durg.html": "/district/durg",
+  "bhilai.html": "/district/bhilai",
+  "raipur.html": "/district/raipur",
+  "bilaspur.html": "/district/bilaspur",
+  "kawardha.html": "/district/kawardha",
+  "khairagarh.html": "/district/khairagarh",
+  "rajnandgaon.html": "/district/rajnandgaon",
   "sports.html": "/category/sports",
-  "astrology.html": "/category/astrology",
+  "astrology.html": "/category/horoscope",
   "politics.html": "/category/politics",
   "crime.html": "/category/crime",
   "entertainment.html": "/category/entertainment",
   "health.html": "/category/health",
   "jobs.html": "/category/jobs",
+  "about.html": "/about",
+  "contact.html": "/contact",
+  "privacy-policy.html": "/privacy-policy",
+  "cookie-policy.html": "/cookie-policy",
+  "terms-and-conditions.html": "/terms-conditions",
+  "disclaimer.html": "/disclaimer",
+  "editorial-policy.html": "/editorial-policy",
+  "fact-check-policy.html": "/fact-check-policy",
+  "correction-policy.html": "/correction-policy",
+  "advertise.html": "/advertise",
+  "admin.html": "/admin",
   "/raipur-news": "/category/raipur",
   "/raipur-promotion-news": "/category/raipur-promotion",
   "/market-news": "/category/market",
@@ -60,7 +71,7 @@ const HINDI_TEXT_BY_EN = {
   "Kawardha, Khairagarh, Rajnandgaon and Bilaspur pages updated": "कवर्धा, खैरागढ़, राजनांदगांव और बिलासपुर पेज अपडेट",
   "Market watch and ad booking sections are open": "मार्केट वॉच और विज्ञापन बुकिंग सेक्शन खुले हैं",
   "Fastest digital news for Chhattisgarh": "छत्तीसगढ़ की सबसे तेज डिजिटल न्यूज़",
-  "Durg 34Â°": "दुर्ग 34°",
+  "Durg 34°": "दुर्ग 34°",
   "Durg 34°": "दुर्ग 34°",
   "ADVERTISEMENT": "विज्ञापन",
   "Local business, stock marketing and digital campaigns": "लोकल बिज़नेस, स्टॉक मार्केटिंग और डिजिटल कैंपेन",
@@ -229,7 +240,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer-links a, .footer-links strong, .copyright";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = node.dataset.autoEn || node.dataset.en || node.textContent.trim();
@@ -262,7 +273,7 @@ function repairMojibakeText(value) {
 }
 
 function looksCorruptHindi(value) {
-  return /Ã |Ã‚|Ãƒ|ï¿½|Ã°|Ã˜|à¤|â€™|Â°|Â©/.test(String(value || ""));
+  return /à|Ã‚|Ãƒ|ï¿½|ð|Ã˜|à¤|â€™|°|©/.test(String(value || ""));
 }
 
 function normalizeDisplayText(value) {
@@ -298,7 +309,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer-links a, .footer-links strong";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());
@@ -1769,10 +1780,31 @@ function createStickySubscribeCta() {
 }
 
 function bindFooterLinks() {
+  const normalizePath = (value = "") => {
+    try {
+      const url = new URL(value, window.location.origin);
+      return url.pathname
+        .replace(/\/index\.html$/i, "/")
+        .replace(/\.html$/i, "")
+        .replace(/\/+$/u, "") || "/";
+    } catch (error) {
+      return String(value || "").replace(/\.html$/i, "").replace(/\/+$/u, "") || "/";
+    }
+  };
+  const currentPath = normalizePath(window.location.pathname);
+
   document.querySelectorAll(".footer a, .visit-strip a").forEach((link) => {
     link.style.pointerEvents = "auto";
     link.style.position = "relative";
     link.style.zIndex = "20";
+    const linkPath = normalizePath(link.getAttribute("href") || "");
+    const isActive = linkPath === currentPath
+      || (currentPath === "/category/breaking" && linkPath === "/category/breaking-news")
+      || (currentPath === "/category/astrology" && linkPath === "/category/horoscope");
+    link.classList.toggle("active", isActive);
+    if (isActive) {
+      link.setAttribute("aria-current", "page");
+    }
     link.addEventListener("click", (event) => {
       event.stopPropagation();
     }, { capture: true });
@@ -1864,7 +1896,7 @@ function repairMojibakeText(value) {
 
     return new TextDecoder("utf-8").decode(bytes)
       .replace(/\uFFFD/g, "")
-      .replace(/Â°/g, "°")
+      .replace(/°/g, "°")
       .replace(/â€™/g, "'")
       .trim();
   } catch (error) {
@@ -1873,14 +1905,14 @@ function repairMojibakeText(value) {
 }
 
 function looksCorruptHindi(value) {
-  return /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(String(value || ""));
+  return /[àÃÂâ�]|œ|™|š|ž|ÿ|\?{2,}/.test(String(value || ""));
 }
 
 function normalizeDisplayText(value) {
   const text = String(value || "").trim();
   const normalized = looksCorruptHindi(text) ? repairMojibakeText(text) : text;
   return normalized
-    .replace(/Â°/g, "°")
+    .replace(/°/g, "°")
     .replace(/â€™/g, "'")
     .trim();
 }
@@ -1905,7 +1937,7 @@ function getHindiText(en, hi) {
     return normalizeDisplayText(HINDI_TEXT_BY_EN[english]);
   }
 
-  if (hindi) {
+  if (hindi && !looksCorruptHindi(hindi)) {
     return hindi;
   }
 
@@ -1917,7 +1949,7 @@ function getLocalizedText(en, hi, language) {
 }
 
 function applyUiLanguage(language) {
-  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer li, .footer-links a, .footer-links strong, .copyright";
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .quick-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer-links a, .footer-links strong, .copyright";
 
   document.querySelectorAll(selector).forEach((node) => {
     const original = normalizeDisplayText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());

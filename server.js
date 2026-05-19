@@ -49,16 +49,16 @@ const CATEGORY_DEFINITIONS = [
   { label: "Local News", slug: "local-news", page: "local-news", badge: "LOCAL", keywords: ["local", "district", "city", "ward", "nagar", "local news"] },
   { label: "MP Shahdol", slug: "mp-shahdol", page: "mp-shahdol-news", badge: "SHAHDOL", keywords: ["shahdol", "mp shahdol", "madhya pradesh shahdol"] },
   { label: "World", slug: "world", page: "desh-duniya-news", badge: "WORLD", keywords: ["world", "global", "international", "desh duniya", "foreign"] },
-  { label: "Education", slug: "education", page: "local-news", badge: "EDUCATION", keywords: ["education", "school", "college", "exam", "admission", "à¤¶à¤¿à¤•à¥à¤·à¤¾", "à¤¸à¥à¤•à¥‚à¤²"] },
-  { label: "Business", slug: "business", page: "market-news", badge: "BUSINESS", keywords: ["business", "startup", "industry", "trade", "à¤µà¥à¤¯à¤¾à¤ªà¤¾à¤°", "à¤•à¤¾à¤°à¥‹à¤¬à¤¾à¤°"] },
-  { label: "Agriculture", slug: "agriculture", page: "local-news", badge: "AGRI", keywords: ["agriculture", "farmer", "crop", "mandi", "farming", "à¤•à¤¿à¤¸à¤¾à¤¨", "à¤–à¥‡à¤¤à¥€"] },
+  { label: "Education", slug: "education", page: "local-news", badge: "EDUCATION", keywords: ["education", "school", "college", "exam", "admission", "à¤¶à¤¿à¤•्षा", "à¤¸à¥à¤•à¥‚ल"] },
+  { label: "Business", slug: "business", page: "market-news", badge: "BUSINESS", keywords: ["business", "startup", "industry", "trade", "व्यापार", "à¤•à¤¾à¤°à¥‹बार"] },
+  { label: "Agriculture", slug: "agriculture", page: "local-news", badge: "AGRI", keywords: ["agriculture", "farmer", "crop", "mandi", "farming", "à¤•िसान", "à¤–à¥‡à¤¤à¥€"] },
   { label: "Technology", slug: "technology", page: "local-news", badge: "TECH", keywords: ["technology", "digital", "ai", "app", "tech", "à¤Ÿà¥‡à¤•"] },
-  { label: "Lifestyle", slug: "lifestyle", page: "entertainment.html", badge: "LIFESTYLE", keywords: ["lifestyle", "fashion", "food", "travel", "à¤²à¤¾à¤‡à¤«à¤¸à¥à¤Ÿà¤¾à¤‡à¤²"] },
-  { label: "Travel", slug: "travel", page: "local-news", badge: "TRAVEL", keywords: ["travel", "tourism", "tourist", "à¤¯à¤¾à¤¤à¥à¤°à¤¾", "à¤ªà¤°à¥à¤¯à¤Ÿà¤¨"] },
-  { label: "Fashion", slug: "fashion", page: "entertainment.html", badge: "FASHION", keywords: ["fashion", "style", "à¤«à¥ˆà¤¶à¤¨"] },
-  { label: "Movie", slug: "movie", page: "entertainment.html", badge: "MOVIE", keywords: ["movie", "film", "cinema", "à¤«à¤¿à¤²à¥à¤®"] },
-  { label: "Music", slug: "music", page: "entertainment.html", badge: "MUSIC", keywords: ["music", "song", "singer", "à¤—à¥€à¤¤", "à¤¸à¤‚à¤—à¥€à¤¤"] },
-  { label: "Events", slug: "events", page: "local-news", badge: "EVENTS", keywords: ["event", "programme", "festival", "à¤•à¤¾à¤°à¥à¤¯à¤•à¥à¤°à¤®", "à¤®à¤¹à¥‹à¤¤à¥à¤¸à¤µ"] },
+  { label: "Lifestyle", slug: "lifestyle", page: "entertainment.html", badge: "LIFESTYLE", keywords: ["lifestyle", "fashion", "food", "travel", "à¤²à¤¾à¤‡à¤«à¤¸à¥à¤Ÿà¤¾à¤‡ल"] },
+  { label: "Travel", slug: "travel", page: "local-news", badge: "TRAVEL", keywords: ["travel", "tourism", "tourist", "यात्रा", "à¤ªà¤°à¥à¤¯à¤Ÿन"] },
+  { label: "Fashion", slug: "fashion", page: "entertainment.html", badge: "FASHION", keywords: ["fashion", "style", "à¤«à¥ˆशन"] },
+  { label: "Movie", slug: "movie", page: "entertainment.html", badge: "MOVIE", keywords: ["movie", "film", "cinema", "फिल्म"] },
+  { label: "Music", slug: "music", page: "entertainment.html", badge: "MUSIC", keywords: ["music", "song", "singer", "à¤—à¥€त", "à¤¸à¤‚à¤—à¥€त"] },
+  { label: "Events", slug: "events", page: "local-news", badge: "EVENTS", keywords: ["event", "programme", "festival", "à¤•à¤¾à¤°à¥à¤¯à¤•्रम", "à¤®à¤¹à¥‹त्सव"] },
   { label: "Sports", slug: "sports", page: "sports.html", badge: "SPORTS", keywords: ["ipl", "cricket", "football", "match", "tournament", "sports", "score", "team", "league"] },
   { label: "Astrology", slug: "astrology", page: "astrology.html", badge: "ASTROLOGY", keywords: ["rashifal", "astrology", "horoscope", "zodiac", "panchang"] },
   { label: "Crime", slug: "crime", page: "crime.html", badge: "CRIME", keywords: ["murder", "police", "theft", "crime", "arrest", "fraud", "case", "fir"] },
@@ -99,14 +99,14 @@ const CATEGORY_DEFINITIONS = [
   { label: "Breaking", slug: "breaking", page: "breaking.html", badge: "BREAKING", keywords: ["breaking", "latest", "alert", "big news", "urgent"] }
 ];
 const CLEAN_CATEGORY_ROUTES = [
-  { path: "/raipur-news", title: "Raipur News", category: "Raipur", description: "à¤°à¤¾à¤¯à¤ªà¥à¤° à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤²à¥‹à¤•à¤² à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿà¥¤" },
-  { path: "/raipur-promotion-news", title: "Raipur Promotion News", category: "Raipur Promotion", description: "à¤°à¤¾à¤¯à¤ªà¥à¤° à¤ªà¥à¤°à¤®à¥‹à¤¶à¤¨, à¤¬à¥à¤°à¤¾à¤‚à¤¡ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤¸à¥à¤ªà¥‰à¤¨à¥à¤¸à¤°à¥à¤¡ à¤²à¥‹à¤•à¤² à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
-  { path: "/market-news", title: "Market News", category: "Market", description: "à¤¶à¥‡à¤¯à¤° à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ, à¤¬à¤¿à¤œà¤¨à¥‡à¤¸ à¤”à¤° à¤¬à¤¾à¤œà¤¾à¤° à¤…à¤ªà¤¡à¥‡à¤Ÿà¥¤" },
-  { path: "/weather-update", title: "Weather Update", category: "Weather", description: "à¤¦à¥à¤°à¥à¤—, à¤­à¤¿à¤²à¤¾à¤ˆ à¤”à¤° à¤°à¤¾à¤¯à¤ªà¥à¤° à¤•à¤¾ à¤®à¥Œà¤¸à¤® à¤…à¤ªà¤¡à¥‡à¤Ÿà¥¤" },
-  { path: "/viral-videos", title: "Viral Reels / Viral Videos", category: "Viral Videos", description: "à¤µà¤¾à¤¯à¤°à¤² à¤µà¥€à¤¡à¤¿à¤¯à¥‹, à¤¯à¥‚à¤Ÿà¥à¤¯à¥‚à¤¬ à¤°à¥€à¤² à¤”à¤° à¤Ÿà¥à¤°à¥‡à¤‚à¤¡à¤¿à¤‚à¤— à¤²à¥‹à¤•à¤² à¤•à¥à¤²à¤¿à¤ªà¥¤" },
-  { path: "/local-news", title: "Local News", category: "Local News", description: "à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—à¤¢à¤¼ à¤•à¥€ à¤²à¥‹à¤•à¤² à¤”à¤° à¤œà¤¿à¤²à¤¾ à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
-  { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "à¤®à¤§à¥à¤¯ à¤ªà¥à¤°à¤¦à¥‡à¤¶ à¤¶à¤¹à¤¡à¥‹à¤² à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚à¥¤" },
-  { path: "/desh-duniya-news", title: "à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾ à¤•à¥€ à¤–à¤¬à¤°", category: "World", description: "à¤¦à¥‡à¤¶-à¤¦à¥à¤¨à¤¿à¤¯à¤¾, à¤…à¤‚à¤¤à¤°à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¥€à¤¯ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤—à¥à¤²à¥‹à¤¬à¤² à¤–à¤¬à¤°à¥‡à¤‚à¥¤" }
+  { path: "/raipur-news", title: "Raipur News", category: "Raipur", description: "रायपुर à¤•à¥€ à¤¤à¤¾à¤œा à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”र à¤²à¥‹à¤•ल à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿ।" },
+  { path: "/raipur-promotion-news", title: "Raipur Promotion News", category: "Raipur Promotion", description: "रायपुर à¤ªà¥à¤°à¤®à¥‹शन, à¤¬à¥à¤°à¤¾à¤‚ड à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”र à¤¸à¥à¤ªà¥‰न्सर्ड à¤²à¥‹à¤•ल à¤–à¤¬à¤°à¥‡à¤‚।" },
+  { path: "/market-news", title: "Market News", category: "Market", description: "à¤¶à¥‡यर à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ, à¤¬à¤¿à¤œà¤¨à¥‡स à¤”र à¤¬à¤¾à¤œार à¤…à¤ªà¤¡à¥‡à¤Ÿ।" },
+  { path: "/weather-update", title: "Weather Update", category: "Weather", description: "à¤¦à¥à¤°à¥à¤—, à¤­à¤¿à¤²à¤¾à¤ˆ à¤”र रायपुर à¤•ा à¤®à¥Œसम à¤…à¤ªà¤¡à¥‡à¤Ÿ।" },
+  { path: "/viral-videos", title: "Viral Reels / Viral Videos", category: "Viral Videos", description: "वायरल à¤µà¥€à¤¡à¤¿à¤¯à¥‹, à¤¯à¥‚à¤Ÿà¥à¤¯à¥‚ब à¤°à¥€ल à¤”र à¤Ÿà¥à¤°à¥‡à¤‚à¤¡à¤¿à¤‚à¤— à¤²à¥‹à¤•ल à¤•्लिप।" },
+  { path: "/local-news", title: "Local News", category: "Local News", description: "à¤›à¤¤à¥à¤¤à¥€à¤¸à¤—ढ़ à¤•à¥€ à¤²à¥‹à¤•ल à¤”र à¤œिला à¤–à¤¬à¤°à¥‡à¤‚।" },
+  { path: "/mp-shahdol-news", title: "MP Shahdol News", category: "MP Shahdol", description: "मध्य à¤ªà¥à¤°à¤¦à¥‡श à¤¶à¤¹à¤¡à¥‹ल à¤•à¥€ à¤¤à¤¾à¤œा à¤–à¤¬à¤°à¥‡à¤‚।" },
+  { path: "/desh-duniya-news", title: "à¤¦à¥‡श-दुनिया à¤•à¥€ à¤–बर", category: "World", description: "à¤¦à¥‡श-दुनिया, à¤…à¤‚à¤¤à¤°à¤°à¤¾à¤·à¥à¤Ÿà¥à¤°à¥€य à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”र à¤—à¥à¤²à¥‹बल à¤–à¤¬à¤°à¥‡à¤‚।" }
 ];
 const CATEGORY_ROUTE_ALIASES = new Map([
   ["home", "breaking"],
@@ -313,7 +313,7 @@ function decodeMojibake(value) {
 
     return new TextDecoder("utf-8").decode(bytes)
       .replace(/\uFFFD/g, "")
-      .replace(/Â°/g, "°")
+      .replace(/°/g, "°")
       .replace(/â€™/g, "'")
       .trim();
   } catch (error) {
@@ -340,7 +340,7 @@ function normalizeText(value) {
     .trim();
   const normalized = /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(text) ? decodeMojibake(text) : text;
   return normalized
-    .replace(/Â°/g, "°")
+    .replace(/°/g, "°")
     .replace(/â€™/g, "'")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -520,7 +520,7 @@ function normalizeSiteSettings(settings = {}) {
       ? settings.weather.map((item) => ({
           ...item,
           city: normalizeText(item.city),
-          temp: normalizeText(item.temp).replace(/Â°/g, "°"),
+          temp: normalizeText(item.temp).replace(/°/g, "°"),
           condition: normalizeText(item.condition)
         }))
       : [],
@@ -1202,19 +1202,19 @@ function inferCategory(text) {
   return "Breaking";
 
   const categoryRules = [
-    ["Astrology", ["astrology", "rashifal", "horoscope", "panchang", "zodiac", "à¤°à¤¾à¤¶à¤¿à¤«à¤²", "à¤œà¥à¤¯à¥‹à¤¤à¤¿à¤·"]],
-    ["Sports", ["sports", "cricket", "ipl", "football", "match", "à¤–à¥‡à¤²", "à¤•à¥à¤°à¤¿à¤•à¥‡à¤Ÿ"]],
+    ["Astrology", ["astrology", "rashifal", "horoscope", "panchang", "zodiac", "राशिफल", "à¤œà¥à¤¯à¥‹तिष"]],
+    ["Sports", ["sports", "cricket", "ipl", "football", "match", "à¤–à¥‡ल", "à¤•à¥à¤°à¤¿à¤•à¥‡à¤Ÿ"]],
     ["Durg", ["durg", "à¤¦à¥à¤°à¥à¤—"]],
     ["Bhilai", ["bhilai", "à¤­à¤¿à¤²à¤¾à¤ˆ"]],
-    ["Raipur", ["raipur", "à¤°à¤¾à¤¯à¤ªà¥à¤°"]],
-    ["Bilaspur", ["bilaspur", "à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°"]],
-    ["Kawardha", ["kawardha", "à¤•à¤µà¤°à¥à¤§à¤¾"]],
-    ["Khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—à¤¢à¤¼", "à¤–à¥ˆà¤°à¤¾à¤—à¥"]],
-    ["Rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚à¤µ"]],
-    ["Politics", ["politics", "election", "minister", "bjp", "congress", "à¤°à¤¾à¤œà¤¨à¥€à¤¤à¤¿", "à¤šà¥à¤¨à¤¾à¤µ"]],
-    ["Crime", ["crime", "police", "arrest", "murder", "fraud", "à¤…à¤ªà¤°à¤¾à¤§", "à¤ªà¥à¤²à¤¿à¤¸"]],
-    ["Health", ["health", "hospital", "doctor", "medical", "à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯", "à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤²"]],
-    ["Jobs", ["job", "jobs", "recruitment", "vacancy", "à¤°à¥‹à¤œà¤—à¤¾à¤°", "à¤¨à¥Œà¤•à¤°à¥€"]]
+    ["Raipur", ["raipur", "रायपुर"]],
+    ["Bilaspur", ["bilaspur", "बिलासपुर"]],
+    ["Kawardha", ["kawardha", "à¤•वर्धा"]],
+    ["Khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—ढ़", "à¤–à¥ˆà¤°à¤¾à¤—ढ़"]],
+    ["Rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚व"]],
+    ["Politics", ["politics", "election", "minister", "bjp", "congress", "à¤°à¤¾à¤œà¤¨à¥€ति", "à¤šुनाव"]],
+    ["Crime", ["crime", "police", "arrest", "murder", "fraud", "à¤…पराध", "पुलिस"]],
+    ["Health", ["health", "hospital", "doctor", "medical", "स्वास्थ्य", "à¤…स्पताल"]],
+    ["Jobs", ["job", "jobs", "recruitment", "vacancy", "à¤°à¥‹à¤œà¤—ार", "à¤¨à¥Œà¤•à¤°à¥€"]]
   ];
 
   const match = categoryRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
@@ -1234,11 +1234,11 @@ function inferCity(text) {
   const cityRules = [
     ["durg", ["durg", "à¤¦à¥à¤°à¥à¤—"]],
     ["bhilai", ["bhilai", "à¤­à¤¿à¤²à¤¾à¤ˆ"]],
-    ["raipur", ["raipur", "à¤°à¤¾à¤¯à¤ªà¥à¤°"]],
-    ["bilaspur", ["bilaspur", "à¤¬à¤¿à¤²à¤¾à¤¸à¤ªà¥à¤°"]],
-    ["kawardha", ["kawardha", "à¤•à¤µà¤°à¥à¤§à¤¾"]],
-    ["khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—à¤¢à¤¼", "à¤–à¥ˆà¤°à¤¾à¤—à¥"]],
-    ["rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚à¤µ"]]
+    ["raipur", ["raipur", "रायपुर"]],
+    ["bilaspur", ["bilaspur", "बिलासपुर"]],
+    ["kawardha", ["kawardha", "à¤•वर्धा"]],
+    ["khairagarh", ["khairagarh", "à¤–à¥ˆà¤°à¤¾à¤—ढ़", "à¤–à¥ˆà¤°à¤¾à¤—ढ़"]],
+    ["rajnandgaon", ["rajnandgaon", "à¤°à¤¾à¤œà¤¨à¤¾à¤‚à¤¦à¤—à¤¾à¤‚व"]]
   ];
 
   const match = cityRules.find(([, keywords]) => keywords.some((keyword) => value.includes(keyword)));
@@ -1836,9 +1836,9 @@ async function requireDatabase(req, res, next) {
 <body class="article-page">
   <main class="portal-shell">
     <section class="market-card category-focus-card">
-      <div class="section-title"><span></span><strong>à¤¨à¥à¤¯à¥‚à¤œ à¤¸à¤°à¥à¤µà¤° à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ</strong></div>
-      <p class="article-summary">à¤•à¥ƒà¤ªà¤¯à¤¾ à¤•à¥à¤› à¤¸à¥‡à¤•à¤‚à¤¡ à¤¬à¤¾à¤¦ à¤ªà¥‡à¤œ refresh à¤•à¤°à¥‡à¤‚. MongoDB connection à¤…à¤­à¥€ à¤¤à¥ˆà¤¯à¤¾à¤° à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ.</p>
-      <a class="read-btn" href="/index.html">à¤¹à¥‹à¤® à¤ªà¤° à¤œà¤¾à¤à¤‚</a>
+      <div class="section-title"><span></span><strong>à¤¨à¥à¤¯à¥‚à¤œ सर्वर à¤•à¤¨à¥‡à¤•à¥à¤Ÿ à¤¹à¥‹ रहा à¤¹à¥ˆ</strong></div>
+      <p class="article-summary">à¤•à¥ƒपया à¤•à¥à¤› à¤¸à¥‡à¤•à¤‚ड बाद à¤ªà¥‡à¤œ refresh à¤•à¤°à¥‡à¤‚. MongoDB connection à¤…à¤­à¥€ à¤¤à¥ˆयार à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ.</p>
+      <a class="read-btn" href="/index.html">à¤¹à¥‹म पर à¤œà¤¾à¤à¤‚</a>
     </section>
   </main>
 </body>
@@ -2220,9 +2220,9 @@ function defaultSiteSettings() {
   return {
     _id: "site",
     weather: [
-      { city: "Durg", temp: "34Â°C", condition: "à¤¸à¤¾à¤« à¤®à¥Œà¤¸à¤®", updatedAt: now },
-      { city: "Bhilai", temp: "33Â°C", condition: "à¤¹à¤²à¥à¤•à¥€ à¤—à¤°à¥à¤®à¥€", updatedAt: now },
-      { city: "Raipur", temp: "35Â°C", condition: "à¤§à¥‚à¤ª", updatedAt: now }
+      { city: "Durg", temp: "34°C", condition: "साफ à¤®à¥Œसम", updatedAt: now },
+      { city: "Bhilai", temp: "33°C", condition: "à¤¹à¤²à¥à¤•à¥€ à¤—à¤°à¥à¤®à¥€", updatedAt: now },
+      { city: "Raipur", temp: "35°C", condition: "à¤§à¥‚प", updatedAt: now }
     ],
     market: [
       { name: "SENSEX", value: "77,958.52", change: "+1.22%" },
@@ -2235,8 +2235,8 @@ function defaultSiteSettings() {
       { match: "Local League", score: "Durg XI 126/3", status: "Live" }
     ],
     videos: [
-      { title: "à¤²à¥‹à¤•à¤² à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤°à¥€à¤² à¤µà¤¾à¤¯à¤°à¤²", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
-      { title: "à¤¶à¤¹à¤° à¤Ÿà¥à¤°à¥ˆà¤«à¤¿à¤• à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤µà¥€à¤¡à¤¿à¤¯à¥‹", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
+      { title: "à¤²à¥‹à¤•ल à¤®à¤¾à¤°à¥à¤•à¥‡à¤Ÿ à¤°à¥€ल वायरल", url: "", type: "Reel", thumbnail: DEFAULT_NEWS_IMAGE },
+      { title: "शहर à¤Ÿà¥à¤°à¥ˆà¤«à¤¿à¤• à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤µà¥€à¤¡à¤¿à¤¯à¥‹", url: "", type: "Video", thumbnail: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop" }
     ],
     ads: {
       header: "",
@@ -2246,8 +2246,8 @@ function defaultSiteSettings() {
     },
     notification: {
       enabled: true,
-      title: "à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥€ à¤¸à¥‚à¤šà¤¨à¤¾ à¤ªà¤¾à¤à¤‚",
-      description: "Khabri Junction à¤¸à¥‡ à¤²à¥‹à¤•à¤² à¤¨à¥à¤¯à¥‚à¤œ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤ªà¤¾à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤¨à¥‹à¤Ÿà¤¿à¤«à¤¿à¤•à¥‡à¤¶à¤¨ à¤¸à¤¬à¥à¤¸à¤•à¥à¤°à¤¾à¤‡à¤¬ à¤•à¤°à¥‡à¤‚à¥¤"
+      title: "à¤¤à¤¾à¤œा à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥€ à¤¸à¥‚à¤šना à¤ªà¤¾à¤à¤‚",
+      description: "Khabri Junction à¤¸à¥‡ à¤²à¥‹à¤•ल à¤¨à¥à¤¯à¥‚à¤œ à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤ªà¤¾à¤¨à¥‡ à¤•à¥‡ लिए à¤¨à¥‹à¤Ÿà¤¿à¤«à¤¿à¤•à¥‡शन à¤¸à¤¬à¥à¤¸à¤•à¥à¤°à¤¾à¤‡ब à¤•à¤°à¥‡à¤‚।"
     },
     integrations: {
       weather: {
@@ -2544,7 +2544,7 @@ async function sendFirebaseNotification(payload, filter = {}) {
 
 function buildPublishNotification(news) {
   return {
-    title: normalizeText(news.titleHi || news.title || "à¤¤à¤¾à¤œà¤¼à¤¾ à¤–à¤¬à¤°"),
+    title: normalizeText(news.titleHi || news.title || "à¤¤à¤¾à¤œ़ा à¤–बर"),
     body: trimForMeta(news.summaryHi || news.summary || news.metaDescription || "", 110),
     image: primaryNewsImage(news),
     url: `${SITE_URL}${articlePath(news)}`,
@@ -4593,22 +4593,24 @@ async function findAdjacentNews(news) {
 }
 
 function renderCategoryLandingPage(route, articles, settings, req) {
+  const language = requestedLanguage(req);
   const routeTitle = normalizeText(route.title);
   const routeDescription = normalizeText(route.description);
   const cleanSettings = normalizeSiteSettings(settings || {});
   const activeDistrictSlug = districtDefinitionFromValue(route.districtLabel || route.category || route.path)?.slug || "";
-  const ui = {
+  const ui = language === "en" ? {
+    readMore: "Read full story",
+    brandTagline: "Latest news from Chhattisgarh",
+    empty: "Fresh stories will appear in this section soon.",
+    weatherTitle: "Weather Update",
+    marketTitle: "Market Tracker",
+    videoTitle: "Viral Videos",
+    weatherFocus: "Durg, Bhilai and Raipur weather",
+    marketFocus: "Real-time market tracker",
+    marketNote: "Values can be updated manually from the admin panel."
+  } : {
     readMore: "\u092a\u0942\u0930\u0940 \u0916\u092c\u0930 \u092a\u0922\u093c\u0947\u0902",
     brandTagline: "\u091b\u0924\u094d\u0924\u0940\u0938\u0917\u0922\u093c \u0915\u0940 \u0924\u093e\u091c\u093e \u0916\u092c\u0930\u0947\u0902",
-    home: "\u0939\u094b\u092e",
-    durg: "\u0926\u0941\u0930\u094d\u0917",
-    bhilai: "\u092d\u093f\u0932\u093e\u0908",
-    raipur: "\u0930\u093e\u092f\u092a\u0941\u0930",
-    market: "\u0906\u091c \u0915\u093e \u092c\u093e\u091c\u093e\u0930",
-    weather: "\u092e\u094c\u0938\u092e",
-    reels: "\u091f\u094d\u0930\u0947\u0902\u0921\u093f\u0902\u0917 \u0930\u0940\u0932",
-    world: "\u0926\u0947\u0936-\u0926\u0941\u0928\u093f\u092f\u093e",
-    shahdol: "\u0936\u0939\u0921\u094b\u0932",
     empty: "\u0907\u0938 \u0938\u0947\u0915\u094d\u0936\u0928 \u092e\u0947\u0902 \u091c\u0932\u094d\u0926 \u0928\u0908 \u0916\u092c\u0930\u0947\u0902 \u0906\u090f\u0902\u0917\u0940\u0964",
     weatherTitle: "\u092e\u094c\u0938\u092e \u0905\u092a\u0921\u0947\u091f",
     marketTitle: "\u092e\u093e\u0930\u094d\u0915\u0947\u091f \u091f\u094d\u0930\u0948\u0915\u0930",
@@ -4620,9 +4622,9 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   const title = `${routeTitle} | Khabri Junction`;
   const canonical = `${publicBaseUrl(req)}${route.path}`;
   const cards = articles.map((rawItem) => {
-    const item = localizedNews(rawItem, "hi");
+    const item = localizedNews(rawItem, language);
     const districtLabel = articleDistrictLabel(rawItem);
-    const publishedAt = formatArticleDate(rawItem.publishedAt || rawItem.createdAt, "hi");
+    const publishedAt = formatArticleDate(rawItem.publishedAt || rawItem.createdAt, language);
     return `
       <article class="news-card">
         <img src="${escapeHTML(articleFeaturedImage(rawItem))}" alt="${escapeHTML(item.title)}" loading="lazy" decoding="async">
@@ -4638,7 +4640,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
             ${districtLabel ? `<span>${escapeHTML(districtLabel)}</span>` : ""}
             <time>${escapeHTML(publishedAt)}</time>
           </div>
-          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=hi">${ui.readMore}</a>
+          <a class="read-btn" href="${escapeHTML(articleUrl(rawItem, req))}?lang=${escapeHTML(language)}">${ui.readMore}</a>
         </div>
       </article>`;
   }).join("");
@@ -4674,7 +4676,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
       : "";
 
   return `<!DOCTYPE html>
-<html lang="hi" translate="no">
+<html lang="${escapeHTML(language)}" translate="no">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4695,9 +4697,13 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   <div class="ad-slot article-top-ad">${cleanSettings.ads?.header || "ADVERTISEMENT"}</div>
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>${ui.brandTagline}</span></div></a>
-    ${portalHeaderNav("hi", activeDistrictSlug)}
+    ${portalHeaderNav(language, activeDistrictSlug)}
   </header>
   <main class="portal-shell">
+    <div class="portal-language-switch category-language-switch" aria-label="Page language">
+      <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(route.path)}?lang=hi">हिंदी</a>
+      <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(route.path)}?lang=en">English</a>
+    </div>
     <section class="portal-layout">
       <div>
         <div class="section-title"><span></span><strong>${escapeHTML(routeTitle)}</strong></div>
@@ -5421,7 +5427,11 @@ app.post("/api/news-analytics/click", requireDatabase, async (req, res, next) =>
 
 async function sendCategoryPage(req, res, next, rawSlug) {
   try {
-    const category = categoryFromValue(rawSlug);
+    const categoryAlias = {
+      "breaking-news": "breaking",
+      horoscope: "astrology"
+    };
+    const category = categoryFromValue(categoryAlias[toSlug(rawSlug)] || rawSlug);
     const settings = await getSiteSettings();
 
     if (!category) {
@@ -5429,7 +5439,7 @@ async function sendCategoryPage(req, res, next, rawSlug) {
         path: req.path,
         title: "Category Not Found",
         category: "Breaking",
-        description: "à¤¯à¤¹ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤…à¤­à¥€ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥‡ à¤²à¤¿à¤ à¤¹à¥‹à¤® à¤¯à¤¾ à¤¬à¥à¤°à¥‡à¤•à¤¿à¤‚à¤— à¤¨à¥à¤¯à¥‚à¤œ à¤¦à¥‡à¤–à¥‡à¤‚."
+        description: "यह à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤…à¤­à¥€ à¤‰पलब्ध à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¤à¤¾à¤œा à¤–à¤¬à¤°à¥‹à¤‚ à¤•à¥‡ लिए à¤¹à¥‹म या à¤¬à¥à¤°à¥‡à¤•à¤¿à¤‚à¤— à¤¨à¥à¤¯à¥‚à¤œ à¤¦à¥‡à¤–à¥‡à¤‚."
       }, [], settings, req));
     }
 
@@ -5438,7 +5448,7 @@ async function sendCategoryPage(req, res, next, rawSlug) {
       path: categoryRoutePath(category),
       title: `${category.label} News`,
       category: category.label,
-      description: `${category.label} à¤•à¥€ à¤¤à¤¾à¤œà¤¾ à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”à¤° à¤²à¥‹à¤•à¤² à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿ Khabri Junction à¤ªà¤° à¤ªà¤¢à¤¼à¥‡à¤‚.`
+      description: `${category.label} à¤•à¥€ à¤¤à¤¾à¤œा à¤–à¤¬à¤°à¥‡à¤‚, à¤…à¤ªà¤¡à¥‡à¤Ÿ à¤”र à¤²à¥‹à¤•ल à¤°à¤¿à¤ªà¥‹à¤°à¥à¤Ÿ Khabri Junction पर à¤ªà¤¢à¤¼à¥‡à¤‚.`
     };
     route.path = categoryRoutePath(category);
     const articles = await getCombinedPublishedNews({ status: "published", section: category.slug }, 24);
@@ -5483,6 +5493,26 @@ app.get("/category/:slug", requireDatabase, (req, res, next) => {
 
 app.get("/district/:slug", requireDatabase, (req, res, next) => {
   sendDistrictPage(req, res, next, req.params.slug);
+});
+
+const STATIC_PAGE_ROUTES = {
+  "/about": "about.html",
+  "/contact": "contact.html",
+  "/privacy-policy": "privacy-policy.html",
+  "/cookie-policy": "cookie-policy.html",
+  "/terms-conditions": "terms-and-conditions.html",
+  "/disclaimer": "disclaimer.html",
+  "/editorial-policy": "editorial-policy.html",
+  "/fact-check-policy": "fact-check-policy.html",
+  "/correction-policy": "correction-policy.html",
+  "/advertise": "advertise.html",
+  "/admin": "admin.html"
+};
+
+Object.entries(STATIC_PAGE_ROUTES).forEach(([routePath, fileName]) => {
+  app.get(routePath, (req, res) => {
+    res.sendFile(path.join(__dirname, fileName));
+  });
 });
 
 CLEAN_CATEGORY_ROUTES.forEach((route) => {
@@ -6153,12 +6183,12 @@ app.use((req, res) => {
 <body class="article-page">
   <main class="portal-shell">
     <section class="market-card category-focus-card">
-      <div class="section-title"><span></span><strong>à¤ªà¥‡à¤œ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾</strong></div>
-      <p class="article-summary">à¤¯à¤¹ à¤²à¤¿à¤‚à¤• à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¨à¥€à¤šà¥‡ à¤¸à¥‡ à¤¸à¤¹à¥€ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤–à¥‹à¤²à¥‡à¤‚.</p>
+      <div class="section-title"><span></span><strong>à¤ªà¥‡à¤œ à¤¨à¤¹à¥€à¤‚ मिला</strong></div>
+      <p class="article-summary">यह à¤²à¤¿à¤‚à¤• à¤‰पलब्ध à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ. à¤¨à¥€à¤šà¥‡ à¤¸à¥‡ à¤¸à¤¹à¥€ à¤•à¥ˆà¤Ÿà¥‡à¤—à¤°à¥€ à¤–à¥‹à¤²à¥‡à¤‚.</p>
       <div class="quick-links">
         ${CATEGORY_DEFINITIONS.slice(0, 24).map((category) => `<a href="${categoryRoutePath(category)}">${escapeHTML(category.label)}</a>`).join("")}
       </div>
-      <a class="read-btn" href="/index.html">à¤¹à¥‹à¤® à¤ªà¤° à¤œà¤¾à¤à¤‚</a>
+      <a class="read-btn" href="/index.html">à¤¹à¥‹म पर à¤œà¤¾à¤à¤‚</a>
     </section>
   </main>
 </body>

@@ -535,7 +535,7 @@ function repairPortalMojibake(value) {
 
 function normalizePortalText(value) {
   const text = String(value || "").trim();
-  return /Ã |Ã‚|Ãƒ|ï¿½|à¤|â€™|Â°|Â©/.test(text) ? repairPortalMojibake(text) : text;
+  return /à|Ã‚|Ãƒ|ï¿½|à¤|â€™|°|©/.test(text) ? repairPortalMojibake(text) : text;
 }
 
 portalLanguage = requestedPortalLanguage === "en" || requestedPortalLanguage === "hi"
@@ -727,7 +727,7 @@ function repairPortalMojibake(value) {
 
     return new TextDecoder("utf-8").decode(bytes)
       .replace(/\uFFFD/g, "")
-      .replace(/Â°/g, "°")
+      .replace(/°/g, "°")
       .replace(/â€™/g, "'")
       .trim();
   } catch (error) {
@@ -739,7 +739,7 @@ function normalizePortalText(value) {
   const text = String(value || "").trim();
   const normalized = /à¤|Ã|Â|â€™|œ|™|š|ž|ÿ|�/.test(text) ? repairPortalMojibake(text) : text;
   return normalized
-    .replace(/Â°/g, "°")
+    .replace(/°/g, "°")
     .replace(/â€™/g, "'")
     .trim();
 }
