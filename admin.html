@@ -26,6 +26,7 @@
       </label>
       <p class="login-error" id="loginError"></p>
       <button class="primary-btn" type="submit"><i class="fa-solid fa-lock-open"></i> Open Admin Panel</button>
+      <small class="login-hint">Superadmin full access, Reporter news update only.</small>
       <a href="index.html">Back to website</a>
     </form>
   </section>
@@ -48,15 +49,15 @@
     </div>
 
     <nav aria-label="Admin sections">
-      <a href="#dashboardPanel"><i class="fa-solid fa-chart-line"></i> Dashboard</a>
-      <a href="#topStory"><i class="fa-solid fa-bolt"></i> Top Story</a>
-      <a href="#ticker"><i class="fa-solid fa-lines-leaning"></i> Breaking Ticker</a>
+      <a href="#dashboardPanel" data-superadmin-only><i class="fa-solid fa-chart-line"></i> Dashboard</a>
+      <a href="#topStory" data-superadmin-only><i class="fa-solid fa-bolt"></i> Top Story</a>
+      <a href="#ticker" data-superadmin-only><i class="fa-solid fa-lines-leaning"></i> Breaking Ticker</a>
       <a href="#newsEditor"><i class="fa-solid fa-newspaper"></i> News Updates</a>
       <a href="#manualCms"><i class="fa-solid fa-pen-to-square"></i> Manual CMS</a>
-      <a href="#adManager"><i class="fa-solid fa-rectangle-ad"></i> Ad Manager</a>
-      <a href="#siteSettings"><i class="fa-solid fa-sliders"></i> Site Settings</a>
-      <a href="#notificationPanel"><i class="fa-solid fa-bell"></i> Notifications</a>
-      <a href="#automationPanel"><i class="fa-solid fa-robot"></i> AI Automation</a>
+      <a href="#adManager" data-superadmin-only><i class="fa-solid fa-rectangle-ad"></i> Ad Manager</a>
+      <a href="#siteSettings" data-superadmin-only><i class="fa-solid fa-sliders"></i> Site Settings</a>
+      <a href="#notificationPanel" data-superadmin-only><i class="fa-solid fa-bell"></i> Notifications</a>
+      <a href="#automationPanel" data-superadmin-only><i class="fa-solid fa-robot"></i> AI Automation</a>
       <a href="index.html"><i class="fa-solid fa-house"></i> Website Preview</a>
     </nav>
   </aside>
@@ -65,13 +66,13 @@
     <header class="admin-header">
       <div>
         <p>Website editor</p>
-        <h1>News Update Panel</h1>
+        <h1>News Update Panel <span class="role-badge" id="adminRoleBadge">Admin</span></h1>
       </div>
       <div class="admin-actions">
         <button class="ghost-btn" id="logoutAdmin" type="button"><i class="fa-solid fa-right-from-bracket"></i> Logout</button>
-        <button class="ghost-btn" id="resetAll" type="button"><i class="fa-solid fa-rotate-left"></i> Reset</button>
-        <button class="danger-btn" id="clearAllPosts" type="button"><i class="fa-solid fa-trash-can"></i> Delete All Posts</button>
-        <button class="primary-btn" id="publishAll" type="button"><i class="fa-solid fa-floppy-disk"></i> Publish Changes</button>
+        <button class="ghost-btn" id="resetAll" type="button" data-superadmin-only><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        <button class="danger-btn" id="clearAllPosts" type="button" data-superadmin-only><i class="fa-solid fa-trash-can"></i> Delete All Posts</button>
+        <button class="primary-btn" id="publishAll" type="button" data-superadmin-only><i class="fa-solid fa-floppy-disk"></i> Publish Changes</button>
       </div>
     </header>
 
@@ -80,7 +81,7 @@
       <span class="status-line-text" id="statusLineText">Changes save in this browser and show on index.html preview.</span>
     </div>
 
-    <section class="panel dashboard-panel" id="dashboardPanel">
+    <section class="panel dashboard-panel" id="dashboardPanel" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>Final report</span>
@@ -103,7 +104,7 @@
       </div>
     </section>
 
-    <section class="panel automation-panel" id="automationPanel">
+    <section class="panel automation-panel" id="automationPanel" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>Pending-only automation</span>
@@ -131,7 +132,7 @@
       <div class="automation-log" id="automationLog" aria-live="polite"></div>
     </section>
 
-    <section class="panel" id="topStory">
+    <section class="panel" id="topStory" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>Featured</span>
@@ -175,7 +176,7 @@
       </div>
     </section>
 
-    <section class="panel" id="ticker">
+    <section class="panel" id="ticker" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>Live strip</span>
@@ -188,7 +189,7 @@
       </label>
     </section>
 
-    <section class="panel site-settings-panel" id="siteSettings">
+    <section class="panel site-settings-panel" id="siteSettings" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>Live widgets</span>
@@ -237,7 +238,7 @@
       </div>
     </section>
 
-    <section class="panel" id="adManager">
+    <section class="panel" id="adManager" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>MongoDB ads</span>
@@ -416,7 +417,7 @@
       </div>
     </section>
 
-    <section class="panel notification-panel" id="notificationPanel">
+    <section class="panel notification-panel" id="notificationPanel" data-superadmin-only>
       <div class="panel-head">
         <div>
           <span>User updates</span>
@@ -468,7 +469,7 @@
           <h2>News Review Queue</h2>
         </div>
         <div class="panel-tools">
-          <button class="ghost-btn" id="bulkApprovePending" type="button"><i class="fa-solid fa-check-double"></i> Bulk Approve Pending</button>
+          <button class="ghost-btn" id="bulkApprovePending" type="button" data-superadmin-only><i class="fa-solid fa-check-double"></i> Bulk Approve Pending</button>
           <button class="ghost-btn" id="addNews" type="button"><i class="fa-solid fa-plus"></i> Add News</button>
         </div>
       </div>
@@ -619,6 +620,6 @@
 
   <div class="admin-toast-stack" id="adminToastStack" aria-live="polite" aria-atomic="true"></div>
 
-  <script src="admin.js?v=20260518-cms-popup"></script>
+  <script src="admin.js?v=20260519-role-panel"></script>
 </body>
 </html>

@@ -10,6 +10,50 @@
   --shadow: 0 16px 38px rgba(19, 24, 33, 0.1);
 }
 
+.login-hint {
+  display: block;
+  color: #64748b;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  margin-left: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.72rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+body[data-admin-role="reporter"] .role-badge {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.reporter-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+[hidden] {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
 }

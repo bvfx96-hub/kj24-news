@@ -1,8 +1,12 @@
 const DEFAULT_REMOTE_API_BASE = "https://kj24-news.onrender.com";
 const ADMIN_STORAGE_KEY = "khabriJunctionAdminData";
 const AUTH_SESSION_KEY = "khabriJunctionAdminAccess";
-const ADMIN_USERNAME = "admin";
-const ADMIN_PASSWORD = "kjadmin123";
+const AUTH_USER_KEY = "khabriJunctionAdminUser";
+const ADMIN_USERS = [
+  { username: "superadmin", password: "kjadmin123", role: "superadmin", name: "Super Admin" },
+  { username: "admin", password: "kjadmin123", role: "superadmin", name: "Super Admin" },
+  { username: "reporter", password: "reporter123", role: "reporter", name: "News Reporter" }
+];
 const API_BASE_URL = window.KJ_API_BASE_URL
   || ((window.location.protocol === "file:" || /github\.io$|githubusercontent\.com$/i.test(window.location.hostname))
     ? DEFAULT_REMOTE_API_BASE
@@ -126,6 +130,7 @@ let state = {
   manualNews: []
 };
 let activeStatusFilter = "pending";
+let currentAdminUser = null;
 
 const fields = {
   loginScreen: document.getElementById("loginScreen"),
@@ -262,6 +267,90 @@ let previewLanguage = "hi";
 
 function hasAccess() {
   return sessionStorage.getItem(AUTH_SESSION_KEY) === "granted";
+}
+
+function getCurrentAdminUser() {
+  if (currentAdminUser) {
+    return currentAdminUser;
+  }
+
+  try {
+    currentAdminUser = JSON.parse(sessionStorage.getItem(AUTH_USER_KEY) || "null");
+  } catch (error) {
+    currentAdminUser = null;
+  }
+
+  if (!currentAdminUser && hasAccess()) {
+    currentAdminUser = ADMIN_USERS[0];
+    sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentAdminUser));
+  }
+
+  return currentAdminUser;
+}
+
+function isSuperAdmin() {
+  return getCurrentAdminUser()?.role === "superadmin";
+}
+
+function isReporter() {
+  return getCurrentAdminUser()?.role === "reporter";
+}
+
+function requireSuperAdmin(actionLabel = "Ye action") {
+  if (isSuperAdmin()) {
+    return true;
+  }
+
+  showStatus(`${actionLabel} sirf Super Admin kar sakta hai. Reporter account news submit/update kar sakta hai.`, "error");
+  showToast("Super Admin required", "error", "Reporter panel se publish, reject, delete ya settings change nahi hoga.");
+  return false;
+}
+
+function setReporterFieldAccess() {
+  const reporterOnly = isReporter();
+  [
+    fields.newsStatus,
+    fields.manualStatus,
+    fields.newsBreaking,
+    fields.newsFeatured,
+    fields.newsTrending,
+    fields.manualBreaking,
+    fields.manualFeatured,
+    fields.manualTrending
+  ].filter(Boolean).forEach((field) => {
+    field.disabled = reporterOnly;
+  });
+}
+
+function applyRoleAccess() {
+  const user = getCurrentAdminUser();
+  const role = user?.role || "guest";
+  document.body.dataset.adminRole = role;
+
+  document.querySelectorAll("[data-superadmin-only]").forEach((node) => {
+    node.hidden = role !== "superadmin";
+  });
+
+  const roleBadge = document.getElementById("adminRoleBadge");
+  if (roleBadge) {
+    roleBadge.textContent = role === "superadmin" ? "Super Admin" : "Reporter";
+  }
+
+  if (role === "reporter") {
+    if (!["#newsEditor", "#manualCms"].includes(window.location.hash)) {
+      window.location.hash = "newsEditor";
+    }
+    activeStatusFilter = "pending";
+  }
+
+  setReporterFieldAccess();
+
+  if (fields.newsList) {
+    renderNewsList();
+  }
+  if (fields.manualNewsList) {
+    renderManualNews();
+  }
 }
 
 function setSelectOptions(select, options) {
@@ -511,9 +600,14 @@ function setAccess(isAllowed) {
   document.body.classList.toggle("locked", !isAllowed);
 
   if (isAllowed) {
+    applyRoleAccess();
     fields.loginError.textContent = "";
-    showStatus("Access granted. You can update and publish news.");
+    showStatus(isReporter()
+      ? "Reporter panel open. Aap news submit/update kar sakte hain; publish Super Admin karega."
+      : "Access granted. You can update and publish news.");
   } else {
+    currentAdminUser = null;
+    document.body.dataset.adminRole = "guest";
     fields.loginPassword.value = "";
     fields.loginUsername.focus();
   }
@@ -524,9 +618,12 @@ function handleLogin(event) {
 
   const username = fields.loginUsername.value.trim();
   const password = fields.loginPassword.value;
+  const user = ADMIN_USERS.find((item) => item.username === username && item.password === password);
 
-  if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+  if (user) {
+    currentAdminUser = { username: user.username, role: user.role, name: user.name };
     sessionStorage.setItem(AUTH_SESSION_KEY, "granted");
+    sessionStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentAdminUser));
     setAccess(true);
     return;
   }
@@ -538,6 +635,7 @@ function handleLogin(event) {
 
 function logoutAdmin() {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
+  sessionStorage.removeItem(AUTH_USER_KEY);
   setAccess(false);
 }
 
@@ -565,6 +663,10 @@ function loadState() {
 }
 
 function publishState() {
+  if (!requireSuperAdmin("Publish changes")) {
+    return;
+  }
+
   syncTopStory();
   syncTicker();
   saveLocalState("Saved locally. Publishing to MongoDB...");
@@ -1271,6 +1373,7 @@ function clearManualForm() {
   fields.manualTrending.checked = false;
   fields.manualFeatured.checked = false;
   if (fields.manualUpload) fields.manualUpload.value = "";
+  setReporterFieldAccess();
 }
 
 function fillManualForm(item) {
@@ -1293,11 +1396,13 @@ function fillManualForm(item) {
   fields.manualBreaking.checked = Boolean(item.breaking);
   fields.manualTrending.checked = Boolean(item.trending);
   fields.manualFeatured.checked = Boolean(item.featured);
+  setReporterFieldAccess();
 }
 
 function manualPayload(imageUrl = "") {
   const titleHi = fields.manualTitleHi.value.trim();
   const image = imageUrl || fields.manualImage.value.trim();
+  const reporterDraft = isReporter();
   return {
     title: titleHi,
     titleHi,
@@ -1310,15 +1415,15 @@ function manualPayload(imageUrl = "") {
     bodyEn: fields.manualBodyEn?.value.trim() || "",
     category: fields.manualCategory.value,
     city: fields.manualCity.value,
-    status: fields.manualStatus.value,
+    status: reporterDraft ? "pending" : fields.manualStatus.value,
     slug: fields.manualSlug.value.trim() || slugifyAdmin(titleHi),
     image,
     sourceImage: image,
     metaTitle: fields.manualMetaTitle.value.trim(),
     metaDescription: fields.manualMetaDescription.value.trim(),
-    breaking: fields.manualBreaking.checked,
-    trending: fields.manualTrending.checked,
-    featured: fields.manualFeatured.checked,
+    breaking: reporterDraft ? false : fields.manualBreaking.checked,
+    trending: reporterDraft ? false : fields.manualTrending.checked,
+    featured: reporterDraft ? false : fields.manualFeatured.checked,
     language: "hi",
     sourceName: "Khabri Junction Desk",
     automated: false
@@ -1332,6 +1437,9 @@ function renderManualNews() {
     const card = document.createElement("article");
     card.className = "news-item";
     const status = item.status || "draft";
+    const superAdminActions = isSuperAdmin()
+      ? `<button type="button" data-manual-delete="${escapeHTML(item._id)}"><i class="fa-solid fa-trash"></i> Delete</button>`
+      : "";
     card.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.category || "MANUAL")}</span>
       <div class="news-item-head">
@@ -1348,7 +1456,7 @@ function renderManualNews() {
       <div class="item-actions">
         <button type="button" data-manual-preview="${escapeHTML(item._id)}"><i class="fa-solid fa-eye"></i> Preview</button>
         <button type="button" data-manual-edit="${escapeHTML(item._id)}"><i class="fa-solid fa-pen"></i> Edit</button>
-        <button type="button" data-manual-delete="${escapeHTML(item._id)}"><i class="fa-solid fa-trash"></i> Delete</button>
+        ${superAdminActions}
       </div>`;
     fields.manualNewsList.appendChild(card);
   });
@@ -1553,6 +1661,9 @@ function previewAdItem(ad = null) {
 }
 
 async function deleteCurrentManualNews() {
+  if (!requireSuperAdmin("Manual news delete")) {
+    return;
+  }
   const id = fields.manualId.value;
   if (!id) return clearManualForm();
   await apiRequest(`/api/manual-news/${id}`, { method: "DELETE" });
@@ -2094,6 +2205,7 @@ function clearNewsForm() {
   fields.newsFeatured.checked = false;
   fields.newsTrending.checked = false;
   showPublishResult(null);
+  setReporterFieldAccess();
 }
 
 function fillNewsForm(index) {
@@ -2122,6 +2234,7 @@ function fillNewsForm(index) {
   fields.newsFeatured.checked = Boolean(item.featured);
   fields.newsTrending.checked = Boolean(item.trending);
   showPublishResult((item.status || "pending") === "published" ? item : null);
+  setReporterFieldAccess();
   openNewsEditorPanel("Edit AI news");
   fields.newsTitle.focus();
 }
@@ -2152,10 +2265,10 @@ async function saveNewsItem(event) {
     body: bodyInput,
     bodyEn: sourceLanguage === "en" ? bodyInput : "",
     bodyHi: fields.newsBodyHi.value.trim(),
-    status: fields.newsStatus.value || "pending",
-    breaking: fields.newsBreaking.checked,
-    featured: fields.newsFeatured.checked,
-    trending: fields.newsTrending.checked,
+    status: isReporter() ? "pending" : (fields.newsStatus.value || "pending"),
+    breaking: isReporter() ? false : fields.newsBreaking.checked,
+    featured: isReporter() ? false : fields.newsFeatured.checked,
+    trending: isReporter() ? false : fields.newsTrending.checked,
     language: sourceLanguage
   };
 
@@ -2255,6 +2368,10 @@ async function saveNewsItem(event) {
 }
 
 async function deleteNewsItem(index) {
+  if (!requireSuperAdmin("News delete")) {
+    return;
+  }
+
   const item = state.news[index];
 
   if (!item) {
@@ -2283,6 +2400,12 @@ async function deleteNewsItem(index) {
 }
 
 async function updateNewsItem(index, overrides, message, options = {}) {
+  const superOnlyKeys = ["status", "featured", "breaking", "trending"];
+  const needsSuperAdmin = Object.keys(overrides || {}).some((key) => superOnlyKeys.includes(key));
+  if (needsSuperAdmin && !requireSuperAdmin(message || "News status update")) {
+    return;
+  }
+
   const item = state.news[index];
 
   if (!item) {
@@ -2511,6 +2634,10 @@ async function runThumbnailAction(action) {
 }
 
 async function bulkApprovePending() {
+  if (!requireSuperAdmin("Bulk approve")) {
+    return;
+  }
+
   const pending = state.news.filter((item) => (item.status || "pending") === "pending" && item._id);
 
   if (!pending.length) {
@@ -2563,6 +2690,17 @@ function renderNewsList() {
       ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> View Article</a>`
       : "";
     const districtLabel = item.district || districtLabelFromValue(item.city) || "";
+    const superAdminActions = isSuperAdmin()
+      ? `
+        <button class="primary-btn" type="button" data-approve="${index}"><i class="fa-solid fa-check"></i> Approve & Publish</button>
+        <button class="ghost-btn" type="button" data-pending="${index}"><i class="fa-solid fa-clock"></i> Pending</button>
+        <button class="danger-btn" type="button" data-reject="${index}"><i class="fa-solid fa-ban"></i> Reject</button>
+        <button class="ghost-btn" type="button" data-breaking="${index}"><i class="fa-solid fa-bolt"></i> Breaking</button>
+        <button class="ghost-btn" type="button" data-top="${index}"><i class="fa-solid fa-star"></i> Top</button>
+        <button class="ghost-btn" type="button" data-trending="${index}"><i class="fa-solid fa-arrow-trend-up"></i> Trend</button>
+        <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
+      `
+      : `<span class="reporter-note"><i class="fa-solid fa-user-pen"></i> Reporter edit only, approval Super Admin karega.</span>`;
     row.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.tag || item.category || "UPDATE")}</span>
       <div class="news-item-head">
@@ -2624,6 +2762,17 @@ function renderNewsList() {
       ? `<a class="ghost-btn" href="${escapeHTML(item.articleUrl)}" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> View Article</a>`
       : "";
     const districtLabel = item.district || districtLabelFromValue(item.city) || "";
+    const superAdminActions = isSuperAdmin()
+      ? `
+        <button class="primary-btn" type="button" data-approve="${index}"><i class="fa-solid fa-check"></i> Approve & Publish</button>
+        <button class="ghost-btn" type="button" data-pending="${index}"><i class="fa-solid fa-clock"></i> Pending</button>
+        <button class="danger-btn" type="button" data-reject="${index}"><i class="fa-solid fa-ban"></i> Reject</button>
+        <button class="ghost-btn" type="button" data-breaking="${index}"><i class="fa-solid fa-bolt"></i> Breaking</button>
+        <button class="ghost-btn" type="button" data-top="${index}"><i class="fa-solid fa-star"></i> Top</button>
+        <button class="ghost-btn" type="button" data-trending="${index}"><i class="fa-solid fa-arrow-trend-up"></i> Trend</button>
+        <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
+      `
+      : `<span class="reporter-note"><i class="fa-solid fa-user-pen"></i> Reporter edit only, approval Super Admin karega.</span>`;
     row.innerHTML = `
       <span>${escapeHTML(item.categoryBadge || item.tag || item.category || "UPDATE")}</span>
       <div class="news-item-head">
@@ -2647,14 +2796,8 @@ function renderNewsList() {
       <div class="item-actions">
         <button class="ghost-btn" type="button" data-preview="${index}"><i class="fa-solid fa-eye"></i> Preview</button>
         <button class="ghost-btn" type="button" data-edit="${index}"><i class="fa-solid fa-pen"></i> Edit</button>
-        <button class="primary-btn" type="button" data-approve="${index}"><i class="fa-solid fa-check"></i> Approve & Publish</button>
-        <button class="ghost-btn" type="button" data-pending="${index}"><i class="fa-solid fa-clock"></i> Pending</button>
-        <button class="danger-btn" type="button" data-reject="${index}"><i class="fa-solid fa-ban"></i> Reject</button>
-        <button class="ghost-btn" type="button" data-breaking="${index}"><i class="fa-solid fa-bolt"></i> Breaking</button>
-        <button class="ghost-btn" type="button" data-top="${index}"><i class="fa-solid fa-star"></i> Top</button>
-        <button class="ghost-btn" type="button" data-trending="${index}"><i class="fa-solid fa-arrow-trend-up"></i> Trend</button>
         ${articleLink}
-        <button class="danger-btn" type="button" data-delete="${index}"><i class="fa-solid fa-trash"></i> Delete</button>
+        ${superAdminActions}
       </div>
     `;
     fields.newsList.appendChild(row);
@@ -2662,6 +2805,10 @@ function renderNewsList() {
 }
 
 async function resetAll() {
+  if (!requireSuperAdmin("Reset")) {
+    return;
+  }
+
   const confirmed = window.confirm("Remove all admin updates from this browser?");
 
   if (!confirmed) {
@@ -2705,6 +2852,10 @@ async function resetAll() {
 }
 
 async function clearAllPosts() {
+  if (!requireSuperAdmin("Delete all posts")) {
+    return;
+  }
+
   const confirmed = window.confirm("Delete all AI + manual posts from MongoDB? This cannot be undone.");
 
   if (!confirmed) {
@@ -2902,6 +3053,9 @@ function bindEvents() {
     }
 
     if (deleteButton) {
+      if (!requireSuperAdmin("Ad delete")) {
+        return;
+      }
       await apiRequest(`/api/ads/${deleteButton.dataset.adDelete}`, { method: "DELETE" });
       showStatus("Ad deleted.");
       await loadAds();
@@ -2927,6 +3081,9 @@ function bindEvents() {
     }
 
     if (deleteButton) {
+      if (!requireSuperAdmin("Manual news delete")) {
+        return;
+      }
       await apiRequest(`/api/manual-news/${deleteButton.dataset.manualDelete}`, { method: "DELETE" });
       showStatus("Manual news deleted.");
       await loadManualNews();
