@@ -5297,6 +5297,25 @@ app.get("/api/uploads/:id", requireDatabase, async (req, res, next) => {
   }
 });
 
+app.get("/assets/uploads/:filename", requireDatabase, async (req, res, next) => {
+  try {
+    const filename = path.basename(normalizeText(req.params.filename));
+    const upload = filename
+      ? await uploadsCollection.findOne({ filename })
+      : null;
+
+    if (!upload?.data || !upload?.mimeType) {
+      return res.status(404).send("upload not found");
+    }
+
+    res.setHeader("Content-Type", upload.mimeType);
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(Buffer.from(upload.data, "base64"));
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/uploads", async (req, res, next) => {
   try {
     const dataUrl = normalizeText(req.body?.dataUrl);
@@ -5331,13 +5350,17 @@ app.post("/api/uploads", async (req, res, next) => {
 
     const url = `/assets/uploads/${filename}`;
     const absoluteUrl = new URL(url, publicBaseUrl(req)).toString();
+    const primaryUrl = apiUrl || url;
+    const absolutePrimaryUrl = new URL(primaryUrl, publicBaseUrl(req)).toString();
     res.status(201).json({
-      url,
+      url: primaryUrl,
       previewUrl: url,
       apiUrl,
-      absoluteUrl,
+      localUrl: url,
+      absoluteUrl: absolutePrimaryUrl,
       absolutePreviewUrl: absoluteUrl,
       absoluteApiUrl: apiUrl ? new URL(apiUrl, publicBaseUrl(req)).toString() : "",
+      absoluteLocalUrl: absoluteUrl,
       imageAlt: normalizeText(req.body?.imageAlt),
       imageCredit: normalizeText(req.body?.imageCredit),
       imageSource: normalizeText(req.body?.imageSource),

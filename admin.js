@@ -1223,8 +1223,8 @@ async function uploadImage(file) {
   });
   return {
     ...result,
-    url: absolutizeBackendUrl(result.absoluteUrl || result.url || result.previewUrl),
-    previewUrl: absolutizeBackendUrl(result.absolutePreviewUrl || result.previewUrl || result.url),
+    url: absolutizeBackendUrl(result.absoluteApiUrl || result.apiUrl || result.absoluteUrl || result.url || result.previewUrl),
+    previewUrl: absolutizeBackendUrl(result.absoluteApiUrl || result.apiUrl || result.absolutePreviewUrl || result.previewUrl || result.url),
     apiUrl: absolutizeBackendUrl(result.absoluteApiUrl || result.apiUrl)
   };
 }

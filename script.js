@@ -1135,8 +1135,14 @@ function renderTopStory(animate = true) {
     window.setTimeout(() => card.classList.remove("is-changing"), 420);
   }
 
-  image.src = story.image;
-  image.alt = story.title.en;
+  image.classList.remove("image-fallback");
+  image.onerror = () => {
+    image.onerror = null;
+    image.classList.add("image-fallback");
+    image.src = FALLBACK_NEWS_IMAGE;
+  };
+  image.src = story.image || FALLBACK_NEWS_IMAGE;
+  image.alt = "";
   kicker.dataset.en = story.kicker.en;
   kicker.dataset.hi = story.kicker.hi;
   title.dataset.en = story.title.en;
