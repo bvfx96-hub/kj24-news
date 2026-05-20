@@ -2765,6 +2765,87 @@ setLanguage = function setLanguage(language) {
 
 setLanguage(currentLanguage || initialLanguage());
 
+function pickHomepageCardNews(sorted, used, matcher) {
+  return takeNews(sorted, 1, used, matcher)[0]
+    || takeNews(sorted, 1, new Set(), matcher)[0]
+    || takeNews(sorted, 1, new Set())[0]
+    || sorted[0]
+    || null;
+}
+
+hydrateHomepageSections = function hydrateHomepageSections(news = []) {
+  const published = Array.isArray(news)
+    ? news.filter((item) => !item.status || item.status === "published")
+    : [];
+
+  if (!published.length) {
+    return;
+  }
+
+  homepageLiveNews = published.slice();
+  document.querySelectorAll(".admin-updates-section").forEach((section) => section.remove());
+
+  const sorted = published.slice().sort((a, b) => (
+    Number(Boolean(b.breaking)) - Number(Boolean(a.breaking)) ||
+    Number(Boolean(b.featured)) - Number(Boolean(a.featured)) ||
+    Number(Boolean(b.trending)) - Number(Boolean(a.trending)) ||
+    new Date(b.publishedAt || b.createdAt || 0) - new Date(a.publishedAt || a.createdAt || 0)
+  ));
+
+  const storyUsed = new Set();
+  const topStoriesNews = [
+    ...takeNews(sorted, 5, storyUsed, (item) => item.breaking || item.featured || item.trending),
+    ...takeNews(sorted, 5, storyUsed)
+  ].slice(0, 5);
+
+  if (topStoriesNews.length) {
+    topStories.splice(0, topStories.length, ...topStoriesNews.map(newsToStory));
+    storyIndex = 0;
+    renderTopStory(false);
+    refreshHomepageTicker(topStoriesNews.concat(sorted));
+    updateHomepageSeo(topStoriesNews[0]);
+  }
+
+  const used = new Set(topStoriesNews.map((item) => newsIdentity(item)));
+  const cityCards = Array.from(document.querySelectorAll(".city-grid .news-card"));
+  ["durg", "bhilai", "raipur"].forEach((slug, index) => {
+    applyNewsToCard(cityCards[index], pickHomepageCardNews(sorted, used, (newsItem) => newsMatches(newsItem, slug)));
+  });
+
+  const districtCards = Array.from(document.querySelectorAll(".district-news-grid .district-card"));
+  ["durg", "bhilai", "rajnandgaon", "bilaspur"].forEach((slug, index) => {
+    applyNewsToCard(districtCards[index], pickHomepageCardNews(sorted, used, (newsItem) => newsMatches(newsItem, slug)), { mode: "district" });
+  });
+
+  setSectionTitleForGrid(".latest-grid", "Trending News", "ट्रेंडिंग न्यूज़");
+  Array.from(document.querySelectorAll(".latest-grid .news-card")).forEach((card) => {
+    applyNewsToCard(card, pickHomepageCardNews(sorted, used, (newsItem) => newsItem.trending || newsMatches(newsItem, "sports") || newsMatches(newsItem, "politics") || newsMatches(newsItem, "health") || newsMatches(newsItem, "jobs")));
+  });
+
+  Array.from(document.querySelectorAll(".entertainment-grid .news-card")).forEach((card) => {
+    applyNewsToCard(card, pickHomepageCardNews(sorted, used, (newsItem) => newsMatches(newsItem, "entertainment")));
+  });
+
+  Array.from(document.querySelectorAll(".world-grid .news-card")).forEach((card) => {
+    applyNewsToCard(card, pickHomepageCardNews(sorted, used, (newsItem) => !newsItem.city && !newsMatches(newsItem, "durg") && !newsMatches(newsItem, "bhilai") && !newsMatches(newsItem, "raipur")));
+  });
+
+  Array.from(document.querySelectorAll(".mini-news-grid article")).forEach((card) => {
+    applyNewsToCard(card, pickHomepageCardNews(sorted, used));
+  });
+
+  const videoGrid = document.querySelector(".video-grid");
+  if (videoGrid?.dataset.customVideos !== "true") {
+    Array.from(document.querySelectorAll(".video-grid .video-card")).forEach((card) => {
+      applyNewsToCard(card, pickHomepageCardNews(sorted, used, (newsItem) => newsItem.trending || /video|reel|viral/i.test(`${newsItem.category || ""} ${newsItem.title || ""} ${newsItem.summary || ""}`)));
+    });
+  }
+};
+
+if (Array.isArray(homepageLiveNews) && homepageLiveNews.length) {
+  hydrateHomepageSections(homepageLiveNews);
+}
+
 const RENDER_MOJIBAKE_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
 
 function decodeRenderMojibakeSegment(segment) {
