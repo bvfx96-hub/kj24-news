@@ -2458,3 +2458,309 @@ function hydrateHomepageSections(news = []) {
 }
 
 setupHomepageNewsSync();
+
+const FINAL_SITE_MOJIBAKE_BYTES = {
+  0x20AC: 0x80,
+  0x201A: 0x82,
+  0x0192: 0x83,
+  0x201E: 0x84,
+  0x2026: 0x85,
+  0x2020: 0x86,
+  0x2021: 0x87,
+  0x02C6: 0x88,
+  0x2030: 0x89,
+  0x0160: 0x8A,
+  0x2039: 0x8B,
+  0x0152: 0x8C,
+  0x017D: 0x8E,
+  0x2018: 0x91,
+  0x2019: 0x92,
+  0x201C: 0x93,
+  0x201D: 0x94,
+  0x2022: 0x95,
+  0x2013: 0x96,
+  0x2014: 0x97,
+  0x02DC: 0x98,
+  0x2122: 0x99,
+  0x0161: 0x9A,
+  0x203A: 0x9B,
+  0x0153: 0x9C,
+  0x017E: 0x9E,
+  0x0178: 0x9F
+};
+
+const FINAL_HOME_HI_LABELS = {
+  "BREAKING": "ताज़ा",
+  "Durg, Bhilai and Raipur news desk is live": "दुर्ग, भिलाई और रायपुर न्यूज़ डेस्क लाइव है",
+  "Local news desk shares fresh district updates": "लोकल न्यूज़ डेस्क ताज़ा जिला अपडेट साझा कर रहा है",
+  "Kawardha, Khairagarh, Rajnandgaon and Bilaspur pages updated": "कवर्धा, खैरागढ़, राजनांदगांव और बिलासपुर पेज अपडेट हैं",
+  "Market watch and ad booking sections are open": "मार्केट वॉच और विज्ञापन बुकिंग सेक्शन खुले हैं",
+  "Fastest digital news for Chhattisgarh": "छत्तीसगढ़ की सबसे तेज डिजिटल न्यूज़",
+  "Durg 34°": "दुर्ग 34°",
+  "ADVERTISEMENT": "विज्ञापन",
+  "Local business, stock marketing and digital campaigns": "लोकल बिज़नेस, स्टॉक मार्केटिंग और डिजिटल कैंपेन",
+  "Menu": "मेन्यू",
+  "Home": "होम",
+  "Breaking": "ब्रेकिंग",
+  "Raipur Promotion": "रायपुर प्रमोशन",
+  "Market": "आज का बाजार",
+  "Weather": "मौसम",
+  "Viral Videos": "वायरल वीडियो",
+  "Local News": "लोकल खबरें",
+  "MP Shahdol": "एमपी शहडोल",
+  "World": "देश-दुनिया",
+  "Coverage Across": "कवरेज",
+  "Entire Chhattisgarh": "पूरा छत्तीसगढ़",
+  "TOP STORY": "मुख्य खबर",
+  "Read Full News": "पूरी खबर पढ़ें",
+  "FOR AD": "विज्ञापन",
+  "Book banner, news sponsor or campaign slot": "बैनर, न्यूज़ स्पॉन्सर या कैंपेन स्लॉट बुक करें",
+  "CITY LATEST NEWS": "शहर की ताज़ा खबरें",
+  "LATEST NEWS": "ताज़ा खबरें",
+  "INDIAN STOCK MARKET": "भारतीय शेयर बाजार",
+  "Market Closed Today": "आज बाजार बंद",
+  "Today close": "आज की क्लोजिंग",
+  "DISTRICT LATEST NEWS": "जिला लेटेस्ट न्यूज़",
+  "Visit Page": "पेज देखें",
+  "Visit Durg Page": "दुर्ग पेज देखें",
+  "Visit Bhilai Page": "भिलाई पेज देखें",
+  "Visit Raipur Page": "रायपुर पेज देखें",
+  "All CG District News": "सभी सीजी जिला खबरें",
+  "MORE NEWS": "और खबरें",
+  "BOTTOM AD SPACE": "बॉटम विज्ञापन स्पेस",
+  "ENTERTAINMENT TOP 6": "मनोरंजन टॉप 6",
+  "Read": "पढ़ें",
+  "VIRAL REELS & VIDEO": "ट्रेंडिंग रील और वीडियो",
+  "WORLD NEWS UPDATE": "देश-दुनिया की खबर",
+  "Quick Links": "क्विक लिंक",
+  "Important Pages": "ज़रूरी पेज",
+  "About Us": "हमारे बारे में",
+  "Contact Us": "संपर्क करें",
+  "Privacy Policy": "प्राइवेसी पॉलिसी",
+  "Cookie Policy": "कुकी नीति",
+  "Terms & Conditions": "नियम और शर्तें",
+  "Disclaimer": "डिस्क्लेमर",
+  "Editorial Policy": "संपादकीय नीति",
+  "Fact Check Policy": "फैक्ट चेक नीति",
+  "Correction Policy": "सुधार नीति",
+  "Advertise": "विज्ञापन",
+  "Admin Panel": "एडमिन पैनल",
+  "Contact": "संपर्क",
+  "Modern digital news platform for Chhattisgarh and India.": "छत्तीसगढ़ और भारत की भरोसेमंद डिजिटल न्यूज़ सेवा",
+  "FULL FLASH NEWS": "फुल फ्लैश न्यूज़",
+  "Back To Home": "होम पर वापस",
+  "All Districts": "सभी जिले",
+  "All CG News": "सभी सीजी खबरें",
+  "CG DISTRICTS": "छत्तीसगढ़ जिले",
+  "Search news": "खबर खोजें",
+  "Latest News": "ताज़ा खबरें",
+  "Read More": "और पढ़ें",
+  "Soon": "जल्द",
+  "Fresh posts will appear soon": "नई पोस्ट जल्द आएगी",
+  "Older posts have been cleared. Newly published stories will appear here.": "पुरानी पोस्ट हटाई जा चुकी हैं। नई खबर publish होते ही यहां दिखाई देगी।",
+  "Fresh district news will appear here after publish.": "नई खबर publish होते ही यहां दिखाई देगी।"
+};
+
+function decodeFinalSiteMojibake(value) {
+  const text = String(value || "").trim();
+
+  if (!text || !/[à-ÿĀ-žƒˆ˜€™]/.test(text)) {
+    return text;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => {
+      const code = char.charCodeAt(0);
+      return code <= 0xff ? code : (FINAL_SITE_MOJIBAKE_BYTES[code] ?? 0x3f);
+    }));
+
+    return new TextDecoder("utf-8").decode(bytes)
+      .replace(/\uFFFD/g, "")
+      .replace(/Â°/g, "°")
+      .replace(/Ã¢â‚¬â„¢/g, "'")
+      .trim();
+  } catch (error) {
+    return text;
+  }
+}
+
+function cleanFinalSiteText(value) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) {
+    return text;
+  }
+  return (/à¤|à¥|Ã|Â|â/.test(text) ? decodeFinalSiteMojibake(text) : text)
+    .replace(/Â°/g, "°")
+    .replace(/Ã¢â‚¬â„¢/g, "'")
+    .trim();
+}
+
+function hasVisibleHindi(value) {
+  return /[\u0900-\u097F]/.test(String(value || ""));
+}
+
+getHindiText = function getHindiText(en, hi) {
+  const english = cleanFinalSiteText(en);
+  const inlineHindi = cleanFinalSiteText(hi);
+
+  if (FINAL_HOME_HI_LABELS[english]) {
+    return FINAL_HOME_HI_LABELS[english];
+  }
+
+  if (hasVisibleHindi(inlineHindi)) {
+    return inlineHindi;
+  }
+
+  const repairedMapped = cleanFinalSiteText(UI_HI_LABELS[english] || HINDI_TEXT_BY_EN[english] || "");
+  if (hasVisibleHindi(repairedMapped)) {
+    return repairedMapped;
+  }
+
+  return english;
+};
+
+getLocalizedText = function getLocalizedText(en, hi, language) {
+  return language === "hi" ? getHindiText(en, hi) : cleanFinalSiteText(en);
+};
+
+applyUiLanguage = function applyUiLanguage(language) {
+  const selector = ".tag, .section-title strong, .menu-links a, .menu-district-menu summary, .menu-district-menu a, .quick-links a, .coverage-links a, .portal-main-nav a, .footer a, .footer h3, .footer p, .footer-links a, .footer-links strong, .copyright";
+
+  document.querySelectorAll(selector).forEach((node) => {
+    const original = cleanFinalSiteText(node.dataset.autoEn || node.dataset.en || node.textContent.trim());
+
+    if (!node.dataset.autoEn) {
+      node.dataset.autoEn = original;
+    }
+
+    node.textContent = language === "hi" ? getHindiText(original, node.dataset.hi) : original;
+  });
+
+  document.querySelectorAll("[data-en]").forEach((node) => {
+    node.dataset.en = cleanFinalSiteText(node.dataset.en);
+    if (node.dataset.hi) {
+      node.dataset.hi = getHindiText(node.dataset.en, node.dataset.hi);
+    }
+  });
+};
+
+emptyNewsMarkup = function emptyNewsMarkup(type = "card") {
+  const badge = currentLanguage === "hi" ? "ताज़ा" : "LIVE";
+  const title = currentLanguage === "hi" ? "नई पोस्ट जल्द आएगी" : "Fresh posts will appear soon";
+  const summary = currentLanguage === "hi"
+    ? "पुरानी पोस्ट हटाई जा चुकी हैं। नई खबर publish होते ही यहां दिखाई देगी।"
+    : "Older posts have been cleared. Newly published stories will appear here.";
+
+  if (type === "district") {
+    return `
+      <article class="district-card news-empty-card" style="background: linear-gradient(135deg, rgba(20, 22, 26, 0.92), rgba(167, 12, 21, 0.92)), url('${FALLBACK_NEWS_IMAGE}') center/cover;">
+        <h3>${badge}</h3>
+        <p>${summary}</p>
+        <button class="visit-btn" type="button" disabled>${title}</button>
+      </article>
+    `;
+  }
+
+  if (type === "mini") {
+    return `
+      <article class="news-empty-card">
+        <p>${summary}</p>
+        <button type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </article>
+    `;
+  }
+
+  if (type === "video") {
+    return `
+      <article class="video-card linked-news-card news-empty-card">
+        <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+        <span class="play-btn"><i class="fa-solid fa-play"></i></span>
+        <div>
+          <span class="tag">${badge}</span>
+          <h3>${title}</h3>
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="news-card news-empty-card">
+      <img src="${FALLBACK_NEWS_IMAGE}" alt="${title}" loading="lazy" decoding="async">
+      <div class="card-body">
+        <span class="tag">${badge}</span>
+        <h3>${title}</h3>
+        <p>${summary}</p>
+        <button class="read-btn" type="button" disabled>${currentLanguage === "hi" ? "जल्द" : "Soon"}</button>
+      </div>
+    </article>
+  `;
+};
+
+districtEmptyMarkupList = function districtEmptyMarkupList() {
+  const placeholders = [
+    { en: "Durg", hi: "दुर्ग", href: "/district/durg" },
+    { en: "Bhilai", hi: "भिलाई", href: "/district/bhilai" },
+    { en: "Rajnandgaon", hi: "राजनांदगांव", href: "/district/rajnandgaon" },
+    { en: "Bilaspur", hi: "बिलासपुर", href: "/district/bilaspur" }
+  ];
+  const summaryEn = "Fresh district news will appear here after publish.";
+  const summaryHi = "नई खबर publish होते ही यहां दिखाई देगी।";
+
+  return placeholders.map((item) => `
+    <article class="district-card news-empty-card" data-page-link="${item.href}" data-city="${item.en.toLowerCase()}">
+      <h3 data-en="${item.en}" data-hi="${item.hi}">${currentLanguage === "hi" ? item.hi : item.en}</h3>
+      <p data-en="${summaryEn}" data-hi="${summaryHi}">${currentLanguage === "hi" ? summaryHi : summaryEn}</p>
+      <a class="visit-btn" href="${item.href}?lang=${currentLanguage}" data-en="Visit Page" data-hi="पेज देखें">${currentLanguage === "hi" ? "पेज देखें" : "Visit Page"}</a>
+    </article>
+  `).join("");
+};
+
+setLanguage = function setLanguage(language) {
+  currentLanguage = language === "en" ? "en" : "hi";
+  document.documentElement.lang = currentLanguage;
+
+  try {
+    localStorage.setItem("khabriJunctionLanguage", currentLanguage);
+    localStorage.setItem("kjLanguage", currentLanguage);
+  } catch (error) {
+    // Ignore storage issues on embedded contexts.
+  }
+
+  document.querySelectorAll("[data-en][data-hi]").forEach((node) => {
+    node.dataset.en = cleanFinalSiteText(node.dataset.en);
+    node.dataset.hi = getHindiText(node.dataset.en, node.dataset.hi);
+    node.textContent = getLocalizedText(node.dataset.en, node.dataset.hi, currentLanguage);
+  });
+
+  document.querySelectorAll(".language-switch button").forEach((button) => {
+    button.textContent = button.dataset.lang === "hi" ? "हिंदी" : "English";
+    button.classList.toggle("active", button.dataset.lang === currentLanguage);
+  });
+
+  const searchInput = document.querySelector('.site-search input[name="q"]');
+  if (searchInput) {
+    const placeholder = currentLanguage === "hi" ? "खबर खोजें" : "Search news";
+    searchInput.placeholder = placeholder;
+    searchInput.setAttribute("aria-label", placeholder);
+  }
+
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", currentLanguage);
+    window.history.replaceState({}, "", url);
+  } catch (error) {
+    // URL sync is optional.
+  }
+
+  updateMarkets();
+  renderTopStory(false);
+  applyUiLanguage(currentLanguage);
+  addCardMeta();
+
+  const stickyButton = document.getElementById("stickySubscribeCta");
+  if (stickyButton) {
+    stickyButton.textContent = currentLanguage === "hi" ? "ताज़ा खबरें" : "Latest News";
+  }
+};
+
+setLanguage(currentLanguage || initialLanguage());

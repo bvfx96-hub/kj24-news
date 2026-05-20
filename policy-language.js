@@ -149,6 +149,68 @@
     "Please share campaign dates, target city, creative size and budget range when enquiring.": "पूछताछ करते समय कैंपेन तारीख, लक्षित शहर, क्रिएटिव साइज और बजट रेंज साझा करें।"
   };
 
+  const POLICY_UTF_MOJIBAKE_BYTES = {
+    0x20AC: 0x80,
+    0x201A: 0x82,
+    0x0192: 0x83,
+    0x201E: 0x84,
+    0x2026: 0x85,
+    0x2020: 0x86,
+    0x2021: 0x87,
+    0x02C6: 0x88,
+    0x2030: 0x89,
+    0x0160: 0x8A,
+    0x2039: 0x8B,
+    0x0152: 0x8C,
+    0x017D: 0x8E,
+    0x2018: 0x91,
+    0x2019: 0x92,
+    0x201C: 0x93,
+    0x201D: 0x94,
+    0x2022: 0x95,
+    0x2013: 0x96,
+    0x2014: 0x97,
+    0x02DC: 0x98,
+    0x2122: 0x99,
+    0x0161: 0x9A,
+    0x203A: 0x9B,
+    0x0153: 0x9C,
+    0x017E: 0x9E,
+    0x0178: 0x9F
+  };
+
+  function repairPolicyMojibake(value) {
+    const text = String(value || "").trim();
+
+    if (!text || !/[à-ÿĀ-žƒˆ˜€™]/.test(text)) {
+      return text;
+    }
+
+    try {
+      const bytes = Uint8Array.from(Array.from(text).map((char) => {
+        const code = char.charCodeAt(0);
+        return code <= 0xff ? code : (POLICY_UTF_MOJIBAKE_BYTES[code] ?? 0x3f);
+      }));
+
+      return new TextDecoder("utf-8").decode(bytes)
+        .replace(/\uFFFD/g, "")
+        .replace(/Â°/g, "°")
+        .replace(/Ã¢â‚¬â„¢/g, "'")
+        .trim();
+    } catch (error) {
+      return text;
+    }
+  }
+
+  function normalizePolicyText(value) {
+    const text = String(value || "").replace(/\s+/g, " ").trim();
+    if (!text) {
+      return text;
+    }
+    const repaired = /à¤|à¥|Ã|Â|â/.test(text) ? repairPolicyMojibake(text) : text;
+    return repaired.replace(/Â°/g, "°").replace(/Ã¢â‚¬â„¢/g, "'").trim();
+  }
+
   function hasHindi(value) {
     return /[\u0900-\u097F]/.test(String(value || ""));
   }
@@ -157,17 +219,20 @@
   const HI_TO_EN = {};
 
   Object.entries(TEXT).forEach(([key, value]) => {
-    if (hasHindi(key) && !hasHindi(value)) {
-      HI_TO_EN[key] = value;
-      EN_TO_HI[value] = key;
+    const cleanKey = normalizePolicyText(key);
+    const cleanValue = normalizePolicyText(value);
+
+    if (hasHindi(cleanKey) && !hasHindi(cleanValue)) {
+      HI_TO_EN[cleanKey] = cleanValue;
+      EN_TO_HI[cleanValue] = cleanKey;
       return;
     }
-    EN_TO_HI[key] = value;
-    HI_TO_EN[value] = key;
+    EN_TO_HI[cleanKey] = cleanValue;
+    HI_TO_EN[cleanValue] = cleanKey;
   });
 
   function normalizeText(value) {
-    return String(value || "").replace(/\s+/g, " ").trim();
+    return normalizePolicyText(value);
   }
 
   function getLanguage() {
@@ -184,9 +249,9 @@
   }
 
   function setText(node, language) {
-    const original = node.dataset.langEn || normalizeText(node.textContent);
-    const english = HI_TO_EN[original] || original;
-    const hindi = EN_TO_HI[english] || EN_TO_HI[original] || original;
+    const original = normalizePolicyText(node.dataset.langEn || normalizeText(node.textContent));
+    const english = normalizePolicyText(HI_TO_EN[original] || original);
+    const hindi = normalizePolicyText(EN_TO_HI[english] || EN_TO_HI[original] || original);
     node.dataset.langEn = english;
     node.dataset.langHi = hindi;
     node.textContent = language === "hi" ? hindi : english;

@@ -1060,3 +1060,245 @@ async function loadPortalMongoNews() {
 }
 
 setupPortalNewsSync();
+
+const FINAL_PORTAL_HI_LABELS = {
+  "Fast local news for Chhattisgarh": "छत्तीसगढ़ की तेज़ लोकल खबरें",
+  "Home": "होम",
+  "Durg": "दुर्ग",
+  "Bhilai": "भिलाई",
+  "Raipur": "रायपुर",
+  "Bilaspur": "बिलासपुर",
+  "Rajnandgaon": "राजनांदगांव",
+  "Khairagarh": "खैरागढ़",
+  "Kawardha": "कवर्धा",
+  "Politics": "राजनीति",
+  "Crime": "क्राइम",
+  "Sports": "खेल जगत",
+  "Entertainment": "मनोरंजन",
+  "Health": "हेल्थ",
+  "Jobs": "जॉब्स",
+  "ADVERTISEMENT SPACE": "विज्ञापन स्थान",
+  "Latest News": "ताज़ा खबरें",
+  "Top News": "टॉप खबरें",
+  "Photos": "फोटो",
+  "Cricket": "क्रिकेट",
+  "Football": "फुटबॉल",
+  "Tennis": "टेनिस",
+  "Photo": "फोटो",
+  "Video": "वीडियो",
+  "SPONSOR SLOT": "स्पॉन्सर स्लॉट",
+  "All Rights Reserved": "सर्वाधिकार सुरक्षित",
+  "Related News": "संबंधित खबरें",
+  "Open Full Page": "पूरी खबर खोलें",
+  "Back To Page": "पेज पर वापस",
+  "Read More": "और पढ़ें",
+  "Read Full News": "पूरी खबर पढ़ें",
+  "Read": "पढ़ें",
+  "Back To Home": "होम देखें",
+  "Fresh posts will appear soon": "नई पोस्ट जल्द आएगी",
+  "There are no published stories on this page yet. Approved stories will appear here.": "अभी इस पेज पर कोई published खबर नहीं है। नई खबर approve होते ही यहां दिखाई देगी।",
+  "LIVE": "ताज़ा"
+};
+
+function localizePortalLabel(value) {
+  const text = normalizePortalText(value);
+  if (portalLanguage !== "hi") {
+    return text;
+  }
+  return FINAL_PORTAL_HI_LABELS[text] || text;
+}
+
+uiText = function uiText(en, hi) {
+  const english = normalizePortalText(en);
+  if (portalLanguage !== "hi") {
+    return english;
+  }
+
+  if (FINAL_PORTAL_HI_LABELS[english]) {
+    return FINAL_PORTAL_HI_LABELS[english];
+  }
+
+  const repaired = normalizePortalText(hi);
+  return /[\u0900-\u097F]/.test(repaired) ? repaired : english;
+};
+
+portalStaticLabel = function portalStaticLabel(value) {
+  return localizePortalLabel(value);
+};
+
+localizePortalTitle = function localizePortalTitle(text) {
+  const raw = normalizePortalText(text);
+  if (portalLanguage !== "hi") {
+    return raw;
+  }
+
+  return raw
+    .replace(/^Home \/\s*/i, "होम / ")
+    .replace(/\bNews\b/g, "समाचार")
+    .replace(/\bDurg\b/g, "दुर्ग")
+    .replace(/\bBhilai\b/g, "भिलाई")
+    .replace(/\bRaipur\b/g, "रायपुर")
+    .replace(/\bBilaspur\b/g, "बिलासपुर")
+    .replace(/\bRajnandgaon\b/g, "राजनांदगांव")
+    .replace(/\bKhairagarh\b/g, "खैरागढ़")
+    .replace(/\bKawardha\b/g, "कवर्धा")
+    .replace(/\bAstrology\b/g, "राशिफल")
+    .replace(/\bBreaking\b/g, "ब्रेकिंग")
+    .replace(/\bPolitics\b/g, "राजनीति")
+    .replace(/\bCrime\b/g, "क्राइम")
+    .replace(/\bSports\b/g, "खेल जगत")
+    .replace(/\bEntertainment\b/g, "मनोरंजन")
+    .replace(/\bHealth\b/g, "हेल्थ")
+    .replace(/\bJobs\b/g, "जॉब्स");
+};
+
+translatePortalStatic = function translatePortalStatic() {
+  document.documentElement.lang = portalLanguage === "hi" ? "hi" : "en";
+
+  document.querySelectorAll(".portal-brand span, .portal-main-nav a, .portal-top-ad, .portal-tabs a, .portal-section-title, .portal-ad, .portal-side-ad, .portal-side-block h2, .portal-read-more").forEach((node) => {
+    const english = normalizePortalText(node.dataset.portalEn || node.textContent);
+    if (!node.dataset.portalEn) {
+      node.dataset.portalEn = english;
+    }
+    node.textContent = portalLanguage === "hi" ? portalStaticLabel(english) : english;
+  });
+
+  const backLink = document.querySelector(".portal-back");
+  if (backLink) {
+    const english = normalizePortalText(backLink.dataset.portalEn || backLink.textContent);
+    if (!backLink.dataset.portalEn) {
+      backLink.dataset.portalEn = english;
+    }
+    backLink.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const title = document.querySelector(".portal-title");
+  if (title) {
+    const english = normalizePortalText(title.dataset.portalEn || title.textContent);
+    if (!title.dataset.portalEn) {
+      title.dataset.portalEn = english;
+    }
+    title.textContent = portalLanguage === "hi" ? localizePortalTitle(english) : english;
+  }
+
+  const footer = document.querySelector(".portal-footer");
+  if (footer) {
+    const english = normalizePortalText(footer.dataset.portalEn || footer.textContent).replace("? 2026", "© 2026");
+    if (!footer.dataset.portalEn) {
+      footer.dataset.portalEn = english;
+    }
+    footer.textContent = portalLanguage === "hi"
+      ? `© 2026 KHABRI JUNCTION - ${portalStaticLabel("All Rights Reserved")}`
+      : english;
+  }
+};
+
+addPortalLanguageSwitch = function addPortalLanguageSwitch() {
+  const header = document.querySelector(".portal-site-header");
+
+  if (!header || document.getElementById("portalLanguageSwitch")) {
+    return;
+  }
+
+  const switcher = document.createElement("div");
+  switcher.className = "portal-language-switch";
+  switcher.id = "portalLanguageSwitch";
+  switcher.innerHTML = `
+    <button class="${portalLanguage === "hi" ? "active" : ""}" type="button" data-portal-lang="hi">हिंदी</button>
+    <button class="${portalLanguage === "en" ? "active" : ""}" type="button" data-portal-lang="en">English</button>
+  `;
+  header.appendChild(switcher);
+  switcher.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-portal-lang]");
+
+    if (!button) {
+      return;
+    }
+
+    portalLanguage = button.dataset.portalLang;
+    localStorage.setItem(PORTAL_LANGUAGE_KEY, portalLanguage);
+    localStorage.setItem("khabriJunctionLanguage", portalLanguage);
+    localStorage.setItem("kjLanguage", portalLanguage);
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", portalLanguage);
+    window.history.replaceState({}, "", url);
+    switcher.querySelectorAll("button").forEach((item) => {
+      item.textContent = item.dataset.portalLang === "hi" ? "हिंदी" : "English";
+      item.classList.toggle("active", item.dataset.portalLang === portalLanguage);
+    });
+    translatePortalStatic();
+    loadPortalMongoNews();
+  });
+};
+
+portalMetaLine = function portalMetaLine(item = {}) {
+  const district = item.district || item.city || "";
+  const publishedAt = item.publishedAt || item.createdAt;
+  const timeText = publishedAt
+    ? new Date(publishedAt).toLocaleString(portalLanguage === "hi" ? "hi-IN" : "en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "";
+
+  return `
+    <div class="card-meta-row">
+      <span>${escapeHTML(localizePortalLabel(item.categoryBadge || item.category || "NEWS"))}</span>
+      ${district ? `<span>${escapeHTML(localizePortalLabel(district))}</span>` : ""}
+      ${timeText ? `<time>${escapeHTML(timeText)}</time>` : ""}
+    </div>
+  `;
+};
+
+portalCard = function portalCard(item) {
+  const image = item.image || PORTAL_FALLBACK_IMAGE;
+  const title = localizedValue(item, "title");
+  const summary = localizedValue(item, "summary");
+  const articleUrl = safePortalPath(item.articleUrl);
+  const url = articleUrl ? `${articleUrl}?lang=${portalLanguage}` : "#";
+
+  return `<article class="portal-card" ${newsDataset(item)}>
+    <img src="${escapeHTML(image)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
+    <span class="portal-badge">${escapeHTML(localizePortalLabel(item.categoryBadge || item.category || "NEWS"))}</span>
+    <h3>${escapeHTML(title)}</h3>
+    ${portalMetaLine(item)}
+    <p>${escapeHTML(summary || "")}</p>
+    <a class="read-btn" href="${escapeHTML(url)}">${uiText("Read Full News", "पूरी खबर पढ़ें")}</a>
+  </article>`;
+};
+
+portalListItem = function portalListItem(item) {
+  const image = item.image || PORTAL_FALLBACK_IMAGE;
+  const title = localizedValue(item, "title");
+  const summary = localizedValue(item, "summary");
+  const articleUrl = safePortalPath(item.articleUrl);
+  const url = articleUrl ? `${articleUrl}?lang=${portalLanguage}` : "#";
+
+  return `<article class="portal-list-item" ${newsDataset(item)}>
+    <div>
+      <span>${escapeHTML(localizePortalLabel(item.categoryBadge || item.category || "NEWS"))}</span>
+      <h3>${escapeHTML(title)}</h3>
+      ${portalMetaLine(item)}
+      <p>${escapeHTML(summary || "")}</p>
+      <a class="read-btn" href="${escapeHTML(url)}">${uiText("Read More", "और पढ़ें")}</a>
+    </div>
+    <img src="${escapeHTML(image)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
+  </article>`;
+};
+
+portalEmptyMarkup = function portalEmptyMarkup() {
+  const title = portalLanguage === "hi" ? "नई पोस्ट जल्द आएगी" : "Fresh posts will appear soon";
+  const summary = portalLanguage === "hi"
+    ? "अभी इस पेज पर कोई published खबर नहीं है। नई खबर approve होते ही यहां दिखाई देगी।"
+    : "There are no published stories on this page yet. Approved stories will appear here.";
+
+  return `
+    <article class="portal-card news-empty-card">
+      <img src="${escapeHTML(PORTAL_FALLBACK_IMAGE)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
+      <span class="portal-badge">${portalLanguage === "hi" ? "ताज़ा" : "LIVE"}</span>
+      <h3>${escapeHTML(title)}</h3>
+      <p>${escapeHTML(summary)}</p>
+      <a class="read-btn" href="/index.html">${portalLanguage === "hi" ? "होम देखें" : "Back To Home"}</a>
+    </article>
+  `;
+};
+
+translatePortalStatic();
+loadPortalMongoNews();
