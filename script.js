@@ -1490,6 +1490,8 @@ function setLanguage(language) {
   document.documentElement.lang = language === "hi" ? "hi" : "en";
   try {
     localStorage.setItem("khabriJunctionLanguage", currentLanguage);
+    localStorage.setItem("kjLanguage", currentLanguage);
+    localStorage.setItem("khabriJunctionPortalLanguage", currentLanguage);
   } catch (error) {
     // Language still applies on this page.
   }
@@ -1522,7 +1524,10 @@ function initialLanguage() {
   }
 
   try {
-    return localStorage.getItem("khabriJunctionLanguage") === "en" ? "en" : "hi";
+    const stored = localStorage.getItem("khabriJunctionLanguage")
+      || localStorage.getItem("kjLanguage")
+      || localStorage.getItem("khabriJunctionPortalLanguage");
+    return stored === "en" ? "en" : "hi";
   } catch (error) {
     return "hi";
   }

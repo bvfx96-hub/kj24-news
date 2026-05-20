@@ -6,7 +6,20 @@ const PORTAL_API_BASE_URL = window.KJ_API_BASE_URL
 const PORTAL_FALLBACK_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=900&auto=format&fit=crop";
 const PORTAL_LANGUAGE_KEY = "khabriJunctionPortalLanguage";
 const requestedPortalLanguage = new URLSearchParams(window.location.search).get("lang");
-let portalLanguage = requestedPortalLanguage === "en" ? "en" : "hi";
+function storedPortalLanguage() {
+  try {
+    const stored = localStorage.getItem(PORTAL_LANGUAGE_KEY)
+      || localStorage.getItem("khabriJunctionLanguage")
+      || localStorage.getItem("kjLanguage");
+    return stored === "en" || stored === "hi" ? stored : "";
+  } catch (error) {
+    return "";
+  }
+}
+
+let portalLanguage = requestedPortalLanguage === "en" || requestedPortalLanguage === "hi"
+  ? requestedPortalLanguage
+  : storedPortalLanguage() || "hi";
 
 if (document.body) {
   document.body.classList.add("ads-pending");
@@ -126,10 +139,10 @@ function addPortalLanguageSwitch() {
   switcher.className = "portal-language-switch";
   switcher.id = "portalLanguageSwitch";
   switcher.innerHTML = `
-    <button class="${portalLanguage === "hi" ? "active" : ""}" type="button" data-portal-lang="hi">हिंदी</button>
+    <button class="${portalLanguage === "hi" ? "active" : ""}" type="button" data-portal-lang="hi">\u0939\u093f\u0902\u0926\u0940</button>
     <button class="${portalLanguage === "en" ? "active" : ""}" type="button" data-portal-lang="en">English</button>
   `;
-  switcher.querySelector('[data-portal-lang="hi"]').textContent = "हिंदी";
+  switcher.querySelector('[data-portal-lang="hi"]').textContent = "\u0939\u093f\u0902\u0926\u0940";
   header.appendChild(switcher);
   switcher.addEventListener("click", (event) => {
     const button = event.target.closest("[data-portal-lang]");
@@ -140,6 +153,11 @@ function addPortalLanguageSwitch() {
 
     portalLanguage = button.dataset.portalLang;
     localStorage.setItem(PORTAL_LANGUAGE_KEY, portalLanguage);
+    localStorage.setItem("khabriJunctionLanguage", portalLanguage);
+    localStorage.setItem("kjLanguage", portalLanguage);
+    const url = new URL(window.location.href);
+    url.searchParams.set("lang", portalLanguage);
+    window.history.replaceState({}, "", url);
     switcher.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item.dataset.portalLang === portalLanguage));
     loadPortalMongoNews();
   });

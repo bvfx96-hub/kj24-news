@@ -171,7 +171,15 @@
   }
 
   function getLanguage() {
-    const stored = localStorage.getItem("kjLanguage");
+    const queryLanguage = new URLSearchParams(window.location.search).get("lang");
+
+    if (queryLanguage === "en" || queryLanguage === "hi") {
+      return queryLanguage;
+    }
+
+    const stored = localStorage.getItem("kjLanguage")
+      || localStorage.getItem("khabriJunctionLanguage")
+      || localStorage.getItem("khabriJunctionPortalLanguage");
     return stored === "en" || stored === "hi" ? stored : "hi";
   }
 
@@ -193,6 +201,8 @@
       button.setAttribute("aria-pressed", String(isActive));
     });
     localStorage.setItem("kjLanguage", language);
+    localStorage.setItem("khabriJunctionLanguage", language);
+    localStorage.setItem("khabriJunctionPortalLanguage", language);
   }
 
   function markTranslatableText() {
@@ -223,7 +233,7 @@
     const switcher = document.createElement("div");
     switcher.className = "language-switch policy-language-switch";
     switcher.setAttribute("aria-label", "Language switch");
-    switcher.innerHTML = '<button type="button" data-lang="hi">हिंदी</button><button type="button" data-lang="en">English</button>';
+    switcher.innerHTML = '<button type="button" data-lang="hi">\u0939\u093f\u0902\u0926\u0940</button><button type="button" data-lang="en">English</button>';
     const header = document.querySelector(".policy-header");
     if (header) {
       header.insertAdjacentElement("afterend", switcher);
@@ -234,6 +244,9 @@
       const button = event.target.closest("button[data-lang]");
       if (!button) return;
       applyLanguage(button.dataset.lang);
+      const url = new URL(window.location.href);
+      url.searchParams.set("lang", button.dataset.lang);
+      window.history.replaceState({}, "", url);
     });
   }
 
