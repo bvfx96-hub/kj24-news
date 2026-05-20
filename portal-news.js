@@ -1303,6 +1303,55 @@ portalEmptyMarkup = function portalEmptyMarkup() {
 translatePortalStatic();
 loadPortalMongoNews();
 
+const PORTAL_PLACE_HI = {
+  Durg: "दुर्ग",
+  Bhilai: "भिलाई",
+  Raipur: "रायपुर",
+  Bilaspur: "बिलासपुर",
+  Rajnandgaon: "राजनांदगांव",
+  Kawardha: "कवर्धा",
+  Khairagarh: "खैरागढ़",
+  Korba: "कोरबा",
+  Raigarh: "रायगढ़",
+  Jagdalpur: "जगदलपुर",
+  Ambikapur: "अंबिकापुर"
+};
+
+portalStaticLabel = function portalStaticLabel(value) {
+  const text = normalizePortalText(value);
+  if (portalLanguage !== "hi") {
+    return text;
+  }
+
+  const latestMatch = text.match(/^Latest\s+(.+?)\s+News$/i);
+  if (latestMatch) {
+    const place = PORTAL_PLACE_HI[latestMatch[1]] || localizePortalTitle(latestMatch[1]) || latestMatch[1];
+    return `ताज़ा ${place} खबरें`;
+  }
+
+  return localizePortalLabel(text) || text;
+};
+
+portalEmptyMarkup = function portalEmptyMarkup() {
+  const title = portalLanguage === "hi" ? "नई पोस्ट जल्द आएगी" : "Fresh posts will appear soon";
+  const summary = portalLanguage === "hi"
+    ? "अभी इस पेज पर कोई प्रकाशित खबर नहीं है। नई खबर स्वीकृत होते ही यहां दिखाई देगी।"
+    : "There are no published stories on this page yet. Approved stories will appear here.";
+
+  return `
+    <article class="portal-card news-empty-card">
+      <img src="${escapeHTML(PORTAL_FALLBACK_IMAGE)}" alt="${escapeHTML(title)}" loading="lazy" decoding="async">
+      <span class="portal-badge">${portalLanguage === "hi" ? "ताज़ा" : "LIVE"}</span>
+      <h3>${escapeHTML(title)}</h3>
+      <p>${escapeHTML(summary)}</p>
+      <a class="read-btn" href="/index.html">${portalLanguage === "hi" ? "होम देखें" : "Back To Home"}</a>
+    </article>
+  `;
+};
+
+translatePortalStatic();
+loadPortalMongoNews();
+
 const PORTAL_RENDER_MOJIBAKE_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
 
 function decodePortalRenderSegment(segment) {
