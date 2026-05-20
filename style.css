@@ -173,7 +173,7 @@ img {
 
 .site-header {
   display: grid;
-  grid-template-columns: minmax(310px, 1fr) auto minmax(270px, 0.8fr);
+  grid-template-columns: minmax(310px, 1fr) auto;
   align-items: center;
   gap: 22px;
   padding: 18px clamp(16px, 4vw, 60px);
@@ -338,6 +338,31 @@ img {
 .ad-slot span {
   color: var(--muted);
   font-size: 0.83rem;
+}
+
+.ad-slot img,
+.portal-side-ad img,
+.mobile-sticky-ad img {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.ad-slot iframe,
+.portal-side-ad iframe,
+.mobile-sticky-ad iframe {
+  max-width: 100%;
+}
+
+.top-banner-ad {
+  width: min(970px, calc(100% - 28px));
+  min-height: 90px;
+  max-height: 250px;
+  margin: 14px auto;
+  padding: 10px;
+  overflow: hidden;
 }
 
 .main-menu {
@@ -2558,8 +2583,8 @@ section {
 }
 
 .article-top-ad {
-  min-height: 76px;
-  border-radius: 0;
+  min-height: 90px;
+  border-radius: 8px;
   box-shadow: none;
 }
 
@@ -2600,8 +2625,11 @@ section {
 }
 
 .in-article-ad {
-  min-height: 92px;
-  margin: 18px 0;
+  width: min(336px, 100%);
+  min-height: 250px;
+  margin: 22px auto;
+  padding: 10px;
+  overflow: hidden;
 }
 
 .article-main {
@@ -2756,6 +2784,15 @@ section {
   display: grid;
   align-content: start;
   gap: 16px;
+}
+
+.article-sidebar-ad {
+  position: sticky;
+  top: 90px;
+  width: 300px;
+  min-height: 250px;
+  max-height: 600px;
+  overflow: hidden;
 }
 
 .article-related {
@@ -3727,7 +3764,7 @@ body.ads-pending .mobile-sticky-ad:not(.adsense-ready) {
     font-size: 0.76rem;
   }
 
-  .header-ad {
+  .site-header .header-ad {
     display: none;
   }
 
@@ -3902,6 +3939,13 @@ body.ads-pending .mobile-sticky-ad:not(.adsense-ready) {
     margin: 14px auto 82px;
   }
 
+  .top-banner-ad {
+    width: min(320px, calc(100% - 18px));
+    min-height: 100px;
+    max-height: 100px;
+    margin: 10px auto;
+  }
+
   .article-main {
     padding: 15px;
     border-radius: 10px;
@@ -3948,7 +3992,12 @@ body.ads-pending .mobile-sticky-ad:not(.adsense-ready) {
   }
 
   .article-sidebar {
-    grid-row: auto;
+    display: none;
+  }
+
+  .in-article-ad {
+    width: min(336px, 100%);
+    min-height: 250px;
   }
 
   .portal-side-ad {

@@ -1440,7 +1440,11 @@ function applyAdCode(selector, code) {
     target.innerHTML = code;
     target.classList.add("adsense-ready");
   } else if (target) {
-    target.classList.remove("adsense-ready");
+    if (target.classList.contains("top-banner-ad")) {
+      target.classList.add("adsense-ready");
+    } else {
+      target.classList.remove("adsense-ready");
+    }
   }
 }
 

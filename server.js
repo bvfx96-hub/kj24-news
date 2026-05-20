@@ -408,6 +408,38 @@ function comparableCopy(value) {
     .trim();
 }
 
+function copyWords(value) {
+  return comparableCopy(value).split(" ").filter((word) => word.length > 1);
+}
+
+function ngrams(words, size) {
+  const set = new Set();
+
+  for (let index = 0; index <= words.length - size; index += 1) {
+    set.add(words.slice(index, index + size).join(" "));
+  }
+
+  return set;
+}
+
+function ngramOverlapRatio(leftWords, rightWords, size = 5) {
+  const leftSet = ngrams(leftWords, size);
+  const rightSet = ngrams(rightWords, size);
+
+  if (!leftSet.size || !rightSet.size) {
+    return 0;
+  }
+
+  let matches = 0;
+  leftSet.forEach((item) => {
+    if (rightSet.has(item)) {
+      matches += 1;
+    }
+  });
+
+  return matches / Math.min(leftSet.size, rightSet.size);
+}
+
 function looksCopiedFromSource(candidate, source) {
   const left = comparableCopy(candidate);
   const right = comparableCopy(source);
@@ -420,8 +452,44 @@ function looksCopiedFromSource(candidate, source) {
     return true;
   }
 
-  const sample = right.split(" ").filter(Boolean).slice(0, 12).join(" ");
-  return sample.length >= 32 && left.includes(sample);
+  const leftWords = left.split(" ").filter(Boolean);
+  const rightWords = right.split(" ").filter(Boolean);
+  const sample = rightWords.slice(0, 12).join(" ");
+  const headlineSample = rightWords.slice(0, 8).join(" ");
+
+  if (sample.length >= 32 && left.includes(sample)) {
+    return true;
+  }
+
+  if (headlineSample.length >= 24 && left.includes(headlineSample)) {
+    return true;
+  }
+
+  if (rightWords.length >= 18 && ngramOverlapRatio(leftWords, rightWords, 5) >= 0.28) {
+    return true;
+  }
+
+  return rightWords.length >= 10 && ngramOverlapRatio(leftWords, rightWords, 4) >= 0.38;
+}
+
+function generatedArticleLooksCopied(article = {}, item = {}) {
+  const sourceText = [
+    item.title,
+    item.sourceTitle,
+    item.summary,
+    item.body
+  ].filter(Boolean).join(" ");
+  const generatedText = [
+    article.title,
+    article.summary,
+    article.body
+  ].filter(Boolean).join(" ");
+
+  return (
+    looksCopiedFromSource(generatedText, sourceText) ||
+    looksCopiedFromSource(article.title, item.title || item.sourceTitle || "") ||
+    looksCopiedFromSource(article.summary, item.summary || "")
+  );
 }
 
 function cleanNewsCopyText(value, options = {}) {
@@ -3079,16 +3147,14 @@ function buildFallbackHindiArticle(item) {
   const titlePrefix = city
     ? `${city.charAt(0).toUpperCase()}${city.slice(1)} अपडेट`
     : `${category || "Breaking"} अपडेट`;
-  const summaryLine = hasHindiText(sourceSummary)
-    ? sourceSummary
-    : `${titlePrefix} को लेकर नई जानकारी सामने आई है।`;
-  const title = `${titlePrefix}: ${summaryLine.replace(/[।!?].*$/u, "").trim()}`.slice(0, 95);
-  const summary = summaryLine.replace(/\s+/g, " ").trim();
+  const topicLabel = `${category || "स्थानीय खबर"} से जुड़ा मामला`;
+  const title = `${titlePrefix}: ${topicLabel} पर नया अपडेट`.slice(0, 95);
   const locationLabel = districtDefinitionFromValue(city)?.label || category || "छत्तीसगढ़";
-  const paragraphOne = `${summary} यह मामला ${locationLabel} से जुड़ा है और शुरुआती जानकारी के अनुसार घटनाक्रम ने स्थानीय स्तर पर ध्यान खींचा है।`;
-  const paragraphTwo = `घटना कब हुई, किस वजह से सामने आई और इससे कौन-कौन प्रभावित हुआ, इसे लेकर संबंधित पक्षों से जानकारी जुटाई जा रही है।`;
-  const paragraphThree = `मौके और हालात से जुड़ी पुष्टि के आधार पर प्रशासनिक तथा आधिकारिक पक्ष सामने आने पर खबर को आगे अपडेट किया जाएगा।`;
-  const body = [paragraphOne, paragraphTwo, paragraphThree].filter(Boolean).join("\n\n");
+  const summary = `${locationLabel} से जुड़ी इस खबर में ${category || "स्थानीय अपडेट"} को लेकर नई जानकारी सामने आई है।`;
+  const paragraphOne = `${locationLabel} में सामने आए इस मामले पर स्थानीय स्तर पर चर्चा है। उपलब्ध जानकारी के आधार पर यह अपडेट ${category || "समाचार"} श्रेणी से जुड़ा है।`;
+  const paragraphTwo = `मामले में कब, कहां और किन परिस्थितियों में घटनाक्रम सामने आया, इसे लेकर आधिकारिक और स्थानीय स्तर पर जानकारी जुटाई जा रही है।`;
+  const paragraphThree = `संबंधित पक्षों से पुष्टि मिलने के बाद खबर में जरूरी तथ्य जोड़े जाएंगे। फिलहाल रिपोर्ट को सावधानी और उपलब्ध जानकारी के आधार पर तैयार किया गया है।`;
+  const body = [paragraphOne, paragraphTwo, paragraphThree].join("\n\n");
 
   return {
     title,
@@ -3116,12 +3182,16 @@ Source URL: ${item.sourceUrl}
 
 Rewrite rules:
 - Do NOT copy-paste the source headline, source summary, or source wording.
+- First extract only verified facts, then write a new article from scratch.
 - Create a fresh Hindi headline in Khabri Junction's own style.
+- Do not use the source headline as the final title; change the phrase structure completely.
 - Rewrite the story in original Hindi language while keeping only the verified facts.
 - Write in clean professional Hindi newsroom style.
 - Follow 5W structure naturally: क्या, कहाँ, कब, कौन, कैसे.
 - Do not reuse more than 7 consecutive words from the source text.
 - Do not translate word-for-word; paraphrase naturally for local Hindi readers.
+- Change sentence order, paragraph order, and wording so the story is clearly original.
+- If the source has only a headline or very short summary, write a short cautious update instead of expanding with copied filler.
 - Do not add fake quotes, fake names, fake numbers, or unverified allegations.
 - Do not include publisher/source names like ${item.sourceName || "source name"} inside the final headline or body.
 - Do not leave HTML entities like &nbsp; in the output.
@@ -3131,7 +3201,7 @@ Return ONLY valid JSON with:
 {
   "title": "Hindi headline",
   "summary": "2 line Hindi summary",
-  "body": "Full Hindi news body, 5-7 short paragraphs, neutral and factual",
+  "body": "Full Hindi news body, 4-6 short paragraphs separated by blank lines, neutral and factual",
   "category": "One of: Durg, Bhilai, Raipur, Bilaspur, Sports, Astrology, Politics, Crime, Entertainment, Health, Jobs, Breaking",
   "city": "lowercase city slug if local, else empty string",
   "breaking": true or false
@@ -3170,7 +3240,7 @@ If exact details are unavailable, use careful wording and keep the article neutr
   const payload = await response.json();
   const outputText = payload.output_text || payload.output?.flatMap((part) => part.content || []).map((part) => part.text || "").join("\n");
 
-  return parseGeneratedArticle(outputText, {
+  const generated = parseGeneratedArticle(outputText, {
     title: item.title,
     summary: item.summary,
     category,
@@ -3178,6 +3248,17 @@ If exact details are unavailable, use careful wording and keep the article neutr
     sourceName: item.sourceName,
     feedSourceName: item.feedSourceName
   });
+
+  if (generatedArticleLooksCopied(generated, item)) {
+    await addAutomationLog("rewrite-guard", "AI output source ke bahut close tha, safe fallback rewrite use hua", {
+      sourceUrl: item.sourceUrl,
+      sourceName: item.sourceName,
+      title: item.title
+    });
+    return buildFallbackHindiArticle(item);
+  }
+
+  return generated;
 }
 
 async function uniqueArticleSlug(title, sourceHash = "") {
@@ -3201,14 +3282,25 @@ async function saveGeneratedNews(item, article) {
   const sourceHash = sourceHashForItem(item);
   const duplicateKey = sourceHash;
   const storyHash = normalizeText(item.storyHash || storyHashForItem(item));
-  const combinedText = `${item.title} ${item.summary} ${article.title} ${article.summary} ${article.body} ${article.category}`;
-  const detectedCategory = categoryFromValue(article.category) || categoryFromValue(inferCategory(combinedText));
+  let articleToSave = article;
+
+  if (generatedArticleLooksCopied(articleToSave, item)) {
+    await addAutomationLog("rewrite-guard", "Save se pehle copied-looking AI article block hua, fallback rewrite save hua", {
+      sourceUrl: item.sourceUrl,
+      sourceName: item.sourceName,
+      title: item.title
+    });
+    articleToSave = buildFallbackHindiArticle(item);
+  }
+
+  const combinedText = `${item.title} ${item.summary} ${articleToSave.title} ${articleToSave.summary} ${articleToSave.body} ${articleToSave.category}`;
+  const detectedCategory = categoryFromValue(articleToSave.category) || categoryFromValue(inferCategory(combinedText));
   const category = detectedCategory?.label || inferCategory(combinedText);
-  const city = article.city || inferCity(combinedText);
-  const slug = await uniqueArticleSlug(article.title, sourceHash);
+  const city = articleToSave.city || inferCity(combinedText);
+  const slug = await uniqueArticleSlug(articleToSave.title, sourceHash);
   const thumbnailFields = await buildThumbnailFields({
-    title: article.title,
-    titleHi: article.title,
+    title: articleToSave.title,
+    titleHi: articleToSave.title,
     category,
     categoryBadge: category,
     city,
@@ -3228,12 +3320,12 @@ async function saveGeneratedNews(item, article) {
   }
 
   const news = normalizeNews(await prepareBilingualNews({
-    title: article.title,
-    titleHi: article.title,
-    summary: article.summary,
-    summaryHi: article.summary,
-    body: article.body,
-    bodyHi: article.body,
+    title: articleToSave.title,
+    titleHi: articleToSave.title,
+    summary: articleToSave.summary,
+    summaryHi: articleToSave.summary,
+    body: articleToSave.body,
+    bodyHi: articleToSave.body,
     category,
     city,
     image: thumbnailFields.image,
@@ -3245,7 +3337,7 @@ async function saveGeneratedNews(item, article) {
     slug,
     createdAt: new Date(),
     status: "pending",
-    breaking: article.breaking,
+    breaking: articleToSave.breaking,
     featured: false,
     trending: false,
     language: "hi",
@@ -3906,7 +3998,10 @@ async function repairNewsLocalization(limit = 40) {
 
     let nextInput = { ...doc };
 
-    if (looksCopiedFromSource(`${doc.titleHi || ""} ${doc.summaryHi || ""}`, `${doc.sourceTitle || ""} ${doc.summary || ""}`)) {
+    if (looksCopiedFromSource(
+      `${doc.titleHi || ""} ${doc.summaryHi || ""} ${doc.bodyHi || ""}`,
+      `${doc.sourceTitle || ""} ${doc.summary || ""} ${doc.body || ""}`
+    )) {
       const regenerated = await generateHindiArticle({
         title: doc.sourceTitle || doc.title || doc.titleHi,
         summary: doc.summaryHi || doc.summary || doc.sourceTitle,
@@ -4425,14 +4520,32 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
     ? `<a href="${escapeHTML(articleUrl(adjacent.next, req))}?lang=${language}"><span>${language === "hi" ? "\u0905\u0917\u0932\u0940 \u0916\u092c\u0930" : "Next story"}</span><strong>${escapeHTML(localizedValue(adjacent.next, "title", language))}</strong></a>`
     : "";
   const bodyText = stripBodyImages(article.body || article.summary);
-  const paragraphs = escapeHTML(bodyText)
+  const rawParagraphs = bodyText
     .split(/\n{2,}/)
+    .map((paragraph) => normalizeText(paragraph))
+    .filter(Boolean);
+  const sentenceParagraphs = (bodyText.match(/[^।.!?]+[।.!?]?/g) || [])
+    .map((sentence) => normalizeText(sentence))
     .filter(Boolean)
-    .map((paragraph) => `<p>${paragraph}</p>`)
-    .join("");
-  const adTop = normalizeText(settings.ads?.["article-top"] || settings.ads?.inArticle);
-  const adBottom = normalizeText(settings.ads?.["article-bottom"] || settings.ads?.inArticle);
-  const sidebarAd = normalizeText(settings.ads?.sidebar);
+    .reduce((groups, sentence, index) => {
+      const groupIndex = Math.floor(index / 2);
+      groups[groupIndex] = [groups[groupIndex], sentence].filter(Boolean).join(" ");
+      return groups;
+    }, [])
+    .filter(Boolean);
+  const articleParagraphs = rawParagraphs.length >= 3 ? rawParagraphs : (sentenceParagraphs.length > 1 ? sentenceParagraphs : rawParagraphs);
+  const paragraphItems = articleParagraphs.map((paragraph) => `<p>${escapeHTML(paragraph)}</p>`);
+  const headerAd = normalizeText(settings.ads?.header) || "ADVERTISEMENT";
+  const inArticleAd = normalizeText(settings.ads?.inArticle || settings.ads?.["article-top"] || settings.ads?.["article-bottom"] || settings.ads?.sidebar || settings.ads?.homepage) || "ADVERTISEMENT<br>336 x 280";
+  const inArticleIndex = Math.min(Math.max(paragraphItems.length >= 3 ? 3 : 2, 1), paragraphItems.length);
+  const paragraphs = inArticleAd
+    ? [
+      ...paragraphItems.slice(0, inArticleIndex),
+      `<div class="ad-slot in-article-ad adsense-ready">${inArticleAd}</div>`,
+      ...paragraphItems.slice(inArticleIndex)
+    ].join("")
+    : paragraphItems.join("");
+  const sidebarAd = normalizeText(settings.ads?.sidebar || settings.ads?.homepage) || "ADVERTISEMENT<br>300 x 600";
   const mobileStickyAd = normalizeText(settings.ads?.["mobile-sticky"]);
   const taxonomyMeta = [
     `<div><strong>${escapeHTML(labels.category)}</strong><span>${escapeHTML(categoryLabel)}</span></div>`,
@@ -4481,6 +4594,7 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
       <a class="${language === "en" ? "active" : ""}" href="${escapeHTML(url)}?lang=en">English</a>
     </div>
   </header>
+  ${headerAd ? `<div class="ad-slot top-banner-ad article-top-ad adsense-ready">${headerAd}</div>` : ""}
   <main class="article-shell">
     <article class="article-main">
       <a class="portal-back" href="${escapeHTML(categoryUrl)}">${escapeHTML(labels.home)} / ${escapeHTML(news.category || labels.news)}</a>
@@ -4506,14 +4620,12 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
         <a href="https://twitter.com/intent/tweet?url=${shareUrl}&text=${shareText}" target="_blank" rel="noopener">X</a>
         <a href="https://api.whatsapp.com/send?text=${shareText}%20${shareUrl}" target="_blank" rel="noopener">WhatsApp</a>
       </div>
-      ${adTop ? `<div class="ad-slot in-article-ad adsense-ready">${adTop}</div>` : ""}
       <div class="article-body">${paragraphs}</div>
       ${sourceCreditMarkup}
-      ${adBottom ? `<div class="ad-slot in-article-ad adsense-ready">${adBottom}</div>` : ""}
       <nav class="article-next-prev" aria-label="Next and previous articles">${prevLink}${nextLink}</nav>
     </article>
     <aside class="article-sidebar">
-      ${sidebarAd ? `<div class="portal-side-ad adsense-ready">${sidebarAd}</div>` : ""}
+      ${sidebarAd ? `<div class="portal-side-ad article-sidebar-ad adsense-ready">${sidebarAd}</div>` : ""}
       <section class="article-related">
         <h2>${escapeHTML(labels.related)}</h2>
         ${relatedCards || `<p>${escapeHTML(labels.noRelated)}</p>`}
@@ -4694,11 +4806,11 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(title)},"description":${JSON.stringify(routeDescription)},"url":${JSON.stringify(canonical)}}</script>
 </head>
 <body class="article-page">
-  <div class="ad-slot article-top-ad">${cleanSettings.ads?.header || "ADVERTISEMENT"}</div>
   <header class="portal-site-header">
     <a class="portal-brand" href="/index.html"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>${ui.brandTagline}</span></div></a>
     ${portalHeaderNav(language, activeDistrictSlug)}
   </header>
+  <div class="ad-slot top-banner-ad article-top-ad">${cleanSettings.ads?.header || "ADVERTISEMENT"}</div>
   <main class="portal-shell">
     <div class="portal-language-switch category-language-switch" aria-label="Page language">
       <a class="${language === "hi" ? "active" : ""}" href="${escapeHTML(route.path)}?lang=hi">हिंदी</a>
@@ -4712,7 +4824,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
         <div class="news-grid latest-grid">${cards || `<div class="ad-slot">${ui.empty}</div>`}</div>
       </div>
       <aside class="portal-sidebar">
-        <div class="portal-side-ad">${cleanSettings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
+        <div class="portal-side-ad article-sidebar-ad">${cleanSettings.ads?.sidebar || "ADVERTISEMENT<br>300 x 250"}</div>
         <section class="market-card"><div class="section-title small"><span></span><strong>${ui.weatherTitle}</strong></div><div class="market-list">${weather}</div></section>
         <section class="market-card"><div class="section-title small"><span></span><strong>${ui.marketTitle}</strong></div><div class="market-list">${market}</div></section>
         <section class="market-card"><div class="section-title small"><span></span><strong>${ui.videoTitle}</strong></div>${videos || "<p>No videos yet.</p>"}</section>
@@ -4847,14 +4959,17 @@ app.get("/api/taxonomy", (req, res) => {
   });
 });
 
-app.get("/api/automation", requireDatabase, async (req, res, next) => {
+async function sendAutomationStatus(req, res, next) {
   try {
     const settings = await getAutomationSettings();
     res.json(serializeAutomationSettings(settings));
   } catch (error) {
     next(error);
   }
-});
+}
+
+app.get("/api/automation", requireDatabase, sendAutomationStatus);
+app.get("/api/automation/status", requireDatabase, sendAutomationStatus);
 
 app.put("/api/automation", requireDatabase, async (req, res, next) => {
   try {
