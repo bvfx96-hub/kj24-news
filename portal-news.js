@@ -1302,3 +1302,85 @@ portalEmptyMarkup = function portalEmptyMarkup() {
 
 translatePortalStatic();
 loadPortalMongoNews();
+
+const PORTAL_RENDER_MOJIBAKE_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
+
+function decodePortalRenderSegment(segment) {
+  const source = String(segment || "");
+  if (!source) {
+    return source;
+  }
+
+  try {
+    const percentEncoded = Array.from(source).map((char) => {
+      const code = char.charCodeAt(0);
+      if (code <= 0xff) {
+        return `%${code.toString(16).padStart(2, "0")}`;
+      }
+      return encodeURIComponent(char);
+    }).join("");
+
+    return decodeURIComponent(percentEncoded);
+  } catch (error) {
+    return source;
+  }
+}
+
+function repairPortalRenderHindi(value) {
+  let output = String(value || "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+
+  if (!output || !/[ÃàÂâ]/.test(output)) {
+    return output;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const repaired = output.replace(PORTAL_RENDER_MOJIBAKE_SEGMENT_RE, (segment) => decodePortalRenderSegment(segment));
+    if (repaired === output) {
+      break;
+    }
+    output = repaired;
+  }
+
+  return output.replace(/\uFFFD/g, "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+}
+
+repairPortalMojibake = function repairPortalMojibake(value) {
+  return repairPortalRenderHindi(value);
+};
+
+normalizePortalText = function normalizePortalText(value) {
+  return repairPortalRenderHindi(value)
+    .replace(/Â°/g, "°")
+    .replace(/Ã¢â‚¬â„¢|â€™/g, "'")
+    .trim();
+};
+
+uiText = function uiText(en, hi) {
+  if (portalLanguage !== "hi") {
+    return normalizePortalText(en);
+  }
+
+  const mappedHindi = normalizePortalText(PORTAL_HINDI_TEXT[en] || "");
+  if (/[\u0900-\u097F]/.test(mappedHindi)) {
+    return mappedHindi;
+  }
+
+  const inlineHindi = normalizePortalText(hi);
+  return /[\u0900-\u097F]/.test(inlineHindi) ? inlineHindi : normalizePortalText(en);
+};
+
+document.querySelectorAll("*").forEach((node) => {
+  for (const attr of node.getAttributeNames()) {
+    if (attr === "data-en" || attr === "data-portal-en") {
+      node.setAttribute(attr, normalizePortalText(node.getAttribute(attr)));
+      continue;
+    }
+
+    if (/^data-.*hi/i.test(attr)) {
+      node.setAttribute(attr, normalizePortalText(node.getAttribute(attr)));
+    }
+  }
+});
+
+translatePortalStatic();
+loadPortalMongoNews();

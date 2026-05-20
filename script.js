@@ -2764,3 +2764,107 @@ setLanguage = function setLanguage(language) {
 };
 
 setLanguage(currentLanguage || initialLanguage());
+
+const RENDER_MOJIBAKE_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
+
+function decodeRenderMojibakeSegment(segment) {
+  const source = String(segment || "");
+  if (!source) {
+    return source;
+  }
+
+  try {
+    const percentEncoded = Array.from(source).map((char) => {
+      const code = char.charCodeAt(0);
+      if (code <= 0xff) {
+        return `%${code.toString(16).padStart(2, "0")}`;
+      }
+      return encodeURIComponent(char);
+    }).join("");
+
+    return decodeURIComponent(percentEncoded);
+  } catch (error) {
+    return source;
+  }
+}
+
+function repairRenderMixedHindi(value) {
+  let output = String(value || "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+
+  if (!output || !/[ÃàÂâ]/.test(output)) {
+    return output;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const repaired = output.replace(RENDER_MOJIBAKE_SEGMENT_RE, (segment) => decodeRenderMojibakeSegment(segment));
+    if (repaired === output) {
+      break;
+    }
+    output = repaired;
+  }
+
+  return output.replace(/\uFFFD/g, "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+}
+
+repairMojibakeText = function repairMojibakeText(value) {
+  return repairRenderMixedHindi(value);
+};
+
+looksCorruptHindi = function looksCorruptHindi(value) {
+  return /Ã|à|Â|â|�|\?{2,}/.test(String(value || ""));
+};
+
+normalizeDisplayText = function normalizeDisplayText(value) {
+  const text = repairRenderMixedHindi(value);
+  return text
+    .replace(/Â°/g, "°")
+    .replace(/Ã¢â‚¬â„¢|â€™/g, "'")
+    .trim();
+};
+
+decodeFinalSiteMojibake = function decodeFinalSiteMojibake(value) {
+  return normalizeDisplayText(value);
+};
+
+cleanFinalSiteText = function cleanFinalSiteText(value) {
+  return normalizeDisplayText(value);
+};
+
+getHindiText = function getHindiText(en, hi) {
+  const english = cleanFinalSiteText(en);
+  const inlineHindi = cleanFinalSiteText(hi);
+
+  if (FINAL_HOME_HI_LABELS[english]) {
+    return cleanFinalSiteText(FINAL_HOME_HI_LABELS[english]);
+  }
+
+  if (hasVisibleHindi(inlineHindi)) {
+    return inlineHindi;
+  }
+
+  const mappedHindi = cleanFinalSiteText(CLEAN_HI_LABELS[english] || UI_HI_LABELS[english] || HINDI_TEXT_BY_EN[english] || "");
+  if (hasVisibleHindi(mappedHindi)) {
+    return mappedHindi;
+  }
+
+  return english;
+};
+
+getLocalizedText = function getLocalizedText(en, hi, language) {
+  return language === "hi" ? getHindiText(en, hi) : cleanFinalSiteText(en);
+};
+
+document.querySelectorAll("*").forEach((node) => {
+  for (const attr of node.getAttributeNames()) {
+    if (attr === "data-en") {
+      node.setAttribute(attr, cleanFinalSiteText(node.getAttribute(attr)));
+      continue;
+    }
+
+    if (/^data-.*hi/i.test(attr)) {
+      node.setAttribute(attr, cleanFinalSiteText(node.getAttribute(attr)));
+    }
+  }
+});
+
+setLanguage(currentLanguage || initialLanguage());

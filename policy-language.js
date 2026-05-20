@@ -342,3 +342,82 @@
     applyLanguage(getLanguage());
   });
 })();
+
+(() => {
+  const POLICY_RENDER_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
+
+  function decodePolicyRenderSegment(segment) {
+    const source = String(segment || "");
+    if (!source) {
+      return source;
+    }
+
+    try {
+      const percentEncoded = Array.from(source).map((char) => {
+        const code = char.charCodeAt(0);
+        if (code <= 0xff) {
+          return `%${code.toString(16).padStart(2, "0")}`;
+        }
+        return encodeURIComponent(char);
+      }).join("");
+
+      return decodeURIComponent(percentEncoded);
+    } catch (error) {
+      return source;
+    }
+  }
+
+  function repairPolicyRenderHindi(value) {
+    let output = String(value || "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+
+    if (!output || !/[ÃàÂâ]/.test(output)) {
+      return output;
+    }
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const repaired = output.replace(POLICY_RENDER_SEGMENT_RE, (segment) => decodePolicyRenderSegment(segment));
+      if (repaired === output) {
+        break;
+      }
+      output = repaired;
+    }
+
+    return output.replace(/\uFFFD/g, "").replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function currentPolicyLanguage() {
+    const queryLanguage = new URLSearchParams(window.location.search).get("lang");
+    if (queryLanguage === "en" || queryLanguage === "hi") {
+      return queryLanguage;
+    }
+    const stored = localStorage.getItem("kjLanguage")
+      || localStorage.getItem("khabriJunctionLanguage")
+      || localStorage.getItem("khabriJunctionPortalLanguage");
+    return stored === "en" ? "en" : "hi";
+  }
+
+  function applyPolicyRepair(language) {
+    document.querySelectorAll("[data-static-lang-text]").forEach((node) => {
+      const english = repairPolicyRenderHindi(node.dataset.langEn || node.textContent);
+      const hindi = repairPolicyRenderHindi(node.dataset.langHi || node.textContent);
+      node.dataset.langEn = english;
+      node.dataset.langHi = hindi;
+      node.textContent = language === "en" ? english : hindi;
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    if (!document.body.classList.contains("policy-page")) {
+      return;
+    }
+
+    applyPolicyRepair(currentPolicyLanguage());
+
+    const switcher = document.querySelector(".policy-language-switch");
+    if (switcher) {
+      switcher.addEventListener("click", () => {
+        window.setTimeout(() => applyPolicyRepair(currentPolicyLanguage()), 0);
+      });
+    }
+  });
+})();
