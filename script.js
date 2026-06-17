@@ -2767,9 +2767,7 @@ setLanguage(currentLanguage || initialLanguage());
 
 function pickHomepageCardNews(sorted, used, matcher) {
   return takeNews(sorted, 1, used, matcher)[0]
-    || takeNews(sorted, 1, new Set(), matcher)[0]
-    || takeNews(sorted, 1, new Set())[0]
-    || sorted[0]
+    || takeNews(sorted, 1, used)[0]
     || null;
 }
 
