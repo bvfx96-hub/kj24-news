@@ -5639,6 +5639,7 @@ const STATIC_PAGE_ROUTES = {
   "/privacy-policy": "privacy-policy.html",
   "/cookie-policy": "cookie-policy.html",
   "/terms-conditions": "terms-and-conditions.html",
+  "/terms-and-conditions": "terms-and-conditions.html",
   "/disclaimer": "disclaimer.html",
   "/editorial-policy": "editorial-policy.html",
   "/fact-check-policy": "fact-check-policy.html",
