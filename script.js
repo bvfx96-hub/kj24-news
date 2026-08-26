@@ -2615,7 +2615,7 @@ getHindiText = function getHindiText(en, hi) {
     return FINAL_HOME_HI_LABELS[english];
   }
 
-  if (hasVisibleHindi(inlineHindi)) {
+  if (hasVisibleHindi(inlineHindi) && !looksCorruptHindi(inlineHindi)) {
     return inlineHindi;
   }
 
@@ -2852,7 +2852,7 @@ if (Array.isArray(homepageLiveNews) && homepageLiveNews.length) {
   hydrateHomepageSections(homepageLiveNews);
 }
 
-const RENDER_MOJIBAKE_SEGMENT_RE = /(?:[ÃàÂâ][^<>"\u0900-\u097F]*)+/g;
+const RENDER_MOJIBAKE_SEGMENT_RE = /(?:[\u00A0-\u00FF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013\u2014\u2018-\u201A\u201C-\u201E\u2020\u2021\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]){2,}/g;
 
 function decodeRenderMojibakeSegment(segment) {
   const source = String(segment || "");
@@ -2861,15 +2861,18 @@ function decodeRenderMojibakeSegment(segment) {
   }
 
   try {
-    const percentEncoded = Array.from(source).map((char) => {
+    const bytes = Uint8Array.from(Array.from(source).map((char) => {
       const code = char.charCodeAt(0);
-      if (code <= 0xff) {
-        return `%${code.toString(16).padStart(2, "0")}`;
-      }
-      return encodeURIComponent(char);
-    }).join("");
+      const byte = code <= 0xff ? code : UTF_MOJIBAKE_BYTES[code];
 
-    return decodeURIComponent(percentEncoded);
+      if (!Number.isInteger(byte)) {
+        throw new Error("unsupported mojibake byte");
+      }
+
+      return byte;
+    }));
+
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch (error) {
     return source;
   }
