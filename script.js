@@ -513,10 +513,18 @@ function newsIdentity(item = {}) {
 
 function localizedNewsField(item = {}, field, language = currentLanguage) {
   if (language === "hi") {
-    return item[`${field}Hi`] || item[field] || item[`${field}En`] || "";
+    const hindi = normalizeDisplayText(item[`${field}Hi`] || "");
+
+    // Older records may already contain unrecoverable question marks. Never show
+    // them as Hindi copy; use the intact English field until the article is edited.
+    if (hasVisibleHindi(hindi) && !looksCorruptHindi(hindi)) {
+      return hindi;
+    }
+
+    return normalizeDisplayText(item[`${field}En`] || item[field] || hindi);
   }
 
-  return item[`${field}En`] || item[field] || item[`${field}Hi`] || "";
+  return normalizeDisplayText(item[`${field}En`] || item[field] || item[`${field}Hi`] || "");
 }
 
 function safeSitePath(url = "") {
