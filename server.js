@@ -305,20 +305,35 @@ function decodeMojibake(value) {
     return text;
   }
 
-  try {
-    const bytes = Uint8Array.from(Array.from(text).map((char) => {
-      const code = char.charCodeAt(0);
-      return code <= 0xff ? code : (CP1252_REVERSE[code] ?? 0x3f);
-    }));
+  const decodeSegment = (segment) => {
+    try {
+      const bytes = Uint8Array.from(Array.from(segment).map((char) => {
+        const code = char.charCodeAt(0);
+        return code <= 0xff ? code : CP1252_REVERSE[code];
+      }));
 
-    return new TextDecoder("utf-8").decode(bytes)
-      .replace(/\uFFFD/g, "")
-      .replace(/°/g, "°")
-      .replace(/â€™/g, "'")
-      .trim();
-  } catch (error) {
-    return text;
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch (error) {
+      return segment;
+    }
+  };
+
+  let output = text;
+  const mojibakeSegment = /(?:[\u00A0-\u00FF\u0152\u0153\u0160\u0161\u0178\u017D\u017E\u0192\u02C6\u02DC\u2013\u2014\u2018-\u201A\u201C-\u201E\u2020\u2021\u2022\u2026\u2030\u2039\u203A\u20AC\u2122]){2,}/g;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const repaired = output.replace(mojibakeSegment, decodeSegment);
+    if (repaired === output) {
+      break;
+    }
+    output = repaired;
   }
+
+  return output
+    .replace(/\uFFFD/g, "")
+    .replace(/°/g, "°")
+    .replace(/â€™/g, "'")
+    .trim();
 }
 
 function decodeHtmlEntities(value) {
