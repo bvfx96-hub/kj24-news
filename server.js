@@ -37,6 +37,7 @@ const NEWS_FRESHNESS_WINDOW_MS = NEWS_FRESHNESS_HOURS * 60 * 60 * 1000;
 const RSS_FETCH_RETRY_COUNT = 3;
 const AUTOMATION_STUCK_MS = 20 * 60 * 1000;
 const SITE_URL = (process.env.SITE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, "");
+const INDEXNOW_KEY = String(process.env.INDEXNOW_KEY || "kj24-news-2026-indexnow-key").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 128);
 const DEFAULT_NEWS_IMAGE = "https://images.unsplash.com/photo-1495020689067-958852a7765e?q=80&w=1200&auto=format&fit=crop";
 const THUMBNAIL_WIDTH = 1200;
 const THUMBNAIL_HEIGHT = 675;
@@ -261,9 +262,15 @@ function renderHomepage(req) {
   return html.replaceAll("http://localhost:3000", base);
 }
 
-app.get(["/", "/index", "/index.html"], (req, res) => {
-  res.type("html").send(renderHomepage(req));
-});
+app.get("/", (req, res) => res.type("html").send(renderHomepage(req)));
+app.get(["/index", "/index.html"], (req, res) => res.redirect(301, "/"));
+const LEGACY_HTML_REDIRECTS = {
+  "/durg.html":"/district/durg","/bhilai.html":"/district/bhilai","/raipur.html":"/district/raipur","/bilaspur.html":"/district/bilaspur","/rajnandgaon.html":"/district/rajnandgaon","/khairagarh.html":"/district/khairagarh","/kawardha.html":"/district/kawardha","/korba.html":"/district/korba","/raigarh.html":"/district/raigarh","/jagdalpur.html":"/district/jagdalpur","/ambikapur.html":"/district/ambikapur","/breaking.html":"/category/breaking","/sports.html":"/category/sports","/astrology.html":"/category/astrology","/politics.html":"/category/politics","/crime.html":"/category/crime","/entertainment.html":"/category/entertainment","/health.html":"/category/health","/jobs.html":"/category/jobs","/about.html":"/about","/contact.html":"/contact","/privacy-policy.html":"/privacy-policy","/cookie-policy.html":"/cookie-policy","/terms-and-conditions.html":"/terms-and-conditions","/disclaimer.html":"/disclaimer","/editorial-policy.html":"/editorial-policy","/fact-check-policy.html":"/fact-check-policy","/correction-policy.html":"/correction-policy","/advertise.html":"/advertise"
+};
+Object.entries(LEGACY_HTML_REDIRECTS).forEach(([legacyPath, canonicalPath]) => app.get(legacyPath, (req, res) => {
+  const language = normalizeText(req.query.lang);
+  res.redirect(301, `${canonicalPath}${language === "hi" || language === "en" ? `?lang=${language}` : ""}`);
+}));
 
 app.use(express.static(__dirname, {
   etag: true,
@@ -2661,9 +2668,19 @@ function buildPublishNotification(news) {
   };
 }
 
+async function submitIndexNow(news) {
+  if (!INDEXNOW_KEY || !news?.slug) return { submitted: false };
+  const base = SITE_URL.replace(/\/+$/, "");
+  const urls = Array.from(new Set([`${base}/`,`${base}${articlePath(news)}`,`${base}${landingPageForNews(news)}`,`${base}/news-sitemap.xml`,`${base}/feed.xml`]));
+  const response = await fetch("https://api.indexnow.org/indexnow", { method:"POST", headers:{"Content-Type":"application/json; charset=utf-8"}, body:JSON.stringify({host:new URL(base).host,key:INDEXNOW_KEY,keyLocation:`${base}/${INDEXNOW_KEY}.txt`,urlList:urls}) });
+  if (!response.ok && response.status !== 202) throw new Error(`IndexNow submission failed: ${response.status}`);
+  return { submitted:true,status:response.status,urls:urls.length };
+}
+
 async function notifyPublishedArticle(news) {
   try {
-    return await sendFirebaseNotification(buildPublishNotification(news));
+    const [firebase, indexNow] = await Promise.allSettled([sendFirebaseNotification(buildPublishNotification(news)), submitIndexNow(news)]);
+    return { firebase: firebase.status === "fulfilled" ? firebase.value : { error: firebase.reason?.message }, indexNow: indexNow.status === "fulfilled" ? indexNow.value : { error: indexNow.reason?.message } };
   } catch (error) {
     await settingsCollection.updateOne(
       { _id: "site" },
@@ -4220,9 +4237,9 @@ function renderNewsSchema(news, related, req) {
       "@id": url
     },
     author: {
-      "@type": "Person",
-      name: "Khabri Junction Desk",
-      image: `${publicBaseUrl(req)}/assets/logo-kj.png`
+      "@type": "Organization", name: "Khabri Junction Desk",
+      url: `${publicBaseUrl(req)}/authors/khabri-junction-desk`,
+      logo: { "@type": "ImageObject", url: `${publicBaseUrl(req)}/assets/logo-kj.png` }
     },
     publisher: {
       "@type": "Organization",
@@ -4608,7 +4625,7 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   const taxonomyMeta = [
     `<div><strong>${escapeHTML(labels.category)}</strong><span>${escapeHTML(categoryLabel)}</span></div>`,
     districtLabel ? `<div><strong>${escapeHTML(labels.district)}</strong><span>${escapeHTML(districtLabel)}</span></div>` : "",
-    `<div><strong>${escapeHTML(labels.author)}</strong><span>${escapeHTML(authorName)}</span></div>`
+    `<div><strong>${escapeHTML(labels.author)}</strong><a href="/authors/khabri-junction-desk">${escapeHTML(authorName)}</a></div>`
   ].filter(Boolean).join("");
   const sourceCreditMarkup = imageCredit
     ? `<p class="article-source-credit">${escapeHTML(imageCredit)}</p>`
@@ -5702,6 +5719,12 @@ app.get("/district/:slug", requireDatabase, (req, res, next) => {
   sendDistrictPage(req, res, next, req.params.slug);
 });
 
+app.get("/authors/khabri-junction-desk", (req, res) => {
+  const base=publicBaseUrl(req), canonical=`${base}/authors/khabri-junction-desk`;
+  const schema={"@context":"https://schema.org","@type":"ProfilePage",mainEntity:{"@type":"Organization",name:"Khabri Junction Desk",url:canonical,logo:`${base}/assets/logo-kj.png`,parentOrganization:{"@type":"NewsMediaOrganization",name:"Khabri Junction",url:`${base}/`},areaServed:{"@type":"State",name:"Chhattisgarh"}}};
+  res.type("html").send(`<!DOCTYPE html><html lang="hi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1"><title>Khabri Junction Desk | स्थानीय समाचार टीम</title><meta name="description" content="Khabri Junction Desk छत्तीसगढ़ की स्थानीय खबरों और जिला अपडेट पर काम करने वाली संपादकीय टीम है।"><link rel="canonical" href="${escapeHTML(canonical)}"><link rel="stylesheet" href="/style.css"><script type="application/ld+json">${JSON.stringify(schema)}</script></head><body class="article-page"><header class="portal-site-header"><a class="portal-brand" href="/"><img src="/assets/logo-kj.png" alt="Khabri Junction logo"><div><strong>KHABRI JUNCTION</strong><span>स्थानीय समाचार टीम</span></div></a></header><main class="article-shell"><article class="article-main"><span class="tag">EDITORIAL TEAM</span><h1 class="article-title">Khabri Junction Desk</h1><p class="article-summary">यह टीम छत्तीसगढ़ की स्थानीय खबरें, प्रशासनिक अपडेट और जनहित सूचनाएं प्रकाशित करती है।</p><div class="article-body"><h2>संपादकीय प्रक्रिया</h2><p>हम स्पष्ट शीर्षक, तारीख, जिला, स्रोत और उपलब्ध होने पर रिपोर्टर का नाम देते हैं।</p><p><a href="/editorial-policy">Editorial Policy</a> · <a href="/fact-check-policy">Fact Check Policy</a> · <a href="/correction-policy">Correction Policy</a> · <a href="/contact">Contact</a></p></div></article></main></body></html>`);
+});
+
 const STATIC_PAGE_ROUTES = {
   "/about": "about.html",
   "/contact": "contact.html",
@@ -5729,6 +5752,8 @@ CLEAN_CATEGORY_ROUTES.forEach((route) => {
     res.redirect(301, categoryRoutePath(category || route.category));
   });
 });
+
+app.get(`/${INDEXNOW_KEY}.txt`, (req, res) => res.type("text/plain; charset=utf-8").send(INDEXNOW_KEY));
 
 app.get("/llms.txt", (req, res) => {
   const base = publicBaseUrl(req);
