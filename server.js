@@ -222,6 +222,7 @@ const MIN_LOCAL_ITEMS_BEFORE_FALLBACK = 4;
 const MAX_ITEMS_PER_SOURCE_PER_RUN = 2;
 
 const app = express();
+app.disable("x-powered-by");
 const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 3000 });
 app.set("trust proxy", true);
 
@@ -241,6 +242,19 @@ app.use(cors({ origin: true, credentials: false }));
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: false, limit: "30mb" }));
 
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+
+  if (req.method === "GET" && !req.path.startsWith("/api/") && !req.path.startsWith("/admin")) {
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
+  }
+
+  next();
+});
+
 function renderHomepage(req) {
   const html = fs.readFileSync(path.join(__dirname, "index.html"), "utf8");
   const base = publicBaseUrl(req);
@@ -251,7 +265,16 @@ app.get(["/", "/index", "/index.html"], (req, res) => {
   res.type("html").send(renderHomepage(req));
 });
 
-app.use(express.static(__dirname));
+app.use(express.static(__dirname, {
+  etag: true,
+  lastModified: true,
+  maxAge: "1h",
+  setHeaders(res, filePath) {
+    if (/\.(?:png|jpe?g|gif|webp|svg|ico|woff2?)$/i.test(filePath)) {
+      res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    }
+  }
+}));
 
 app.get("/favicon.ico", (req, res) => {
   res.type("png").sendFile(`${__dirname}/assets/logo-kj.png`);
@@ -4184,7 +4207,9 @@ function renderNewsSchema(news, related, req) {
   const schema = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
+    "@id": `${url}#article`,
     headline: news.title,
+    inLanguage: detectContentLanguage(news.title || news.body || news.summary),
     description: news.metaDescription || news.summary,
     image: [image],
     datePublished: news.publishedAt || news.createdAt,
@@ -4207,6 +4232,23 @@ function renderNewsSchema(news, related, req) {
       }
     },
     articleSection: news.category,
+    about: [news.category, news.city, "Chhattisgarh"].filter(Boolean).map((name) => ({
+      "@type": "Thing",
+      name
+    })),
+    contentLocation: news.city ? {
+      "@type": "Place",
+      name: news.city,
+      address: {
+        "@type": "PostalAddress",
+        addressRegion: "Chhattisgarh",
+        addressCountry: "IN"
+      }
+    } : undefined,
+    speakable: {
+      "@type": "SpeakableSpecification",
+      cssSelector: [".article-title", ".article-summary", ".article-body"]
+    },
     keywords: news.keywords,
     thumbnailUrl: image,
     creditText: articleImageCredit(news, image, "en") || "Khabri Junction Desk",
@@ -5676,6 +5718,86 @@ CLEAN_CATEGORY_ROUTES.forEach((route) => {
   });
 });
 
+app.get("/llms.txt", (req, res) => {
+  const base = publicBaseUrl(req);
+  const categoryLinks = CATEGORY_DEFINITIONS
+    .map((category) => `- [${category.title || category.label || category.slug}](${base}${categoryRoutePath(category)})`)
+    .join("\n");
+  const districtLinks = CITY_DEFINITIONS
+    .map((district) => `- [${district.label} News](${base}${districtRoutePath(district.slug)})`)
+    .join("\n");
+
+  res.type("text/markdown; charset=utf-8").send(`# Khabri Junction
+
+> Khabri Junction is a bilingual Hindi and English digital news publication covering verified local updates from Chhattisgarh, with primary coverage of Durg, Bhilai, Raipur, Bilaspur and nearby districts.
+
+## Canonical website
+- [Homepage](${base}/)
+- [Latest news sitemap](${base}/news-sitemap.xml)
+- [Full sitemap](${base}/sitemap.xml)
+- [RSS feed](${base}/feed.xml)
+
+## Editorial scope
+Khabri Junction publishes district news, public alerts, politics, crime, sports, entertainment, health, jobs and other civic-interest reporting. Article pages include publication dates, update dates, author attribution, categories, districts and source details when available.
+
+## Main sections
+${categoryLinks}
+
+## District coverage
+${districtLinks}
+
+## Editorial and trust pages
+- [About](${base}/about)
+- [Contact](${base}/contact)
+- [Editorial Policy](${base}/editorial-policy)
+- [Fact Check Policy](${base}/fact-check-policy)
+- [Correction Policy](${base}/correction-policy)
+- [Privacy Policy](${base}/privacy-policy)
+
+## Languages
+Use ?lang=hi for Hindi and ?lang=en for English where localized content is available.
+
+## Citation guidance
+When citing Khabri Junction, link to the canonical article URL and include the headline, publication date and Khabri Junction as publisher. Prefer the article's explicitly displayed source and update information over inferred details.
+`);
+});
+
+app.get(["/feed.xml", "/rss.xml"], requireDatabase, async (req, res, next) => {
+  try {
+    const news = await getCombinedPublishedNews({ status: "published" }, 50);
+    const base = publicBaseUrl(req);
+    const items = news.map((item) => {
+      const url = articleUrl(item, req);
+      const title = localizedValue(item, "title", "hi") || item.title;
+      const description = localizedValue(item, "summary", "hi") || item.summary || "";
+      const published = new Date(item.publishedAt || item.createdAt || Date.now()).toUTCString();
+
+      return `<item>
+        <title>${escapeXML(title)}</title>
+        <link>${escapeXML(url)}</link>
+        <guid isPermaLink="true">${escapeXML(url)}</guid>
+        <description>${escapeXML(description)}</description>
+        <pubDate>${published}</pubDate>
+        <category>${escapeXML(item.category || "News")}</category>
+      </item>`;
+    }).join("\n");
+
+    res.type("application/rss+xml; charset=utf-8").send(`<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Khabri Junction</title>
+    <link>${escapeXML(base)}/</link>
+    <description>Latest local news from Chhattisgarh in Hindi and English.</description>
+    <language>hi-IN</language>
+    <atom:link href="${escapeXML(base)}/feed.xml" rel="self" type="application/rss+xml"/>
+    ${items}
+  </channel>
+</rss>`);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/news-sitemap.xml", requireDatabase, async (req, res, next) => {
   try {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
@@ -5763,8 +5885,21 @@ app.get("/robots.txt", (req, res) => {
 
   res.type("text/plain").send(`User-agent: *
 Allow: /
+Disallow: /admin
 Disallow: /admin.html
 Disallow: /api/
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
 
 Sitemap: ${base}/sitemap.xml
 Sitemap: ${base}/news-sitemap.xml
