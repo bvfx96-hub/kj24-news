@@ -1936,6 +1936,7 @@ async function requireDatabase(req, res, next) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>Loading News | Khabri Junction</title>
   <link rel="stylesheet" href="/style.css">
 </head>
@@ -4619,13 +4620,17 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>${escapeHTML(article.metaTitle || article.title)}</title>
   <meta name="description" content="${escapeHTML(article.metaDescription || article.summary)}">
   <meta name="keywords" content="${escapeHTML(news.keywords || "")}">
   <link rel="canonical" href="${escapeHTML(url)}">
-  <link rel="alternate" hreflang="en" href="${escapeHTML(url)}?lang=en">
-  <link rel="alternate" hreflang="hi" href="${escapeHTML(url)}?lang=hi">
+  <link rel="alternate" hreflang="en-IN" href="${escapeHTML(url)}?lang=en">
+  <link rel="alternate" hreflang="hi-IN" href="${escapeHTML(url)}?lang=hi">
+  <link rel="alternate" hreflang="x-default" href="${escapeHTML(url)}">
   <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Khabri Junction">
+  <meta property="og:locale" content="${language === "hi" ? "hi_IN" : "en_IN"}">
   <meta property="og:title" content="${escapeHTML(article.ogTitle || article.title)}">
   <meta property="og:description" content="${escapeHTML(article.ogDescription || article.summary)}">
   <meta property="og:image" content="${escapeHTML(articleBanner)}">
@@ -4633,6 +4638,10 @@ function renderArticlePage(news, related, req, adjacent = {}, settings = {}) {
   <meta property="article:section" content="${escapeHTML(news.category || "News")}">
   <meta property="article:published_time" content="${new Date(news.publishedAt || news.createdAt).toISOString()}">
   <meta property="article:modified_time" content="${new Date(news.updatedAt || news.createdAt).toISOString()}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHTML(article.ogTitle || article.title)}">
+  <meta name="twitter:description" content="${escapeHTML(article.ogDescription || article.summary)}">
+  <meta name="twitter:image" content="${escapeHTML(articleBanner)}">
   <link rel="icon" href="/assets/logo-kj.png" type="image/png">
   <link rel="apple-touch-icon" href="/assets/logo-kj.png">
   <link rel="stylesheet" href="/style.css">
@@ -4721,6 +4730,7 @@ function renderSearchPage(results, query, req) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>${escapeHTML(title)}</title>
   <meta name="description" content="${escapeHTML(description)}">
   <link rel="canonical" href="${escapeHTML(publicBaseUrl(req))}/search?q=${encodeURIComponent(query || "")}&lang=${language}">
@@ -4850,6 +4860,7 @@ function renderCategoryLandingPage(route, articles, settings, req) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>${escapeHTML(title)}</title>
   <meta name="description" content="${escapeHTML(routeDescription)}">
   <link rel="canonical" href="${escapeHTML(canonical)}">
@@ -4968,6 +4979,7 @@ function renderWebStoriesIndex(news, req) {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>Khabri Junction Web Stories</title>
   <meta name="description" content="Mobile-first Web Stories from Khabri Junction.">
   <link rel="canonical" href="${publicBaseUrl(req)}/web-stories">
@@ -6465,6 +6477,7 @@ app.use((req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google" content="notranslate">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">
   <title>Page Not Found | Khabri Junction</title>
   <link rel="icon" href="/assets/logo-kj.png" type="image/png">
   <link rel="stylesheet" href="/style.css">
