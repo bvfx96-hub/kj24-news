@@ -1471,10 +1471,6 @@ async function loadSiteSettings() {
       markets.splice(0, markets.length, ...settings.market);
       updateMarkets();
     }
-
-    renderWeatherWidget(settings.weather || []);
-    realtimeWeatherFallback(settings.weather || []).then(renderWeatherWidget);
-    renderCricketScores(settings.cricket || []);
     renderAdminVideos(settings.videos || []);
     renderWebStoriesSegment();
     reorderHomepageSections();
